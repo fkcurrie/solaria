@@ -63,7 +63,7 @@ func main() {
 	flag.Parse()
 
 	log.Println("==========================================================")
-	log.Println("☀️  SOLARIA GO EDGE AGENT (Raspberry Pi & Linux)")
+	log.Println("SOLARIA GO EDGE AGENT (Raspberry Pi & Linux)")
 	log.Println("    1296 Wren Lake Drive, Dorset, Ontario, Canada")
 	log.Println("==========================================================")
 
@@ -140,7 +140,7 @@ func main() {
 			}
 
 			log.Printf(
-				"☀️ [%s] Solar: %dW (%.1fV) | Batt: %.1fV (%d%%) | Clouds: %d%% | Direct Rad: %.0f W/m²",
+				"[%s] Solar: %dW (%.1fV) | Batt: %.1fV (%d%%) | Clouds: %d%% | Direct Rad: %.0f W/m²",
 				sunCondition,
 				telemetry.PVPowerW,
 				telemetry.PVVoltageV,

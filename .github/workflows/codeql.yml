@@ -1,4 +1,4 @@
-name: "🛡️ CodeQL Advanced Security Analysis"
+name: "CodeQL Security Analysis"
 
 on:
   push:
@@ -20,18 +20,18 @@ jobs:
     timeout-minutes: 15
 
     steps:
-    - name: 📥 Checkout repository
+    - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: 🐹 Initialize CodeQL
+    - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
         languages: 'go'
 
-    - name: 🔨 Autobuild
+    - name: Autobuild
       uses: github/codeql-action/autobuild@v4
 
-    - name: 🔬 Perform CodeQL Analysis
+    - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
       with:
         category: "/language:go"

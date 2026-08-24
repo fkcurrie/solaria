@@ -1,16 +1,16 @@
-# ☀️ Project Solaria: Core Tenets & System Soul (SOUL.md)
+# Project Solaria: Core Tenets & System Soul (SOUL.md)
 
-> *"Solar power is not just voltage and current; it is a live conversation between the sun, the local atmosphere, the PV string topology, and the battery chemistry."*
+> "Solar power is not just voltage and current; it is a live conversation between the sun, the local atmosphere, the PV string topology, and the battery chemistry."
 
 ---
 
-## 🧭 The Core Mission
+## The Core Mission
 
 To build a resilient, highly accurate, edge-to-cloud solar monitoring and intelligence platform for off-grid and battery systems powered by Renogy charge controllers (BT-1/BT-2 RS232/RS485). The system continuously correlates actual photovoltaic energy harvest with localized atmospheric conditions at **1296 Wren Lake Drive, Dorset, Ontario, Canada (45.186° N, 78.863° W)** to provide actionable insights on solar performance, shading, cloud attenuation, and battery health, streaming real-time and historical analytics into **Google BigQuery** (`solaria-solar.solaria.telemetry`).
 
 ---
 
-## ⚡ Solar Array & Hardware Profile
+## Solar Array & Hardware Profile
 
 ### Photovoltaic Array Specifications
 
@@ -29,7 +29,7 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 
 ---
 
-## 🏛️ Guiding Architectural Tenets
+## Guiding Architectural Tenets
 
 ### 1. Edge-First Resilience (Never Drop a Watt-Hour)
 
@@ -62,7 +62,7 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 
 ---
 
-## 📍 Site Profile: Dorset, Ontario Installation
+## Site Profile: Dorset, Ontario Installation
 
 - **Location:** 1296 Wren Lake Drive, Dorset, Ontario, Canada
 - **Coordinates:** `45.186° N, 78.863° W` (Algonquin Highlands)

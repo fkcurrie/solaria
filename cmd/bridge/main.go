@@ -32,6 +32,7 @@ var (
 	arrayRatedWatts = 400.0
 	cloudEndpoint   = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
 	cloudToken      = "solaria_cottage_secret_token_2026"
+	storageMode     = "both" // "local", "bigquery" / "cloud", "both"
 
 	mu             sync.Mutex
 	rxBuffer       []byte
@@ -145,6 +146,9 @@ func loadEnv() {
 	}
 	if val := os.Getenv("SOLARIA_API_TOKEN"); val != "" {
 		cloudToken = val
+	}
+	if val := os.Getenv("STORAGE_MODE"); val != "" {
+		storageMode = strings.ToLower(val)
 	}
 }
 
@@ -469,7 +473,7 @@ var (
 )
 
 func uploadToCloud(record SolarRecord) {
-	if cloudEndpoint == "" {
+	if storageMode == "local" || cloudEndpoint == "" {
 		return
 	}
 	uploadMu.Lock()
@@ -556,8 +560,12 @@ func processFrame(frame []byte) {
 			SunClassification: sunState,
 		}
 
-		logToCSV(telem)
-		uploadToCloud(record)
+		if storageMode != "cloud" && storageMode != "bigquery" {
+			logToCSV(telem)
+		}
+		if storageMode != "local" {
+			uploadToCloud(record)
+		}
 
 		tempStr := "N/A"
 		if wx.TemperatureC != nil {
@@ -1006,7 +1014,7 @@ func main() {
 	loadEnv()
 
 	banner := `===========================================================================
-☀️  RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
+RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
 ===========================================================================
   • Site: %s (%.3f°N, %.3f°W)
   • Service UUID 0xFFD0 (Write Commands to FFD1)

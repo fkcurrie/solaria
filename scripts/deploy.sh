@@ -6,7 +6,7 @@ REGION="${2:-us-central1}"
 SERVICE_NAME="solaria-dashboard"
 
 echo "=========================================================="
-echo "☀️  Deploying Solaria Solar Dashboard to Cloud Run"
+echo "Deploying Solaria Solar Dashboard to Cloud Run"
 echo "    Project: $PROJECT_ID"
 echo "    Region:  $REGION"
 echo "    Service: $SERVICE_NAME"
@@ -26,5 +26,5 @@ gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars "GCP_PROJECT=$PROJECT_ID,SOLARIA_API_TOKEN=solaria_cottage_secret_token_2026"
 
 echo ""
-echo "✅ Solaria Cloud Run Service Deployed Successfully!"
+echo "[OK] Solaria Cloud Run Service Deployed Successfully!"
 gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format="value(status.url)"

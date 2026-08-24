@@ -1,4 +1,4 @@
-name: 📝 Documentation Linter & Link Checker
+name: Documentation Linter and Link Checker
 
 on:
   push:
@@ -24,13 +24,13 @@ permissions:
 
 jobs:
   markdown-lint:
-    name: 🔍 Markdown Style Linter
+    name: Markdown Style Linter
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: 🧹 Run markdownlint-cli2
+      - name: Run markdownlint-cli2
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           globs: |
@@ -38,13 +38,13 @@ jobs:
             !node_modules
 
   link-check:
-    name: 🔗 Broken Link Checker
+    name: Broken Link Checker
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: 🌐 Check Markdown Links
+      - name: Check Markdown Links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
           use-quiet-mode: 'yes'

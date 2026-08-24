@@ -60,7 +60,7 @@ func (u *Uploader) FlushPending() {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-		log.Printf("☁️ [Uploader] Synced %d record(s) to Cloud Run!", len(records))
+		log.Printf("[Uploader] Synced %d record(s) to Cloud Run", len(records))
 		_ = u.spooler.Clear()
 	} else {
 		log.Printf("[Uploader] Ingest rejected status %d", resp.StatusCode)
