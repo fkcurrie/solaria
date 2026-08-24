@@ -72,6 +72,40 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 - **Google Cloud BigQuery:** Telemetry is streamed directly into `solaria-solar.solaria.telemetry` with daily time-partitioning on `timestamp` and clustering on `site` and `sun_classification`.
 - **Google Cloud Run:** Go dashboard microservice providing real-time ring buffer streaming and analytical visualization.
 
+### 4. Distinct Two-Tier Dashboard Architecture
+
+Solaria enforces a strict architectural separation between the local edge hardware gateway and the central cloud analytics hub:
+
+```text
++-------------------------------------------------------------------------------+
+|                       SOLARIA TWO-TIER DASHBOARD TOPOLOGY                     |
++-----------------------------------+-------------------------------------------+
+| Localhost Edge Gateway            | Central Cloud Analytics Hub               |
+| (http://localhost:8080)           | (https://solaria-dashboard-*.run.app)     |
++-----------------------------------+-------------------------------------------+
+| • Sole Purpose: Hardware pairing  | • Sole Purpose: Comprehensive analytics,  |
+|   and link verification.          |   diagnostics, and cottage management.    |
+| • One-Click BLE Connect Button    | • Real-time & Historical Telemetry        |
+| • Bluetooth LE Status Card        | • Oscilloscope sliding window & CSV       |
+| • Cloud Uplink & Spool Status     | • Appliance Power Budget & Runtime        |
+| • Live Activity Console Log       | • Winterization & Departure Assistant     |
+| • Direct Cloud Dashboard Launcher | • Daily Sunset Digest & Morning Forecast  |
+|                                   | • Tree Shading Advisory Engine            |
+|                                   | • Commissioning Wizard & Topology Verifier|
+|                                   | • BT-1 Signal Strength Diagnostics        |
+|                                   | • BigQuery Provisioning Assistant         |
++-----------------------------------+-------------------------------------------+
+```
+
+1. **Local Edge Gateway (`http://localhost:8080` / `http://solaria.local:8080`):**
+   - **Target Audience:** Field installer or cottage owner standing near the battery box / charge controller.
+   - **Scope:** Intentionally minimalistic. It contains **only** the Web Bluetooth pairing button (*"⚡ Connect Renogy BT-1"*), BLE connectivity health, cloud uplink/spooling verification, and a live activity console log with a direct launcher button to the Cloud Hub.
+   - **Invariant:** It never duplicates the heavy solar analytical dashboards, charts, or planning assistants.
+
+2. **Central Cloud Analytics Hub (`https://solaria-dashboard-952659886764.us-central1.run.app/`):**
+   - **Target Audience:** Cottage owner, electrical engineer, or remote observer monitoring the installation from anywhere in the world.
+   - **Scope:** The complete intelligence suite housing all high-level solar analytics, historical BigQuery charts, real-time oscilloscope streaming, appliance power budgeting, tree shading advice, departure certificates, and hardware topology verification tools.
+
 ---
 
 ## Site Profile: Dorset, Ontario Installation
