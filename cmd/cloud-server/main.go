@@ -1630,6 +1630,42 @@ func handleNetworkDiscovery(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(info)
 }
 
+// GCPOnboardingInfo contains Google Cloud provisioning guidance and status
+type GCPOnboardingInfo struct {
+	Status           string   `json:"status"`
+	SetupScript      string   `json:"setup_script"`
+	OneClickShellURL string   `json:"one_click_shell_url"`
+	RequiredAPIs     []string `json:"required_apis"`
+	BigQueryDataset  string   `json:"bigquery_dataset"`
+	BigQueryTable    string   `json:"bigquery_table"`
+	Partitioning     string   `json:"partitioning"`
+	Clustering       string   `json:"clustering"`
+	Instructions     string   `json:"instructions"`
+}
+
+func handleGCPOnboarding(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	info := GCPOnboardingInfo{
+		Status:           "READY",
+		SetupScript:      "./setup-gcp.sh",
+		OneClickShellURL: "https://shell.cloud.google.com/?show=terminal",
+		RequiredAPIs: []string{
+			"bigquery.googleapis.com",
+			"run.googleapis.com",
+			"cloudbuild.googleapis.com",
+			"artifactregistry.googleapis.com",
+		},
+		BigQueryDataset: "solaria",
+		BigQueryTable:   "telemetry",
+		Partitioning:    "DAY (timestamp)",
+		Clustering:      "site_name, battery_soc",
+		Instructions:    "Run `./setup-gcp.sh` in Cloud Shell or terminal to automatically configure BigQuery datasets, partitioned telemetry tables, IAM roles, and Cloud Run.",
+	}
+	_ = json.NewEncoder(w).Encode(info)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1651,6 +1687,7 @@ func main() {
 	http.HandleFunc("/api/v1/array-topology", handleArrayTopology)
 	http.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)
 	http.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
+	http.HandleFunc("/api/v1/gcp-onboarding", handleGCPOnboarding)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
