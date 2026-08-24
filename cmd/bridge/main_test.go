@@ -282,6 +282,48 @@ func TestHandleNetworkDiscovery(t *testing.T) {
 	}
 }
 
+func TestDiskSpooler_Count(t *testing.T) {
+	tempDir := t.TempDir()
+	spooler := NewDiskSpooler(tempDir)
 
+	if count := spooler.Count(); count != 0 {
+		t.Fatalf("Expected empty spool count 0, got %d", count)
+	}
 
+	rec := SolarRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Site:      "Test Site",
+		Telemetry: Telemetry{PVPowerW: 250, BatterySOCPct: 90},
+	}
+	_ = spooler.Spool(rec)
+	_ = spooler.Spool(rec)
 
+	if count := spooler.Count(); count != 2 {
+		t.Fatalf("Expected spool count 2, got %d", count)
+	}
+}
+
+func TestHandleBridgeStatus(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/bridge-status", nil)
+	w := httptest.NewRecorder()
+	handleBridgeStatus(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to parse bridge status JSON: %v", err)
+	}
+
+	if resp["site"] == nil || resp["site"] == "" {
+		t.Errorf("Expected non-empty site name in status response")
+	}
+	if _, ok := resp["spool_count"]; !ok {
+		t.Errorf("Expected spool_count in response")
+	}
+	if _, ok := resp["total_successful_uploads"]; !ok {
+		t.Errorf("Expected total_successful_uploads in response")
+	}
+}
