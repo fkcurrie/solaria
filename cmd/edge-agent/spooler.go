@@ -27,9 +27,18 @@ func NewSpooler(filePath string) *Spooler {
 	return &Spooler{filePath: filePath}
 }
 
+// MaxSpoolBytes limits spool file size to 25MB to protect flash storage (SD cards)
+const MaxSpoolBytes int64 = 25 * 1024 * 1024
+
 func (s *Spooler) Append(record SolarRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Check file size before appending
+	if fi, err := os.Stat(s.filePath); err == nil && fi.Size() > MaxSpoolBytes {
+		// Log note or truncate older half if needed
+		_ = os.Truncate(s.filePath, MaxSpoolBytes/2)
+	}
 
 	f, err := os.OpenFile(s.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {

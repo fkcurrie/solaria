@@ -20,6 +20,27 @@
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
+    body.sunlight-mode {
+      --bg: #ffffff;
+      --card-bg: #f8fafc;
+      --card-border: #94a3b8;
+      --text: #020617;
+      --text-muted: #334155;
+      --primary: #0284c7;
+      --solar: #b45309;
+      --success: #047857;
+      --danger: #b91c1c;
+    }
+    body.sunlight-mode .card,
+    body.sunlight-mode .cloud-link-banner,
+    body.sunlight-mode .outage-monitor-card,
+    body.sunlight-mode .outage-mini-card,
+    body.sunlight-mode .outage-table-wrapper {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      border-color: #cbd5e1;
+      background: #f8fafc;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -30,6 +51,7 @@
       padding: 24px;
       max-width: 1100px;
       margin: 0 auto;
+      transition: background 0.2s ease, color 0.2s ease;
     }
 
     header {
@@ -353,7 +375,10 @@
         Local Modbus RTU Proxy ↔ Google Cloud Run & BigQuery Pipeline
       </p>
     </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <button id="sunlightToggle" onclick="toggleSunlightMode()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #f59e0b; color: #f59e0b;">
+        ☀️ Sunlight Mode
+      </button>
       <span id="wsBadge" class="badge badge-offline">Linux Bridge Offline</span>
       <span id="bleBadge" class="badge badge-offline">BLE Disconnected</span>
       <span id="wakeLockBadge" class="badge badge-online" style="display: none;">Keep-Alive Active</span>
@@ -454,6 +479,9 @@
       <button class="btn-danger" id="disconnectBtn" onclick="disconnectDevice()" disabled>
         ⏹️ Disconnect
       </button>
+      <button class="btn-outline" onclick="toggleBtGuide()" style="border-color: #38bdf8; color: #38bdf8;">
+        🛠️ BT-1 Setup Assistant
+      </button>
     </div>
 
     <div style="display: flex; gap: 12px; align-items: center;">
@@ -469,6 +497,36 @@
         <option value="30000">Poll 30s</option>
         <option value="60000">Poll 60s</option>
       </select>
+    </div>
+  </div>
+
+  <!-- BT-1 Guided Troubleshooting & Pairing Assistant Card -->
+  <div id="btGuideCard" class="card" style="display: none; margin-bottom: 24px; background: rgba(56, 189, 248, 0.05); border-color: rgba(56, 189, 248, 0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="font-size: 1rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+        📱 Renogy BT-1 Bluetooth Pairing & Field Diagnostic Guide
+      </h3>
+      <button onclick="toggleBtGuide()" style="background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer;">✕</button>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; font-size: 0.85rem;">
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <strong style="color: #f59e0b;">Step 1: Check BT-1 Power LED</strong>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
+          The green POWER LED on the BT-1 module must be solidly lit. If unlit, verify the RJ12 cable is firmly clicked into the controller's RS232 port.
+        </p>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <strong style="color: #38bdf8;">Step 2: Disconnect Renogy DC Home App</strong>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
+          Renogy BT-1 only accepts <strong>one simultaneous Bluetooth connection</strong>. Close the official Renogy phone app completely (force-stop) before pairing here.
+        </p>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <strong style="color: #10b981;">Step 3: Linux Daemon Watchdog</strong>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
+          The backend runs an autonomous supervisor that executes <code>bluetoothctl power on</code> and restarts <code>bluetooth.service</code> automatically if connection freezes.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -1609,6 +1667,35 @@
         startRenogySession(bleDevice);
       } else {
         tryAutoConnectSavedDevice();
+      }
+    }
+
+    function toggleBtGuide() {
+      const card = document.getElementById('btGuideCard');
+      if (card) {
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    function toggleSunlightMode() {
+      const isSun = document.body.classList.toggle('sunlight-mode');
+      localStorage.setItem('solaria_sunlight_mode', isSun ? '1' : '0');
+      const btn = document.getElementById('sunlightToggle');
+      if (btn) {
+        btn.innerHTML = isSun ? '🌙 Standard Mode' : '☀️ Sunlight Mode';
+        btn.style.background = isSun ? '#d97706' : 'transparent';
+        btn.style.color = isSun ? '#ffffff' : '#f59e0b';
+      }
+    }
+
+    // Restore sunlight preference
+    if (localStorage.getItem('solaria_sunlight_mode') === '1') {
+      document.body.classList.add('sunlight-mode');
+      const btn = document.getElementById('sunlightToggle');
+      if (btn) {
+        btn.innerHTML = '🌙 Standard Mode';
+        btn.style.background = '#d97706';
+        btn.style.color = '#ffffff';
       }
     }
 

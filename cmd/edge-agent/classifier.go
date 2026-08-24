@@ -22,7 +22,8 @@ func ClassifySunCondition(telem *Telemetry, weather WeatherMetrics, panelRatedWa
 		return ConditionNight
 	}
 
-	if telem.BatterySOCPct >= 99 && (telem.ChargingState == "Floating Charging" || telem.ChargingState == "Boost Charging") {
+	if (telem.BatterySOCPct >= 98 || telem.BatteryVoltageV >= 14.1) &&
+		(telem.ChargingState == "Floating Charging" || telem.ChargingState == "Boost Charging" || (telem.PVVoltageV >= 26.0 && telem.PVCurrentA < 1.0)) {
 		return ConditionAbsorptionFloat
 	}
 

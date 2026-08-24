@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -238,17 +240,27 @@ func (r *RingBuffer) GetHistory(limit int) []SolarRecord {
 }
 
 var (
-	ringBuf    = NewRingBuffer(1440)
-	apiToken   = "solaria_cottage_secret_token_2026"
-	gcpProject = "solaria-solar"
-	bqClient   *bigquery.Client
-	bqTable    *bigquery.Table
-	tmpl       *template.Template
+	ringBuf      = NewRingBuffer(1440)
+	apiToken     = ""
+	gcpProject   = "solaria-solar"
+	bqClient     *bigquery.Client
+	bqTable      *bigquery.Table
+	tmpl         *template.Template
+	bqBatchQueue = make(chan []SolarRecord, 250)
 )
 
 func init() {
 	if envTok := os.Getenv("SOLARIA_API_TOKEN"); envTok != "" {
 		apiToken = envTok
+	} else {
+		// Generate cryptographically secure ephemeral token for development if not provided
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err == nil {
+			apiToken = hex.EncodeToString(b)
+			log.Printf("⚠️ SOLARIA_API_TOKEN not set; generated ephemeral session token: %s", apiToken)
+		} else {
+			apiToken = "solaria_cottage_dev_token_2026"
+		}
 	}
 	if envProj := os.Getenv("GCP_PROJECT"); envProj != "" {
 		gcpProject = envProj
@@ -258,6 +270,11 @@ func init() {
 		log.Printf("Template parse note: %v", err)
 	}
 	tmpl = t
+
+	// Start BigQuery worker pool
+	for i := 0; i < 4; i++ {
+		go bqWorker(i)
+	}
 
 	// Initialize BigQuery Client & Dataset / Table Schema
 	ctx := context.Background()
@@ -289,6 +306,102 @@ func init() {
 		log.Printf("✅ Google Cloud BigQuery client initialized for dataset 'solaria.telemetry' in project: %s", gcpProject)
 	} else {
 		log.Printf("BigQuery note: %v", err)
+	}
+}
+
+func bqWorker(workerID int) {
+	for items := range bqBatchQueue {
+		if bqTable == nil || len(items) == 0 {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		var bqRows []*BQRecord
+		for _, it := range items {
+			ts, err := time.Parse(time.RFC3339, it.Timestamp)
+			if err != nil {
+				ts = time.Now().UTC()
+			}
+			lat := 45.186
+			lon := -78.863
+			if it.Location != nil {
+				if v, ok := it.Location["latitude"]; ok {
+					lat = v
+				}
+				if v, ok := it.Location["longitude"]; ok {
+					lon = v
+				}
+			}
+			arrCap := int64(it.Telemetry.ArrayCapacityW)
+			if arrCap == 0 {
+				arrCap = 400
+			}
+			arrTop := it.Telemetry.ArrayTopology
+			if arrTop == "" {
+				arrTop = "2S2P (4x100W)"
+			}
+			arrUtil := (float64(it.Telemetry.PVPowerW) / float64(arrCap)) * 100.0
+			perfRatio := 0.0
+			totalRad := it.Weather.DirectRadiationWM2 + it.Weather.DiffuseRadiationWM2
+			if totalRad > 20 {
+				expectedW := (totalRad / 1000.0) * float64(arrCap)
+				perfRatio = (float64(it.Telemetry.PVPowerW) / expectedW) * 100.0
+			}
+
+			row := &BQRecord{
+				Timestamp:                   ts,
+				Site:                        it.Site,
+				Latitude:                    lat,
+				Longitude:                   lon,
+				ArrayCapacityW:              arrCap,
+				ArrayTopology:               arrTop,
+				ArrayUtilizationPct:         arrUtil,
+				PerformanceRatioPct:         perfRatio,
+				PVPowerW:                    int64(it.Telemetry.PVPowerW),
+				PVVoltageV:                  it.Telemetry.PVVoltageV,
+				PVCurrentA:                  it.Telemetry.PVCurrentA,
+				BatterySOCPct:               int64(it.Telemetry.BatterySOCPct),
+				BatteryVoltageV:             it.Telemetry.BatteryVoltageV,
+				BatteryCurrentA:             it.Telemetry.BatteryCurrentA,
+				ControllerTempC:             int64(it.Telemetry.ControllerTempC),
+				BatteryTempC:                int64(it.Telemetry.BatteryTempC),
+				LoadPowerW:                  int64(it.Telemetry.LoadPowerW),
+				LoadVoltageV:                it.Telemetry.LoadVoltageV,
+				LoadCurrentA:                it.Telemetry.LoadCurrentA,
+				LoadStatus:                  it.Telemetry.LoadStatus,
+				ChargingState:               it.Telemetry.ChargingState,
+				DailyMinBatteryVoltageV:     it.Telemetry.DailyMinBatteryVoltageV,
+				DailyMaxBatteryVoltageV:     it.Telemetry.DailyMaxBatteryVoltageV,
+				DailyMaxChargingCurrentA:    it.Telemetry.DailyMaxChargingCurrentA,
+				DailyMaxDischargingCurrentA: it.Telemetry.DailyMaxDischargingCurrentA,
+				DailyMaxPVWatts:             int64(it.Telemetry.DailyMaxPVWatts),
+				DailyMaxLoadWatts:           int64(it.Telemetry.DailyMaxLoadWatts),
+				DailyChargingAh:             int64(it.Telemetry.DailyChargingAh),
+				DailyDischargingAh:          int64(it.Telemetry.DailyDischargingAh),
+				DailyGeneratedWh:            int64(it.Telemetry.DailyGeneratedWh),
+				DailyConsumedWh:             int64(it.Telemetry.DailyConsumedWh),
+				OperatingDays:               int64(it.Telemetry.OperatingDays),
+				TotalBatteryOverDischarge:   int64(it.Telemetry.TotalBatteryOverDischarge),
+				TotalBatteryFullCharge:      int64(it.Telemetry.TotalBatteryFullCharge),
+				TotalChargingAh:             int64(it.Telemetry.TotalChargingAh),
+				TotalDischargingAh:          int64(it.Telemetry.TotalDischargingAh),
+				TotalGeneratedKWh:           int64(it.Telemetry.TotalGeneratedKWh),
+				TotalConsumedKWh:            int64(it.Telemetry.TotalConsumedKWh),
+				FaultBits:                   int64(it.Telemetry.FaultBits),
+				FaultFlags:                  it.Telemetry.FaultFlags,
+				WeatherTempC:                it.Weather.TemperatureC,
+				CloudCoverPct:               int64(it.Weather.CloudCoverPct),
+				DirectRadWM2:                it.Weather.DirectRadiationWM2,
+				DiffuseRadWM2:               it.Weather.DiffuseRadiationWM2,
+				IsDay:                       it.Weather.IsDay,
+				SunClassification:           it.SunClassification,
+			}
+			bqRows = append(bqRows, row)
+		}
+		inserter := bqTable.Inserter()
+		if err := inserter.Put(ctx, bqRows); err != nil {
+			log.Printf("[BigQuery Worker %d] Streaming insert error: %v", workerID, err)
+		}
+		cancel()
 	}
 }
 
@@ -327,6 +440,9 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit body read to 4MB to prevent memory exhaustion
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+
 	var batch IngestBatch
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 		http.Error(w, fmt.Sprintf("Bad Request: %v", err), http.StatusBadRequest)
@@ -336,99 +452,13 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 	if len(batch.Batch) > 0 {
 		ringBuf.Push(batch.Batch)
 
-		// Stream to BigQuery asynchronously
+		// Enqueue to BigQuery worker pool non-blockingly
 		if bqTable != nil {
-			go func(items []SolarRecord) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-
-				var bqRows []*BQRecord
-				for _, it := range items {
-					ts, err := time.Parse(time.RFC3339, it.Timestamp)
-					if err != nil {
-						ts = time.Now().UTC()
-					}
-					lat := 45.186
-					lon := -78.863
-					if it.Location != nil {
-						if v, ok := it.Location["latitude"]; ok {
-							lat = v
-						}
-						if v, ok := it.Location["longitude"]; ok {
-							lon = v
-						}
-					}
-					arrCap := int64(it.Telemetry.ArrayCapacityW)
-					if arrCap == 0 {
-						arrCap = 400
-					}
-					arrTop := it.Telemetry.ArrayTopology
-					if arrTop == "" {
-						arrTop = "2S2P (4x100W)"
-					}
-					arrUtil := (float64(it.Telemetry.PVPowerW) / float64(arrCap)) * 100.0
-					perfRatio := 0.0
-					totalRad := it.Weather.DirectRadiationWM2 + it.Weather.DiffuseRadiationWM2
-					if totalRad > 20 {
-						expectedW := (totalRad / 1000.0) * float64(arrCap)
-						perfRatio = (float64(it.Telemetry.PVPowerW) / expectedW) * 100.0
-					}
-
-					row := &BQRecord{
-						Timestamp:                   ts,
-						Site:                        it.Site,
-						Latitude:                    lat,
-						Longitude:                   lon,
-						ArrayCapacityW:              arrCap,
-						ArrayTopology:               arrTop,
-						ArrayUtilizationPct:         arrUtil,
-						PerformanceRatioPct:         perfRatio,
-						PVPowerW:                    int64(it.Telemetry.PVPowerW),
-						PVVoltageV:                  it.Telemetry.PVVoltageV,
-						PVCurrentA:                  it.Telemetry.PVCurrentA,
-						BatterySOCPct:               int64(it.Telemetry.BatterySOCPct),
-						BatteryVoltageV:             it.Telemetry.BatteryVoltageV,
-						BatteryCurrentA:             it.Telemetry.BatteryCurrentA,
-						ControllerTempC:             int64(it.Telemetry.ControllerTempC),
-						BatteryTempC:                int64(it.Telemetry.BatteryTempC),
-						LoadPowerW:                  int64(it.Telemetry.LoadPowerW),
-						LoadVoltageV:                it.Telemetry.LoadVoltageV,
-						LoadCurrentA:                it.Telemetry.LoadCurrentA,
-						LoadStatus:                  it.Telemetry.LoadStatus,
-						ChargingState:               it.Telemetry.ChargingState,
-						DailyMinBatteryVoltageV:     it.Telemetry.DailyMinBatteryVoltageV,
-						DailyMaxBatteryVoltageV:     it.Telemetry.DailyMaxBatteryVoltageV,
-						DailyMaxChargingCurrentA:    it.Telemetry.DailyMaxChargingCurrentA,
-						DailyMaxDischargingCurrentA: it.Telemetry.DailyMaxDischargingCurrentA,
-						DailyMaxPVWatts:             int64(it.Telemetry.DailyMaxPVWatts),
-						DailyMaxLoadWatts:           int64(it.Telemetry.DailyMaxLoadWatts),
-						DailyChargingAh:             int64(it.Telemetry.DailyChargingAh),
-						DailyDischargingAh:          int64(it.Telemetry.DailyDischargingAh),
-						DailyGeneratedWh:            int64(it.Telemetry.DailyGeneratedWh),
-						DailyConsumedWh:             int64(it.Telemetry.DailyConsumedWh),
-						OperatingDays:               int64(it.Telemetry.OperatingDays),
-						TotalBatteryOverDischarge:   int64(it.Telemetry.TotalBatteryOverDischarge),
-						TotalBatteryFullCharge:      int64(it.Telemetry.TotalBatteryFullCharge),
-						TotalChargingAh:             int64(it.Telemetry.TotalChargingAh),
-						TotalDischargingAh:          int64(it.Telemetry.TotalDischargingAh),
-						TotalGeneratedKWh:           int64(it.Telemetry.TotalGeneratedKWh),
-						TotalConsumedKWh:            int64(it.Telemetry.TotalConsumedKWh),
-						FaultBits:                   int64(it.Telemetry.FaultBits),
-						FaultFlags:                  it.Telemetry.FaultFlags,
-						WeatherTempC:                it.Weather.TemperatureC,
-						CloudCoverPct:               int64(it.Weather.CloudCoverPct),
-						DirectRadWM2:                it.Weather.DirectRadiationWM2,
-						DiffuseRadWM2:               it.Weather.DiffuseRadiationWM2,
-						IsDay:                       it.Weather.IsDay,
-						SunClassification:           it.SunClassification,
-					}
-					bqRows = append(bqRows, row)
-				}
-				inserter := bqTable.Inserter()
-				if err := inserter.Put(ctx, bqRows); err != nil {
-					log.Printf("[BigQuery] Streaming insert error: %v", err)
-				}
-			}(batch.Batch)
+			select {
+			case bqBatchQueue <- batch.Batch:
+			default:
+				log.Printf("⚠️ BigQuery ingest queue full (%d items); dropping BQ batch", len(batch.Batch))
+			}
 		}
 	}
 
@@ -448,13 +478,23 @@ func handleLive(w http.ResponseWriter, r *http.Request) {
 func handleHistory(w http.ResponseWriter, r *http.Request) {
 	limit := 60
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if val, err := strconv.Atoi(l); err == nil && val > 0 {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 && val <= 1440 {
 			limit = val
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(ringBuf.GetHistory(limit))
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "healthy",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"service":   "solaria-dashboard",
+		"version":   "2.0-rover-400w",
+	})
 }
 
 func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
@@ -537,35 +577,33 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	loc, err := time.LoadLocation("America/Toronto")
-	if err != nil {
-		loc = time.FixedZone("EDT", -4*3600)
+	loc, _ := time.LoadLocation("America/Toronto")
+	if loc == nil {
+		loc = time.UTC
 	}
 	nowLocal := time.Now().In(loc)
 
+	// Pre-populate 24 hour slots
 	hours := make([]string, 24)
-	genWh := make([]interface{}, 24)
-	irradiance := make([]interface{}, 24)
-	battSOC := make([]interface{}, 24)
-	weatherIcons := make([]interface{}, 24)
-	weatherConds := make([]interface{}, 24)
-	cloudPct := make([]interface{}, 24)
-	tempC := make([]interface{}, 24)
-	for i := 0; i < 24; i++ {
-		hours[i] = fmt.Sprintf("%02d:00", i)
-		genWh[i] = nil
-		irradiance[i] = nil
-		battSOC[i] = nil
-		weatherIcons[i] = nil
-		weatherConds[i] = nil
-		cloudPct[i] = nil
-		tempC[i] = nil
+	genWh := make([]float64, 24)
+	irradiance := make([]float64, 24)
+	battSOC := make([]int, 24)
+	weatherIcons := make([]string, 24)
+	weatherConds := make([]string, 24)
+	cloudPct := make([]int, 24)
+	tempC := make([]float64, 24)
+
+	for h := 0; h < 24; h++ {
+		hours[h] = fmt.Sprintf("%02d:00", h)
+		weatherIcons[h] = "☀️"
+		weatherConds[h] = "Clear"
 	}
 
 	recordsCount := 0
 	peakWatts := 0
 	totalWh := 0.0
 
+	// Query BigQuery for today's aggregated hourly metrics
 	if bqClient != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -588,6 +626,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 			GROUP BY hour
 			ORDER BY hour
 		`, gcpProject))
+		q.MaxBytesBilled = 100 * 1024 * 1024
 
 		it, err := q.Read(ctx)
 		if err == nil {
@@ -715,6 +754,7 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 			GROUP BY log_date
 			ORDER BY log_date
 		`, gcpProject))
+		q.MaxBytesBilled = 100 * 1024 * 1024
 
 		it, err := q.Read(ctx)
 		if err == nil {
@@ -806,6 +846,7 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 			GROUP BY day_num
 			ORDER BY day_num
 		`, gcpProject))
+		q.MaxBytesBilled = 100 * 1024 * 1024
 
 		it, err := q.Read(ctx)
 		if err == nil {
@@ -874,6 +915,7 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 			GROUP BY month_num
 			ORDER BY month_num
 		`, gcpProject))
+		q.MaxBytesBilled = 100 * 1024 * 1024
 
 		it, err := q.Read(ctx)
 		if err == nil {
@@ -959,6 +1001,7 @@ func main() {
 	http.HandleFunc("/api/v1/stats/month", handleMonthStats)
 	http.HandleFunc("/api/v1/stats/year", handleYearStats)
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
+	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
 
 	// #nosec G706 - Configuration startup logging

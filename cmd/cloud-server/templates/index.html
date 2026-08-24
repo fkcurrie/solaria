@@ -18,6 +18,32 @@
       --purple: #a855f7;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
+    body.sunlight-mode {
+      --bg: #ffffff;
+      --card-bg: #f8fafc;
+      --card-border: #94a3b8;
+      --text: #020617;
+      --text-muted: #334155;
+      --solar: #b45309;
+      --battery: #047857;
+      --sky: #0369a1;
+      --purple: #6b21a8;
+    }
+    body.sunlight-mode .card,
+    body.sunlight-mode .site-banner,
+    body.sunlight-mode .table-card {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      border-color: #cbd5e1;
+    }
+    body.sunlight-mode .nav-tab-btn {
+      background: #f1f5f9;
+      color: #334155;
+      border-color: #cbd5e1;
+    }
+    body.sunlight-mode .nav-tab-btn.active {
+      background: #d97706;
+      color: #ffffff;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
@@ -26,6 +52,7 @@
       padding: 24px;
       max-width: 1500px;
       margin: 0 auto;
+      transition: background 0.2s ease, color 0.2s ease;
     }
     header {
       display: flex;
@@ -278,6 +305,9 @@
       </p>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <button id="sunlightToggle" onclick="toggleSunlightMode()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;">
+        ☀️ Sunlight Mode
+      </button>
       <span id="arrayBadge" class="badge badge-array">⚡ 400W (2S2P)</span>
       <span id="faultBadge" class="badge badge-ok">HEALTHY</span>
       <span id="sunConditionBadge" class="badge badge-night">🌙 Initializing...</span>
@@ -422,6 +452,34 @@
   <!-- TAB 2: DAY VIEW (HOURLY BREAKDOWN) -->
   <div id="tab-day" class="tab-content">
     <div id="dayStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+
+    <!-- Daily Dusk Generation & Battery Health Digest Card -->
+    <div id="dailyDigestCard" class="card" style="margin-bottom: 20px; background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 2rem;">🌅</span>
+          <div>
+            <h3 style="font-size: 1.05rem; color: #f59e0b; margin-bottom: 2px;">Daily Dusk Solar & Battery Digest</h3>
+            <p id="digestSubtitle" style="font-size: 0.8rem; color: var(--text-muted);">Summary of today's solar harvest and storage autonomy for 1296 Wren Lake Drive.</p>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Harvest</div>
+            <div id="digestYield" style="font-size: 1.2rem; font-weight: 800; color: #f59e0b; font-family: var(--mono);">-- Wh</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Peak Power</div>
+            <div id="digestPeak" style="font-size: 1.2rem; font-weight: 800; color: #38bdf8; font-family: var(--mono);">-- W</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Battery Status</div>
+            <div id="digestBattStatus" style="font-size: 1.2rem; font-weight: 800; color: #10b981; font-family: var(--mono);">100% Float Reached</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 24-Hour Weather Progression Timeline Ribbon -->
     <div id="dayWeatherStrip" class="weather-timeline" style="display: none;"></div>
     <div class="charts-grid">
@@ -910,6 +968,13 @@
         if (banner && data.status_message) {
           banner.style.display = 'flex';
           banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">DAY TELEMETRY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Date: ${data.date}</div>`;
+        }
+
+        if (document.getElementById('digestYield')) {
+          document.getElementById('digestYield').innerText = `${data.total_yield_wh || 0} Wh`;
+          document.getElementById('digestPeak').innerText = `${data.peak_watts || 0} W`;
+          const maxSoc = Math.max(...(data.battery_soc_pct || [0]));
+          document.getElementById('digestBattStatus').innerText = maxSoc >= 98 ? `Float Achieved (${maxSoc}%)` : `Peak SOC ${maxSoc}%`;
         }
 
         const strip = document.getElementById('dayWeatherStrip');
@@ -1531,6 +1596,28 @@
     setInterval(() => {
       document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
     }, 1000);
+
+    function toggleSunlightMode() {
+      const isSun = document.body.classList.toggle('sunlight-mode');
+      localStorage.setItem('solaria_sunlight_mode', isSun ? '1' : '0');
+      const btn = document.getElementById('sunlightToggle');
+      if (btn) {
+        btn.innerHTML = isSun ? '🌙 Standard Mode' : '☀️ Sunlight Mode';
+        btn.style.background = isSun ? '#d97706' : 'rgba(245, 158, 11, 0.1)';
+        btn.style.color = isSun ? '#ffffff' : '#f59e0b';
+      }
+    }
+
+    // Restore preference
+    if (localStorage.getItem('solaria_sunlight_mode') === '1') {
+      document.body.classList.add('sunlight-mode');
+      const btn = document.getElementById('sunlightToggle');
+      if (btn) {
+        btn.innerHTML = '🌙 Standard Mode';
+        btn.style.background = '#d97706';
+        btn.style.color = '#ffffff';
+      }
+    }
 
     window.addEventListener('load', () => {
       initLiveCharts();
