@@ -72,8 +72,6 @@ yarn-error.log*
 *~
 
 # Local Development Files & Scripts (Excluded from Public Repo)
-SOUL.md
-docs/SOUL.md
 deploy/deploy.sh
 deploy/config.yaml
 scripts/
