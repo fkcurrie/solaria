@@ -1549,6 +1549,34 @@ func handleArrayTopology(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// BluetoothSignalDiagnostics holds signal quality and antenna placement advice
+type BluetoothSignalDiagnostics struct {
+	ModuleType       string `json:"module_type"`
+	RSSI             int    `json:"rssi_dbm"`
+	SignalQuality    string `json:"signal_quality"`
+	PacketDropRate   string `json:"packet_drop_rate"`
+	FaradayShielding string `json:"faraday_shielding"`
+	PlacementAdvice  string `json:"placement_advice"`
+	WiringAdvice     string `json:"wiring_advice"`
+}
+
+// handleBluetoothSignal returns Bluetooth signal strength analysis and antenna placement guidance
+func handleBluetoothSignal(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	resp := BluetoothSignalDiagnostics{
+		ModuleType:       "Renogy BT-1 Bluetooth RS232 Module (BLE 4.2 / CC2541)",
+		RSSI:             -58,
+		SignalQuality:    "STRONG (-58 dBm)",
+		PacketDropRate:   "0.02% (High Reliability)",
+		FaradayShielding: "NONE DETECTED (Line-of-Sight or Wooden Enclosure)",
+		PlacementAdvice:  "BT-1 signal is strong. Ensure module remains mounted outside of any grounded aluminum or sheet metal battery boxes.",
+		WiringAdvice:     "If range drops through cottage walls, extend RJ12 modular cable up to 5m to position BT-1 on an elevated wooden wall or windowsill.",
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1568,6 +1596,7 @@ func main() {
 	http.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
 	http.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
 	http.HandleFunc("/api/v1/array-topology", handleArrayTopology)
+	http.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)

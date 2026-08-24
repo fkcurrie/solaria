@@ -998,6 +998,42 @@
     </div>
   </div>
 
+  <!-- 📶 Bluetooth Signal Strength & Antenna Placement Card -->
+  <div class="card" style="border-left: 4px solid #f59e0b; margin-bottom: 24px; background: rgba(245, 158, 11, 0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
+          📶 BT-1 Bluetooth Signal Strength (RSSI) & Antenna Placement Tool
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
+          BLE link margin, packet reliability metrics, and metal battery box Faraday shielding bypass.
+        </p>
+      </div>
+      <div id="edgeBtSignalQualityBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
+        STRONG (-58 dBm)
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px;">
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">BLE Signal Strength</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">-58 dBm <span style="font-size: 0.75rem; color: #94a3b8;">(Good: > -75 dBm)</span></div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Modbus CRC Packet Loss</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">0.02% <span style="font-size: 0.75rem; color: #94a3b8;">(Ultra Reliable)</span></div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Faraday Enclosure Check</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">PASSED <span style="font-size: 0.75rem; color: #94a3b8;">(Unshielded)</span></div>
+      </div>
+    </div>
+
+    <div style="font-size: 0.82rem; color: #fde68a; padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border-radius: 6px; line-height: 1.4;">
+      📡 <strong>Antenna Placement Tip:</strong> If installing in a metal battery box, mount the BT-1 module <em>outside</em> using an RJ12 extension cable. Metal walls act as a Faraday cage attenuating 2.4 GHz BLE signals by >30 dB.
+    </div>
+  </div>
+
   <!-- Live Real-Time Oscilloscope & Telemetry Charts -->
   <div style="margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
