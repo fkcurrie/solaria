@@ -551,6 +551,16 @@
         tryAutoConnectSavedDevice();
       };
 
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'watchdog_reconnect') {
+            log(`🔄 [Supervisor Watchdog] Telemetry quiet for ${msg.seconds_since_last_packet}s. Triggering automatic GATT re-sync...`, 'warn');
+            reconnectGattSession();
+          }
+        } catch (e) {}
+      };
+
       ws.onclose = () => {
         const badge = document.getElementById('wsBadge');
         badge.className = 'badge badge-offline';
@@ -975,18 +985,57 @@
       }
     }
 
+    async function reconnectGattSession() {
+      if (isConnectingGatt) return;
+      log('🔄 Re-syncing GATT connection with Renogy controller...', 'warn');
+      if (pollTimer) clearInterval(pollTimer);
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+        try {
+          bleDevice.gatt.disconnect();
+        } catch (e) {}
+      }
+      isConnectingGatt = false;
+      await new Promise(r => setTimeout(r, 1000));
+      if (bleDevice) {
+        startRenogySession(bleDevice);
+      } else {
+        tryAutoConnectSavedDevice();
+      }
+    }
+
     // Immediate auto-connect on page boot
     document.addEventListener('DOMContentLoaded', () => {
       connectWebSocket();
       tryAutoConnectSavedDevice();
     });
 
-    window.addEventListener('load', () => {
-      tryAutoConnectSavedDevice();
-      // Watchdog: ensures connection is maintained if tab was in background
-      setInterval(() => {
+    // Screen WakeLock & Page Visibility Re-engagement
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        requestWakeLock();
         if (autoReconnectEnabled && (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected)) {
           tryAutoConnectSavedDevice();
+        }
+      }
+    });
+
+    window.addEventListener('load', () => {
+      tryAutoConnectSavedDevice();
+      // Watchdog: ensures connection is maintained and un-wedged automatically
+      setInterval(() => {
+        if (!autoReconnectEnabled) return;
+        
+        // If not connected, attempt auto-connect
+        if (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected) {
+          tryAutoConnectSavedDevice();
+          return;
+        }
+
+        // If connected but no packets received in > 35 seconds, trigger reconnection
+        const now = Date.now();
+        if (lastTelemetryProcessTime > 0 && (now - lastTelemetryProcessTime) > 35000 && !isConnectingGatt) {
+          log(`⚠️ Telemetry stream stalled (${Math.round((now - lastTelemetryProcessTime)/1000)}s silent). Restarting GATT session...`, 'warn');
+          reconnectGattSession();
         }
       }, 5000);
     });

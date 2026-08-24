@@ -583,15 +583,121 @@ func processFrame(frame []byte) {
 			telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
 }
 
+var (
+	clientsMu       sync.Mutex
+	activeClients   = make(map[*websocket.Conn]string)
+	lastFrameTime   = time.Now()
+	lastHealthCheck time.Time
+)
+
+func broadcastControlMsg(msg map[string]interface{}) {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	for conn := range activeClients {
+		_ = conn.WriteMessage(websocket.TextMessage, data)
+	}
+}
+
+func checkAndHealBluetoothSubsystem() {
+	now := time.Now()
+	if time.Since(lastHealthCheck) < 20*time.Second {
+		return
+	}
+	lastHealthCheck = now
+
+	// 1. Check systemctl status for bluetooth daemon
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "systemctl", "is-active", "bluetooth")
+	out, err := cmd.Output()
+	status := strings.TrimSpace(string(out))
+
+	if err != nil || status != "active" {
+		fmt.Printf("\n[\033[1;31mWATCHDOG ALERT\033[0m] Bluetooth daemon is %s. Attempting auto-recovery...\n", status)
+		// Attempt restart
+		restartCmd := exec.Command("sudo", "systemctl", "restart", "bluetooth")
+		if rErr := restartCmd.Run(); rErr != nil {
+			// Try non-sudo systemctl start if sudo not configured
+			_ = exec.Command("systemctl", "start", "bluetooth").Run()
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// 2. Ensure bluetooth power is ON
+	_ = exec.Command("bluetoothctl", "power", "on").Run()
+}
+
+func startBluetoothWatchdog(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous 15s Bluetooth & Telemetry Watchdog active.\n")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			frameMu.Lock()
+			elapsed := time.Since(lastFrameTime)
+			frameMu.Unlock()
+
+			clientsMu.Lock()
+			clientCount := len(activeClients)
+			clientsMu.Unlock()
+
+			// Check stream freshness
+			if elapsed > 30*time.Second {
+				fmt.Printf("[\033[1;33mWATCHDOG\033[0m] Telemetry silent for %.0fs (Clients connected: %d). Verifying host BLE health...\n",
+					elapsed.Seconds(), clientCount)
+
+				// Self-heal Linux bluetooth subsystem
+				checkAndHealBluetoothSubsystem()
+
+				if clientCount > 0 {
+					// Instruct browser client to force-reconnect GATT session
+					broadcastControlMsg(map[string]interface{}{
+						"type":                       "watchdog_reconnect",
+						"reason":                     "stalled_telemetry",
+						"seconds_since_last_packet": int(elapsed.Seconds()),
+					})
+				} else {
+					fmt.Printf("[\033[1;31mWATCHDOG\033[0m] No browser WebSocket connected to ws://localhost:%d. Open http://localhost:%d in Chrome.\n", wsPort, httpPort)
+				}
+			} else {
+				// Send lightweight heartbeat ping to keep sockets active
+				broadcastControlMsg(map[string]interface{}{
+					"type":      "ping",
+					"timestamp": time.Now().UTC().Format(time.RFC3339),
+				})
+			}
+		}
+	}
+}
+
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		clientsMu.Lock()
+		delete(activeClients, conn)
+		clientsMu.Unlock()
+		conn.Close()
+	}()
 
 	clientAddr := conn.RemoteAddr().String()
-	fmt.Printf("[\033[92mWS\033[0m] Browser connected: %s\n", clientAddr)
+	clientsMu.Lock()
+	activeClients[conn] = clientAddr
+	clientsMu.Unlock()
+
+	fmt.Printf("[\033[92mWS\033[0m] Browser connected: %s (Active clients: %d)\n", clientAddr, len(activeClients))
 
 	var localRx []byte
 
@@ -641,6 +747,9 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 					// Verify CRC16
 					crcl, crch := calcCRC16(frame[:len(frame)-2])
 					if frame[len(frame)-2] == crcl && frame[len(frame)-1] == crch {
+						frameMu.Lock()
+						lastFrameTime = time.Now()
+						frameMu.Unlock()
 						processFrame(frame)
 					}
 				}
@@ -702,12 +811,18 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 		}
 	}()
 
+	// 3. Start Autonomous Bluetooth & Telemetry Watchdog Supervisor
+	watchdogCtx, watchdogCancel := context.WithCancel(context.Background())
+	defer watchdogCancel()
+	go startBluetoothWatchdog(watchdogCtx)
+
 	// Wait for terminate signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
 	fmt.Println("\nShutting down Solaria Golang Gateway...")
+	watchdogCancel()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_ = server.Shutdown(ctx)
