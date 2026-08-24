@@ -1369,6 +1369,136 @@ func handleSunsetDigest(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// CalculateSunTimes computes precise astronomical sunrise and sunset for a given location and time.
+func CalculateSunTimes(t time.Time, lat, lon float64) (sunrise, sunset, solarNoon time.Time, isDay bool) {
+	loc := t.Location()
+	year, month, day := t.Date()
+	midnight := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	dayOfYear := t.YearDay()
+
+	// Fractional year (radians)
+	gamma := (2 * math.Pi / 365.0) * float64(dayOfYear-1)
+
+	// Equation of time (minutes)
+	eqtime := 229.18 * (0.000075 + 0.001868*math.Cos(gamma) - 0.032077*math.Sin(gamma) -
+		0.014615*math.Cos(2*gamma) - 0.040849*math.Sin(2*gamma))
+
+	// Solar declination (radians)
+	decl := 0.006918 - 0.399912*math.Cos(gamma) + 0.070257*math.Sin(gamma) -
+		0.006758*math.Cos(2*gamma) + 0.000907*math.Sin(2*gamma) -
+		0.002697*math.Cos(3*gamma) + 0.00148*math.Sin(3*gamma)
+
+	latRad := lat * math.Pi / 180.0
+	zenithRad := 90.833 * math.Pi / 180.0 // standard atmospheric refraction + solar disk
+
+	cosHA := (math.Cos(zenithRad) - math.Sin(latRad)*math.Sin(decl)) / (math.Cos(latRad) * math.Cos(decl))
+	if cosHA > 1.0 {
+		return time.Time{}, time.Time{}, time.Time{}, false
+	}
+	if cosHA < -1.0 {
+		return time.Time{}, time.Time{}, time.Time{}, true
+	}
+
+	haRad := math.Acos(cosHA)
+	haDeg := haRad * 180.0 / math.Pi
+
+	// Solar noon in UTC minutes from midnight
+	solarNoonUTCMin := 720.0 - 4.0*lon - eqtime
+	sunriseUTCMin := solarNoonUTCMin - 4.0*haDeg
+	sunsetUTCMin := solarNoonUTCMin + 4.0*haDeg
+
+	sunriseUTC := midnight.Add(time.Duration(sunriseUTCMin * float64(time.Minute)))
+	sunsetUTC := midnight.Add(time.Duration(sunsetUTCMin * float64(time.Minute)))
+	solarNoonUTC := midnight.Add(time.Duration(solarNoonUTCMin * float64(time.Minute)))
+
+	sunrise = sunriseUTC.In(loc)
+	sunset = sunsetUTC.In(loc)
+	solarNoon = solarNoonUTC.In(loc)
+
+	isDay = t.After(sunrise) && t.Before(sunset)
+	return sunrise, sunset, solarNoon, isDay
+}
+
+func formatDurationCountdown(d time.Duration) string {
+	if d <= 0 {
+		return "Now"
+	}
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
+}
+
+func handleSunTimes(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	loc, err := time.LoadLocation("America/Toronto")
+	if err != nil {
+		loc = time.FixedZone("EDT", -4*3600)
+	}
+
+	now := time.Now().In(loc)
+	lat := 45.2536
+	lon := -78.8978
+
+	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(now, lat, lon)
+
+	tomorrow := now.AddDate(0, 0, 1)
+	nextSunrise, nextSunset, _, _ := CalculateSunTimes(tomorrow, lat, lon)
+
+	var nextEvent string
+	var nextEventTime time.Time
+	var secondsRemaining int64
+
+	if isDay {
+		nextEvent = "sunset"
+		nextEventTime = sunset
+		secondsRemaining = int64(sunset.Sub(now).Seconds())
+	} else {
+		nextEvent = "sunrise"
+		if now.Before(sunrise) {
+			nextEventTime = sunrise
+			secondsRemaining = int64(sunrise.Sub(now).Seconds())
+		} else {
+			nextEventTime = nextSunrise
+			secondsRemaining = int64(nextSunrise.Sub(now).Seconds())
+		}
+	}
+
+	if secondsRemaining < 0 {
+		secondsRemaining = 0
+	}
+
+	resp := map[string]interface{}{
+		"site":               "1296 Wren Lake Drive, Dorset, ON",
+		"latitude":           lat,
+		"longitude":          lon,
+		"timezone":           "America/Toronto",
+		"current_time":       now.Format(time.RFC3339),
+		"current_time_text":  now.Format("03:04:05 PM"),
+		"is_day":             isDay,
+		"today_sunrise":      sunrise.Format(time.RFC3339),
+		"today_sunset":       sunset.Format(time.RFC3339),
+		"today_solar_noon":   solarNoon.Format(time.RFC3339),
+		"today_sunrise_text": sunrise.Format("03:04 PM"),
+		"today_sunset_text":  sunset.Format("03:04 PM"),
+		"tomorrow_sunrise":   nextSunrise.Format(time.RFC3339),
+		"tomorrow_sunset":    nextSunset.Format(time.RFC3339),
+		"next_event":         nextEvent,
+		"next_event_time":    nextEventTime.Format(time.RFC3339),
+		"seconds_remaining":  secondsRemaining,
+		"countdown_text":     formatDurationCountdown(time.Duration(secondsRemaining) * time.Second),
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 // ShadingPattern represents a detected diurnal shading anomaly
 type ShadingPattern struct {
 	TimeWindow      string `json:"time_window"`
@@ -1682,6 +1812,7 @@ func main() {
 	http.HandleFunc("/api/v1/power-budget", handlePowerBudget)
 	http.HandleFunc("/api/v1/winterize-status", handleWinterizeStatus)
 	http.HandleFunc("/api/v1/sunset-digest", handleSunsetDigest)
+	http.HandleFunc("/api/v1/sun-times", handleSunTimes)
 	http.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
 	http.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
 	http.HandleFunc("/api/v1/array-topology", handleArrayTopology)
