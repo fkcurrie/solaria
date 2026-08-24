@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/csv"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -1213,23 +1215,159 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func buildMockRTUFrame(pvWatts int, pvV float64, battV float64, battA float64, soc int, ctrlTemp int, battTemp int) []byte {
+	raw := make([]byte, 73)
+	raw[0] = 0xFF
+	raw[1] = 0x03
+	raw[2] = 0x44 // 68 bytes payload
+
+	data := raw[3:71]
+
+	// 0x0100: SOC
+	binary.BigEndian.PutUint16(data[0:2], uint16(soc))
+	// 0x0101: Battery Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[2:4], uint16(battV*10))
+	// 0x0102: Charging Current (0.01A)
+	if battA > 0 {
+		binary.BigEndian.PutUint16(data[4:6], uint16(battA*100))
+	} else {
+		binary.BigEndian.PutUint16(data[4:6], 0)
+	}
+	// 0x0103: Controller Temp & Battery Temp
+	data[6] = byte(int8(ctrlTemp))
+	data[7] = byte(int8(battTemp))
+
+	// 0x0104: Load Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[8:10], uint16(battV*10))
+	// 0x0105: Load Current (0.01A)
+	loadW := 15
+	if battA < 0 {
+		loadW = int(-battA * battV)
+	}
+	loadA := float64(loadW) / battV
+	binary.BigEndian.PutUint16(data[10:12], uint16(loadA*100))
+	// 0x0106: Load Power
+	binary.BigEndian.PutUint16(data[12:14], uint16(loadW))
+
+	// 0x0107: PV Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[14:16], uint16(pvV*10))
+	// 0x0108: PV Current (0.01A)
+	var pvA float64
+	if pvV > 0 {
+		pvA = float64(pvWatts) / pvV
+	}
+	binary.BigEndian.PutUint16(data[16:18], uint16(pvA*100))
+	// 0x0109: PV Power
+	binary.BigEndian.PutUint16(data[18:20], uint16(pvWatts))
+
+	// 0x010B: Daily Min Battery Voltage (12.8V)
+	binary.BigEndian.PutUint16(data[22:24], 128)
+	// 0x010C: Daily Max Battery Voltage (14.2V)
+	binary.BigEndian.PutUint16(data[24:26], 142)
+	// 0x010D: Daily Max Charging Current (20.0A)
+	binary.BigEndian.PutUint16(data[26:28], 2000)
+	// 0x010F: Daily Max PV Power (385W)
+	binary.BigEndian.PutUint16(data[30:32], 385)
+	// 0x0113: Daily Generated Wh (1450 Wh)
+	binary.BigEndian.PutUint16(data[38:40], 1450)
+	// 0x0114: Daily Consumed Wh (380 Wh)
+	binary.BigEndian.PutUint16(data[40:42], 380)
+	// 0x0115: Operating Days (128)
+	binary.BigEndian.PutUint16(data[42:44], 128)
+	// 0x011C: Total Generated kWh (412 kWh)
+	binary.BigEndian.PutUint32(data[56:60], 412)
+
+	// 0x0120: Charging State
+	chgCode := byte(0x02) // MPPT
+	if pvWatts < 5 {
+		chgCode = 0x00 // Deactivated
+	} else if battV >= 14.1 {
+		chgCode = 0x04 // Boost/Absorption
+	}
+	data[67] = chgCode
+
+	// Modbus CRC-16
+	crcLow, crcHigh := calcCRC16(raw[:71])
+	raw[71] = crcLow
+	raw[72] = crcHigh
+
+	return raw
+}
+
+func startMockSimulator(ctx context.Context) {
+	fmt.Println("\n[\033[1;36mMOCK SIMULATOR\033[0m] Initializing offline Renogy Rover 400W 2S2P simulation engine...")
+	fmt.Println("[\033[1;36mMOCK SIMULATOR\033[0m] Generating live Modbus RTU telemetry frames (2s interval). No BT-1 required.")
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	type SimItem struct {
+		PVPowerW        int     `json:"pv_power_w"`
+		PVVoltageV      float64 `json:"pv_voltage_v"`
+		PVCurrentA      float64 `json:"pv_current_a"`
+		BatterySOCPct   int     `json:"battery_soc_pct"`
+		BatteryVoltageV float64 `json:"battery_voltage_v"`
+		BatteryCurrentA float64 `json:"battery_current_a"`
+		ControllerTempC int     `json:"controller_temp_c"`
+		BatteryTempC    int     `json:"battery_temp_c"`
+	}
+
+	var items []SimItem
+	if data, err := os.ReadFile("testdata/sample_day.json"); err == nil {
+		_ = json.Unmarshal(data, &items)
+	}
+
+	simIdx := 720 // Start at solar midday
+	if len(items) == 0 {
+		// Fallback sample
+		items = append(items, SimItem{
+			PVPowerW:        348,
+			PVVoltageV:      37.2,
+			PVCurrentA:      9.35,
+			BatterySOCPct:   92,
+			BatteryVoltageV: 13.9,
+			BatteryCurrentA: 24.8,
+			ControllerTempC: 31,
+			BatteryTempC:    22,
+		})
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cur := items[simIdx%len(items)]
+			simIdx = (simIdx + 1) % len(items)
+
+			frame := buildMockRTUFrame(cur.PVPowerW, cur.PVVoltageV, cur.BatteryVoltageV, cur.BatteryCurrentA, cur.BatterySOCPct, cur.ControllerTempC, cur.BatteryTempC)
+			processFrame(frame)
+		}
+	}
+}
+
 func main() {
+	mockFlag := flag.Bool("mock", false, "Run in offline simulation mode generating realistic 400W 2S2P Renogy Rover telemetry")
+	flag.Parse()
+
 	loadEnv()
 	tracker.load()
 
+	isMock := *mockFlag || os.Getenv("MOCK_MODE") == "true" || os.Getenv("SOLARIA_MOCK") == "true"
+
 	banner := `===========================================================================
-RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
+SOLARIA: RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
 ===========================================================================
   • Site: %s (%.3f°N, %.3f°W)
   • Service UUID 0xFFD0 (Write Commands to FFD1)
   • Service UUID 0xFFF0 (Receive Telemetry from FFF1)
   • Automatic Stream Chunk Reassembly & CRC16 Engine
-  • High-Performance Golang Runtime
+  • Simulation Mode: %v
 ---------------------------------------------------------------------------
 Open Dashboard: http://localhost:%d in Chrome on your device
 ===========================================================================`
 
-	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, httpPort)
+	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, isMock, httpPort)
 
 	// 1. Start WebSocket Server on 8765
 	wsMux := http.NewServeMux()
@@ -1275,10 +1413,15 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 		}
 	}()
 
-	// 3. Start Autonomous Bluetooth & Telemetry Watchdog Supervisor
+	// 3. Start Watchdog or Mock Simulation
 	watchdogCtx, watchdogCancel := context.WithCancel(context.Background())
 	defer watchdogCancel()
-	go startBluetoothWatchdog(watchdogCtx)
+
+	if isMock {
+		go startMockSimulator(watchdogCtx)
+	} else {
+		go startBluetoothWatchdog(watchdogCtx)
+	}
 
 	// Wait for terminate signal
 	sigChan := make(chan os.Signal, 1)

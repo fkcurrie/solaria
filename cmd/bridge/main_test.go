@@ -86,3 +86,21 @@ func TestCalcCRC16_Bridge(t *testing.T) {
 		t.Errorf("Expected non-zero CRC16, got 0")
 	}
 }
+
+func TestBuildMockRTUFrame_Valid(t *testing.T) {
+	frame := buildMockRTUFrame(350, 37.5, 13.8, 25.2, 94, 32, 24)
+	if len(frame) != 73 {
+		t.Fatalf("Expected 73 bytes, got %d", len(frame))
+	}
+	telem, err := decodeTelemetry(frame)
+	if err != nil {
+		t.Fatalf("Failed to decode mock frame: %v", err)
+	}
+	if telem.PVPowerW != 350 {
+		t.Errorf("Expected PV Power 350W, got %dW", telem.PVPowerW)
+	}
+	if telem.BatterySOCPct != 94 {
+		t.Errorf("Expected SOC 94%%, got %d%%", telem.BatterySOCPct)
+	}
+}
+

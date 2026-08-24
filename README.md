@@ -34,6 +34,21 @@ go run ./cmd/bridge
 
 Open `http://localhost:8080` in Chrome to pair with the Renogy BT-1 module.
 
+### Offline Development & Simulation Mode (No BT-1 Required)
+
+If developing away from the cottage or without BT-1 hardware, start the bridge with the `--mock` flag to simulate live 400W 2S2P solar telemetry and diurnal cycles:
+
+```bash
+# Start bridge in simulation mode with live WebSocket telemetry broadcast
+go run ./cmd/bridge --mock
+
+# Replay realistic 24-hour solar dataset to Cloud Server or local ingest
+go run ./cmd/replay --file testdata/sample_day.json --endpoint http://localhost:8081/api/v1/telemetry
+
+# Generate custom 24-hour test fixtures
+go run ./cmd/generate-data
+```
+
 ---
 
 ## AI Agent Integration
