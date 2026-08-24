@@ -33,6 +33,8 @@ var (
 	cloudEndpoint   = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
 	cloudToken      = "solaria_cottage_secret_token_2026"
 	storageMode     = "both" // "local", "bigquery" / "cloud", "both"
+	siteTZ          = "America/Toronto"
+	siteLoc         = time.Local
 
 	mu             sync.Mutex
 	rxBuffer       []byte
@@ -149,6 +151,16 @@ func loadEnv() {
 	}
 	if val := os.Getenv("STORAGE_MODE"); val != "" {
 		storageMode = strings.ToLower(val)
+	}
+	if val := os.Getenv("TIMEZONE"); val != "" {
+		siteTZ = val
+	} else if val := os.Getenv("SITE_TIMEZONE"); val != "" {
+		siteTZ = val
+	}
+	if loc, err := time.LoadLocation(siteTZ); err == nil {
+		siteLoc = loc
+	} else {
+		siteLoc = time.Local
 	}
 }
 
@@ -596,6 +608,8 @@ type OutageEvent struct {
 	Status       string `json:"status"` // "ACTIVE" or "RESOLVED"
 	StartTime    string `json:"start_time"`
 	EndTime      string `json:"end_time,omitempty"`
+	StartISO     string `json:"start_iso"`
+	EndISO       string `json:"end_iso,omitempty"`
 	DurationSec  int    `json:"duration_sec"`
 	Reason       string `json:"reason"`
 	RecoveredVia string `json:"recovered_via,omitempty"`
@@ -689,7 +703,8 @@ func (t *OutageTracker) RecordOutageStart(reason string) (*OutageEvent, OutageSt
 	event := OutageEvent{
 		ID:          t.outageCount,
 		Status:      "ACTIVE",
-		StartTime:   t.outageStart.Format("15:04:05"),
+		StartTime:   t.outageStart.In(siteLoc).Format("15:04:05"),
+		StartISO:    t.outageStart.UTC().Format(time.RFC3339),
 		DurationSec: 0,
 		Reason:      reason,
 	}
@@ -740,8 +755,10 @@ func (t *OutageTracker) RecordOutageEnd(recoveredVia string) (*OutageEvent, Outa
 	event := OutageEvent{
 		ID:           t.outageCount,
 		Status:       "RESOLVED",
-		StartTime:    t.outageStart.Format("15:04:05"),
-		EndTime:      now.Format("15:04:05"),
+		StartTime:    t.outageStart.In(siteLoc).Format("15:04:05"),
+		EndTime:      now.In(siteLoc).Format("15:04:05"),
+		StartISO:     t.outageStart.UTC().Format(time.RFC3339),
+		EndISO:       now.UTC().Format(time.RFC3339),
 		DurationSec:  durSec,
 		Reason:       "Telemetry stream interrupted",
 		RecoveredVia: recoveredVia,
@@ -749,7 +766,8 @@ func (t *OutageTracker) RecordOutageEnd(recoveredVia string) (*OutageEvent, Outa
 
 	if len(t.history) > 0 {
 		t.history[0].Status = "RESOLVED"
-		t.history[0].EndTime = now.Format("15:04:05")
+		t.history[0].EndTime = now.In(siteLoc).Format("15:04:05")
+		t.history[0].EndISO = now.UTC().Format(time.RFC3339)
 		t.history[0].DurationSec = durSec
 		t.history[0].RecoveredVia = recoveredVia
 	}

@@ -26,9 +26,10 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Go root binaries (do NOT ignore cmd/ source directories)
+# Go binaries
 /cloud-server
 /edge-agent
+/bridge
 /bin/
 *.exe
 *.exe~
@@ -68,4 +69,10 @@ yarn-error.log*
 *.swp
 *.swo
 *~
-bridge
+
+# Local Development Files & Scripts (Excluded from Public Repo)
+SOUL.md
+docs/SOUL.md
+deploy/deploy.sh
+deploy/config.yaml
+scripts/

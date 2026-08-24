@@ -687,11 +687,21 @@
       }
     }
 
+    function formatLocalTime(isoStr, fallbackStr) {
+      if (isoStr) {
+        const d = new Date(isoStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        }
+      }
+      return fallbackStr || '--:--:--';
+    }
+
     function renderOutageHistory(history) {
       const tbody = document.getElementById('outageTableBody');
       if (!tbody) return;
       if (!history || history.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">✨ No telemetry outages recorded. Stream connection is 100% stable.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">No telemetry outages recorded. Stream connection is 100% stable.</td></tr>`;
         return;
       }
       tbody.innerHTML = history.map(h => {
@@ -699,14 +709,15 @@
         const statusBadge = isActive
           ? `<span class="badge-outage-active">ACTIVE OUTAGE</span>`
           : `<span class="badge-outage-resolved">RESOLVED</span>`;
+        const startStr = formatLocalTime(h.start_iso, h.start_time);
+        const restoredStr = isActive ? '--:--:--' : formatLocalTime(h.end_iso, h.end_time);
         const durStr = isActive ? 'In Progress...' : formatSecs(h.duration_sec);
-        const restoredStr = h.end_time || '--:--:--';
         const actionStr = h.recovered_via || h.reason || 'Watchdog self-healing';
         return `
           <tr>
             <td><strong>#${h.id}</strong></td>
             <td>${statusBadge}</td>
-            <td style="color: #fbbf24;">${h.start_time}</td>
+            <td style="color: #fbbf24;">${startStr}</td>
             <td style="color: #34d399;">${restoredStr}</td>
             <td>${durStr}</td>
             <td style="color: var(--text-muted);">${actionStr}</td>
@@ -717,7 +728,7 @@
 
     function log(msg, type = 'info') {
       const box = document.getElementById('logBox');
-      const time = new Date().toLocaleTimeString();
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       const div = document.createElement('div');
       div.className = `log-entry log-${type}`;
       div.textContent = `[${time}] ${msg}`;
@@ -778,9 +789,11 @@
           } else if (msg.type === 'outage_event') {
             updateOutageStats(msg.stats);
             if (msg.event === 'outage_start') {
-              log(`🚨 [OUTAGE DETECTED #${msg.outage.id}] Telemetry stream interrupted at ${msg.outage.start_time} (${msg.outage.reason}). Watchdog auto-healing active...`, 'error');
+              const st = formatLocalTime(msg.outage.start_iso, msg.outage.start_time);
+              log(`[OUTAGE DETECTED #${msg.outage.id}] Telemetry stream interrupted at ${st} (${msg.outage.reason}). Watchdog auto-healing active...`, 'error');
             } else if (msg.event === 'outage_end') {
-              log(`✅ [STREAM RESTORED] Telemetry resumed at ${msg.outage.end_time}! Outage #${msg.outage.id} resolved (Downtime: ${formatSecs(msg.outage.duration_sec)} | Availability: ${msg.stats.availability_pct.toFixed(1)}%)`, 'success');
+              const et = formatLocalTime(msg.outage.end_iso, msg.outage.end_time);
+              log(`[STREAM RESTORED] Telemetry resumed at ${et}! Outage #${msg.outage.id} resolved (Downtime: ${formatSecs(msg.outage.duration_sec)} | Availability: ${msg.stats.availability_pct.toFixed(1)}%)`, 'success');
             }
             if (msg.history) {
               renderOutageHistory(msg.history);
@@ -793,7 +806,7 @@
               updateOutageStats(msg.stats);
             }
           } else if (msg.type === 'watchdog_reconnect') {
-            log(`🔄 [Supervisor Watchdog] Telemetry quiet for ${msg.seconds_since_last_packet}s. Triggering automatic GATT re-sync...`, 'warn');
+            log(`[Supervisor Watchdog] Telemetry quiet for ${msg.seconds_since_last_packet}s. Triggering automatic GATT re-sync...`, 'warn');
             reconnectGattSession();
           }
         } catch (e) {}
