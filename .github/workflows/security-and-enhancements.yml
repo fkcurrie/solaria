@@ -21,12 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.23'
+          go-version: '1.24'
           cache: true
 
       - name: 🛡️ Run Official Go Vulnerability Scanner (govulncheck)
@@ -40,7 +40,7 @@ jobs:
           gosec -exclude=G104 -fmt=sarif -out=gosec.sarif ./... || true
 
       - name: 📊 Upload SARIF to GitHub Security Tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: gosec.sarif
@@ -51,12 +51,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 🐹 Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.23'
+          go-version: '1.24'
           cache: true
 
       - name: 🧹 Run Auto-Formatters & Dependency Tidy
@@ -65,7 +65,8 @@ jobs:
           go mod tidy
 
       - name: 🚀 Create Pull Request with Enhancements
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(automated): Apply Go formatting, tidy, and security fixes"
