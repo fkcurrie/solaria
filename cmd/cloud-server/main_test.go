@@ -262,3 +262,32 @@ func TestHandlePowerBudget(t *testing.T) {
 		t.Errorf("Expected status CRITICAL for 1000W load, got %v", resCrit["status"])
 	}
 }
+
+func TestHandleWinterizeStatus(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/winterize-status", nil)
+	w := httptest.NewRecorder()
+	handleWinterizeStatus(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/winterize-status, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode winterize status response: %v", err)
+	}
+
+	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
+		t.Errorf("Expected Dorset site, got %v", res["site"])
+	}
+
+	checklist, ok := res["departure_checklist"].([]interface{})
+	if !ok || len(checklist) != 5 {
+		t.Errorf("Expected 5-step departure checklist, got %v", res["departure_checklist"])
+	}
+
+	recs, ok := res["winter_recommendations"].([]interface{})
+	if !ok || len(recs) == 0 {
+		t.Errorf("Expected winter recommendations, got %v", res["winter_recommendations"])
+	}
+}
