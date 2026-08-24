@@ -588,18 +588,18 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 	// Pre-populate 24 hour slots
 	hours := make([]string, 24)
-	genWh := make([]float64, 24)
-	irradiance := make([]float64, 24)
-	battSOC := make([]int, 24)
+	genWh := make([]interface{}, 24)
+	irradiance := make([]interface{}, 24)
+	battSOC := make([]interface{}, 24)
 	weatherIcons := make([]string, 24)
 	weatherConds := make([]string, 24)
-	cloudPct := make([]int, 24)
-	tempC := make([]float64, 24)
+	cloudPct := make([]interface{}, 24)
+	tempC := make([]interface{}, 24)
 
 	for h := 0; h < 24; h++ {
 		hours[h] = fmt.Sprintf("%02d:00", h)
-		weatherIcons[h] = "☀️"
-		weatherConds[h] = "Clear"
+		weatherIcons[h] = ""
+		weatherConds[h] = ""
 	}
 
 	recordsCount := 0

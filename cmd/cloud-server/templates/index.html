@@ -795,7 +795,7 @@
         ctx.textBaseline = 'bottom';
 
         icons.forEach((icon, idx) => {
-          if (!icon) return;
+          if (!icon || typeof icon !== 'string' || icon.trim() === '') return;
           const xPos = x.getPixelForTick(idx);
           if (isNaN(xPos)) return;
 
@@ -1067,17 +1067,17 @@
           strip.style.display = 'flex';
           let html = '';
           data.hours.forEach((h, i) => {
-            const hasData = (data.generation_wh && data.generation_wh[i] !== null) || (data.irradiance_w_m2 && data.irradiance_w_m2[i] !== null);
-            const icon = (data.weather_icons && data.weather_icons[i]) || '🌙';
-            const cloud = (data.cloud_cover_pct && data.cloud_cover_pct[i] !== null) ? `${data.cloud_cover_pct[i]}%` : '--';
-            const yieldWh = (data.generation_wh && data.generation_wh[i] !== null) ? `${data.generation_wh[i]} Wh` : '--';
-            const cond = (data.weather_conditions && data.weather_conditions[i]) || 'No Data';
+            const icon = (data.weather_icons && data.weather_icons[i]) ? data.weather_icons[i] : '';
+            const hasData = icon !== '' || (data.generation_wh && data.generation_wh[i] !== null && data.generation_wh[i] > 0);
+            const cloud = (hasData && data.cloud_cover_pct && data.cloud_cover_pct[i] !== null) ? `${data.cloud_cover_pct[i]}%` : '--';
+            const yieldWh = (hasData && data.generation_wh && data.generation_wh[i] !== null) ? `${data.generation_wh[i]} Wh` : '--';
+            const cond = (hasData && data.weather_conditions && data.weather_conditions[i]) ? data.weather_conditions[i] : 'Pending / Future Hour';
 
             html += `
               <div class="weather-hour-chip ${hasData ? 'has-data' : ''}" title="${h}: ${cond}">
                 <span style="font-weight:600; color:#94a3b8; font-size:0.7rem;">${h}</span>
-                <span class="wh-icon">${hasData ? icon : '·'}</span>
-                <span class="wh-cloud">${hasData ? cloud : '--'}</span>
+                <span class="wh-icon">${hasData && icon ? icon : '·'}</span>
+                <span class="wh-cloud">${cloud}</span>
                 <span class="wh-yield">${yieldWh}</span>
               </div>
             `;
