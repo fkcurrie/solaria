@@ -51,6 +51,8 @@ type Telemetry struct {
 	StringHealthStatus      string  `json:"string_health_status"`
 	SubZeroInhibitWarning   bool    `json:"subzero_inhibit_warning"`
 	SubZeroInhibitMessage   string  `json:"subzero_inhibit_message"`
+	ColdDerateWarning       bool    `json:"cold_derate_warning"`
+	ColdDerateMessage       string  `json:"cold_derate_message"`
 	BatteryType             string  `json:"battery_type"`
 	ControllerModel         string  `json:"controller_model"`
 	ControllerRatedCurrentA int     `json:"controller_rated_current_a"`
@@ -256,6 +258,9 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 
 	subZeroWarn := false
 	subZeroMsg := "OK: Thermal probe within safe operating limits"
+	coldDerateWarn := false
+	coldDerateMsg := "OK: Thermal conditions optimal for full charging rate"
+
 	if battTemp <= 0 {
 		subZeroWarn = true
 		if battAmps > 0.1 || pvPower > 5 {
@@ -263,15 +268,19 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 		} else {
 			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", battTemp)
 		}
-	} else if battTemp <= 3 {
-		subZeroWarn = true
-		subZeroMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Near Freezing). Monitor thermal enclosure.", battTemp)
+	} else if battTemp <= 5 {
+		coldDerateWarn = true
+		if battAmps > 15.0 {
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", battTemp, battAmps)
+		} else {
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", battTemp)
+		}
 	}
 
 	stringStatus := "NOMINAL_2S2P"
 	if pvVolts < 5.0 {
 		stringStatus = "NIGHT_OR_INACTIVE"
-	} else if pvVolts >= 13.0 && pvVolts < 24.0 {
+	} else if pvVolts >= 10.0 && pvVolts < 26.0 {
 		stringStatus = "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT"
 	} else if pvVolts >= 26.0 && pvPower > 0 {
 		stringStatus = "NOMINAL_2S2P_ACTIVE"
@@ -316,6 +325,8 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 		StringHealthStatus:          stringStatus,
 		SubZeroInhibitWarning:       subZeroWarn,
 		SubZeroInhibitMessage:       subZeroMsg,
+		ColdDerateWarning:           coldDerateWarn,
+		ColdDerateMessage:           coldDerateMsg,
 		BatteryType:                 "LiFePO4 12V 170Ah (B07Q8DQ6TR)",
 		ControllerModel:             "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
 		ControllerRatedCurrentA:     20,

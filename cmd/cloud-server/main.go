@@ -76,6 +76,8 @@ type Telemetry struct {
 	StringHealthStatus      string  `json:"string_health_status"`
 	SubZeroInhibitWarning   bool    `json:"subzero_inhibit_warning"`
 	SubZeroInhibitMessage   string  `json:"subzero_inhibit_message"`
+	ColdDerateWarning       bool    `json:"cold_derate_warning"`
+	ColdDerateMessage       string  `json:"cold_derate_message"`
 	BatteryType             string  `json:"battery_type"`
 	ControllerModel         string  `json:"controller_model"`
 	ControllerRatedCurrentA int     `json:"controller_rated_current_a"`
@@ -245,8 +247,50 @@ func (r *RingBuffer) GetHistory(limit int) []SolarRecord {
 	return r.records[n-limit:]
 }
 
+type CacheEntry struct {
+	Data      []byte
+	ExpiresAt time.Time
+}
+
+type StatsCache struct {
+	mu      sync.RWMutex
+	entries map[string]CacheEntry
+}
+
+func (c *StatsCache) Get(key string) ([]byte, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, found := c.entries[key]
+	if !found || time.Now().After(entry.ExpiresAt) {
+		return nil, false
+	}
+	return entry.Data, true
+}
+
+func (c *StatsCache) Set(key string, data []byte, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = CacheEntry{
+		Data:      data,
+		ExpiresAt: time.Now().Add(ttl),
+	}
+}
+
+func (c *StatsCache) Invalidate(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, key)
+}
+
+func (c *StatsCache) InvalidateAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = make(map[string]CacheEntry)
+}
+
 var (
 	ringBuf      = NewRingBuffer(1440)
+	statsCache   = &StatsCache{entries: make(map[string]CacheEntry)}
 	apiToken     = ""
 	gcpProject   = "solaria-solar"
 	bqClient     *bigquery.Client
@@ -457,6 +501,7 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	if len(batch.Batch) > 0 {
 		ringBuf.Push(batch.Batch)
+		statsCache.Invalidate("day")
 
 		// Enqueue to BigQuery worker pool non-blockingly
 		if bqTable != nil {
@@ -582,6 +627,12 @@ func classifyWeather(cloudPct float64, tempC float64, isDay bool, avgIrr float64
 func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if cached, ok := statsCache.Get("day"); ok {
+		w.Header().Set("X-Cache", "HIT")
+		w.Write(cached)
+		return
+	}
 
 	loc, _ := time.LoadLocation("America/Toronto")
 	if loc == nil {
@@ -719,12 +770,27 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 		"sample_count":       recordsCount,
 		"status_message":     fmt.Sprintf("Streaming live data: %d samples recorded today.", recordsCount),
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statsCache.Set("day", data, 2*time.Minute)
+	w.Header().Set("X-Cache", "MISS")
+	w.Write(data)
 }
 
 func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if cached, ok := statsCache.Get("week"); ok {
+		w.Header().Set("X-Cache", "HIT")
+		w.Write(cached)
+		return
+	}
 
 	now := time.Now()
 	daysMap := make(map[string]map[string]interface{})
@@ -814,12 +880,27 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 		"days_with_data": totalDaysWithData,
 		"status_message": fmt.Sprintf("%d of 7 days logged in BigQuery since setup on %s.", totalDaysWithData, now.Format("Jan 02, 2006")),
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statsCache.Set("week", data, 10*time.Minute)
+	w.Header().Set("X-Cache", "MISS")
+	w.Write(data)
 }
 
 func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if cached, ok := statsCache.Get("month"); ok {
+		w.Header().Set("X-Cache", "HIT")
+		w.Write(cached)
+		return
+	}
 
 	now := time.Now()
 	daysInMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
@@ -890,12 +971,27 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 		"days_with_data": totalDaysWithData,
 		"status_message": fmt.Sprintf("%d of %d days logged for %s.", totalDaysWithData, daysInMonth, now.Format("January 2006")),
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statsCache.Set("month", data, 15*time.Minute)
+	w.Header().Set("X-Cache", "MISS")
+	w.Write(data)
 }
 
 func handleYearStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if cached, ok := statsCache.Get("year"); ok {
+		w.Header().Set("X-Cache", "HIT")
+		w.Write(cached)
+		return
+	}
 
 	now := time.Now()
 	months := []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
@@ -956,7 +1052,16 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 		"months_with_data": totalMonthsWithData,
 		"status_message":   fmt.Sprintf("%d of 12 months logged in %d.", totalMonthsWithData, now.Year()),
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statsCache.Set("year", data, 30*time.Minute)
+	w.Header().Set("X-Cache", "MISS")
+	w.Write(data)
 }
 
 func mathSinFactor(h int) float64 {

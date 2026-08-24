@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHandleHealth(t *testing.T) {
@@ -141,3 +142,50 @@ func TestPWAStaticFiles(t *testing.T) {
 		t.Fatalf("Failed to read embedded logo: %v", err)
 	}
 }
+
+func TestStatsCache_TTLAndInvalidation(t *testing.T) {
+	cache := &StatsCache{entries: make(map[string]CacheEntry)}
+
+	// 1. Set and retrieve valid entry
+	cache.Set("test_key", []byte(`{"hello":"world"}`), 200*time.Millisecond)
+	val, ok := cache.Get("test_key")
+	if !ok || string(val) != `{"hello":"world"}` {
+		t.Errorf("Expected cache hit for active entry, got %v (%s)", ok, string(val))
+	}
+
+	// 2. Invalidate entry
+	cache.Invalidate("test_key")
+	_, okAfterInvalidate := cache.Get("test_key")
+	if okAfterInvalidate {
+		t.Errorf("Expected cache miss after explicit Invalidate()")
+	}
+
+	// 3. Expiration test
+	cache.Set("expiring_key", []byte(`{"temp":1}`), 50*time.Millisecond)
+	time.Sleep(70 * time.Millisecond)
+	_, okExpired := cache.Get("expiring_key")
+	if okExpired {
+		t.Errorf("Expected cache miss for expired entry")
+	}
+}
+
+func TestHandleDayStats_CacheHeaders(t *testing.T) {
+	statsCache.InvalidateAll()
+
+	// First request: Cache MISS
+	req1 := httptest.NewRequest(http.MethodGet, "/api/v1/stats/day", nil)
+	w1 := httptest.NewRecorder()
+	handleDayStats(w1, req1)
+	if w1.Header().Get("X-Cache") != "MISS" {
+		t.Errorf("Expected X-Cache: MISS on initial call, got %s", w1.Header().Get("X-Cache"))
+	}
+
+	// Second request: Cache HIT
+	req2 := httptest.NewRequest(http.MethodGet, "/api/v1/stats/day", nil)
+	w2 := httptest.NewRecorder()
+	handleDayStats(w2, req2)
+	if w2.Header().Get("X-Cache") != "HIT" {
+		t.Errorf("Expected X-Cache: HIT on subsequent call, got %s", w2.Header().Get("X-Cache"))
+	}
+}
+

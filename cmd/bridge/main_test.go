@@ -1,7 +1,9 @@
 package main
 
 import (
+	"net/http"
 	"testing"
+	"time"
 )
 
 func TestDecodeTelemetry_Bridge(t *testing.T) {
@@ -103,4 +105,150 @@ func TestBuildMockRTUFrame_Valid(t *testing.T) {
 		t.Errorf("Expected SOC 94%%, got %d%%", telem.BatterySOCPct)
 	}
 }
+
+func TestIsAllowedOrigin(t *testing.T) {
+	tests := []struct {
+		origin  string
+		allowed bool
+	}{
+		{"", true},
+		{"http://localhost:8080", true},
+		{"http://127.0.0.1:8080", true},
+		{"http://192.168.1.100:8080", true},
+		{"http://10.0.0.45:8080", true},
+		{"https://solaria-dashboard-952659886764.us-central1.run.app", true},
+		{"chrome-extension://solaria-bridge-helper", true},
+		{"https://malicious-site.com", false},
+		{"http://54.210.12.89", false},
+	}
+
+	for _, tc := range tests {
+		req, _ := http.NewRequest("GET", "ws://localhost:8765", nil)
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		res := isAllowedOrigin(req)
+		if res != tc.allowed {
+			t.Errorf("Origin %q: expected %v, got %v", tc.origin, tc.allowed, res)
+		}
+	}
+}
+
+func TestVerifyBridgeAuth(t *testing.T) {
+	bridgeToken = "test_secret_bridge_token_123"
+	defer func() { bridgeToken = "" }()
+
+	// 1. Valid Query Param
+	req1, _ := http.NewRequest("GET", "ws://localhost:8765?token=test_secret_bridge_token_123", nil)
+	if !verifyBridgeAuth(req1, "") {
+		t.Errorf("Expected auth with query token to pass")
+	}
+
+	// 2. Valid Authorization Header
+	req2, _ := http.NewRequest("GET", "ws://localhost:8765", nil)
+	req2.Header.Set("Authorization", "Bearer test_secret_bridge_token_123")
+	if !verifyBridgeAuth(req2, "") {
+		t.Errorf("Expected auth with Bearer header to pass")
+	}
+
+	// 3. Valid Payload Token
+	if !verifyBridgeAuth(nil, "test_secret_bridge_token_123") {
+		t.Errorf("Expected auth with payload token to pass")
+	}
+
+	// 4. Invalid Token
+	reqInvalid, _ := http.NewRequest("GET", "ws://localhost:8765?token=wrong_token", nil)
+	if verifyBridgeAuth(reqInvalid, "wrong_token") {
+		t.Errorf("Expected invalid token to be rejected")
+	}
+}
+
+func TestCheckControlRateLimit(t *testing.T) {
+	client := "test_client_ip:12345"
+	if !checkControlRateLimit(client, 100*time.Millisecond) {
+		t.Errorf("First rate limit check should succeed")
+	}
+	if checkControlRateLimit(client, 100*time.Millisecond) {
+		t.Errorf("Immediate second check should be rate-limited")
+	}
+	time.Sleep(120 * time.Millisecond)
+	if !checkControlRateLimit(client, 100*time.Millisecond) {
+		t.Errorf("Check after delay should succeed")
+	}
+}
+
+func TestDiskSpooler_SpoolAndDrain(t *testing.T) {
+	tmpDir := t.TempDir()
+	spooler := NewDiskSpooler(tmpDir)
+
+	record1 := SolarRecord{
+		Timestamp: "2026-08-24T12:00:00Z",
+		Site:      "Test Site",
+		Telemetry: Telemetry{PVPowerW: 300},
+	}
+	record2 := SolarRecord{
+		Timestamp: "2026-08-24T12:01:00Z",
+		Site:      "Test Site",
+		Telemetry: Telemetry{PVPowerW: 310},
+	}
+
+	if err := spooler.Spool(record1); err != nil {
+		t.Fatalf("Failed to spool record 1: %v", err)
+	}
+	if err := spooler.Spool(record2); err != nil {
+		t.Fatalf("Failed to spool record 2: %v", err)
+	}
+
+	// Test successful drain
+	var uploaded []SolarRecord
+	drained, err := spooler.Drain(func(rec SolarRecord) error {
+		uploaded = append(uploaded, rec)
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Drain returned error: %v", err)
+	}
+	if drained != 2 {
+		t.Errorf("Expected 2 records drained, got %d", drained)
+	}
+	if len(uploaded) != 2 {
+		t.Errorf("Expected 2 uploaded records, got %d", len(uploaded))
+	}
+
+	// Verify spool is empty after complete drain
+	drainedAgain, _ := spooler.Drain(func(rec SolarRecord) error {
+		return nil
+	})
+	if drainedAgain != 0 {
+		t.Errorf("Expected 0 records on second drain, got %d", drainedAgain)
+	}
+}
+
+func TestDecodeTelemetry_ColdDeratingAndStringImbalance(t *testing.T) {
+	// Frame with Battery Temp = 4C (Cold derate zone 0-5C)
+	frame := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, 4)
+	telem, err := decodeTelemetry(frame)
+	if err != nil {
+		t.Fatalf("decodeTelemetry failed: %v", err)
+	}
+	if !telem.ColdDerateWarning {
+		t.Errorf("Expected ColdDerateWarning to be true at 4C")
+	}
+
+	// Frame with Battery Temp = -2C (Sub-zero inhibit)
+	frameSubZero := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, -2)
+	telemSubZero, _ := decodeTelemetry(frameSubZero)
+	if !telemSubZero.SubZeroInhibitWarning {
+		t.Errorf("Expected SubZeroInhibitWarning to be true at -2C")
+	}
+
+	// Frame with String Imbalance: PV Volts = 18.0V (single string/bypass) while power is 120W
+	frameImbalance := buildMockRTUFrame(120, 18.0, 13.5, 8.5, 80, 25, 20)
+	telemImbalance, _ := decodeTelemetry(frameImbalance)
+	if telemImbalance.StringHealthStatus != "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT" {
+		t.Errorf("Expected POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT, got %s", telemImbalance.StringHealthStatus)
+	}
+}
+
 

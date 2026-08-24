@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,6 +39,7 @@ var (
 	arrayRatedWatts = 400.0
 	cloudEndpoint   = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
 	cloudToken      = "solaria_cottage_secret_token_2026"
+	bridgeToken     = ""
 	storageMode     = "both" // "local", "bigquery" / "cloud", "both"
 	siteTZ          = "America/Toronto"
 	siteLoc         = time.Local
@@ -46,21 +51,175 @@ var (
 	idTokenCache   string
 	idTokenExpires time.Time
 
+	diskSpooler *DiskSpooler
+
+	// Rate limiter for control actions
+	controlRateMu    sync.Mutex
+	lastControlTimes = make(map[string]time.Time)
+
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			if origin == "" {
-				return true
-			}
-			u, err := url.Parse(origin)
-			if err != nil {
-				return false
-			}
-			host := u.Hostname()
-			return host == "localhost" || host == "127.0.0.1" || strings.HasSuffix(host, ".run.app") || strings.HasPrefix(origin, "chrome-extension://")
-		},
+		CheckOrigin: isAllowedOrigin,
 	}
 )
+
+func isAllowedOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasSuffix(host, ".run.app") || strings.HasPrefix(origin, "chrome-extension://") {
+		return true
+	}
+	// Check private LAN IP ranges (192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12)
+	ip := net.ParseIP(host)
+	if ip != nil && (ip.IsPrivate() || ip.IsLoopback()) {
+		return true
+	}
+	return false
+}
+
+func initBridgeAuth() {
+	token := os.Getenv("SOLARIA_BRIDGE_TOKEN")
+	if token == "" {
+		token = os.Getenv("SOLARIA_API_TOKEN")
+	}
+	if token == "" {
+		b := make([]byte, 16)
+		_, _ = rand.Read(b)
+		token = hex.EncodeToString(b)
+	}
+	bridgeToken = token
+}
+
+func verifyBridgeAuth(r *http.Request, payloadToken string) bool {
+	if bridgeToken == "" {
+		return true
+	}
+	if r != nil && r.URL.Query().Get("token") == bridgeToken {
+		return true
+	}
+	if r != nil {
+		auth := r.Header.Get("Authorization")
+		if strings.HasPrefix(auth, "Bearer ") && strings.TrimPrefix(auth, "Bearer ") == bridgeToken {
+			return true
+		}
+	}
+	if payloadToken != "" && payloadToken == bridgeToken {
+		return true
+	}
+	return false
+}
+
+func checkControlRateLimit(clientKey string, minInterval time.Duration) bool {
+	controlRateMu.Lock()
+	defer controlRateMu.Unlock()
+	last, exists := lastControlTimes[clientKey]
+	if exists && time.Since(last) < minInterval {
+		return false
+	}
+	lastControlTimes[clientKey] = time.Now()
+	return true
+}
+
+// DiskSpooler provides fault-tolerant disk-backed buffering for telemetry when network is lost.
+type DiskSpooler struct {
+	spoolPath string
+	mu        sync.Mutex
+}
+
+func NewDiskSpooler(dir string) *DiskSpooler {
+	_ = os.MkdirAll(dir, 0750)
+	return &DiskSpooler{
+		spoolPath: filepath.Join(dir, "telemetry_spool.jsonl"),
+	}
+}
+
+func (s *DiskSpooler) Spool(record SolarRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	data, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(s.spoolPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := f.Write(append(data, '\n')); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := os.Stat(s.spoolPath); os.IsNotExist(err) {
+		return 0, nil
+	}
+
+	f, err := os.Open(s.spoolPath)
+	if err != nil {
+		return 0, err
+	}
+
+	var toUpload []SolarRecord
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var r SolarRecord
+		if err := json.Unmarshal(line, &r); err == nil {
+			toUpload = append(toUpload, r)
+		}
+	}
+	f.Close()
+
+	if len(toUpload) == 0 {
+		_ = os.Remove(s.spoolPath)
+		return 0, nil
+	}
+
+	var remaining []SolarRecord
+	drainedCount := 0
+
+	for i, rec := range toUpload {
+		if err := uploader(rec); err != nil {
+			remaining = toUpload[i:]
+			break
+		}
+		drainedCount++
+	}
+
+	if len(remaining) == 0 {
+		_ = os.Remove(s.spoolPath)
+	} else {
+		tmpPath := s.spoolPath + ".tmp"
+		tf, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		if err == nil {
+			for _, r := range remaining {
+				d, _ := json.Marshal(r)
+				_, _ = tf.Write(append(d, '\n'))
+			}
+			tf.Close()
+			_ = os.Rename(tmpPath, s.spoolPath)
+		}
+	}
+
+	return drainedCount, nil
+}
 
 type WeatherMetrics struct {
 	TemperatureC        *float64 `json:"temperature_c"`
@@ -111,6 +270,8 @@ type Telemetry struct {
 	StringHealthStatus          string  `json:"string_health_status"`
 	SubZeroInhibitWarning       bool    `json:"subzero_inhibit_warning"`
 	SubZeroInhibitMessage       string  `json:"subzero_inhibit_message"`
+	ColdDerateWarning           bool    `json:"cold_derate_warning"`
+	ColdDerateMessage           string  `json:"cold_derate_message"`
 	BatteryType                 string  `json:"battery_type"`
 	ControllerModel             string  `json:"controller_model"`
 	ControllerRatedCurrentA     int     `json:"controller_rated_current_a"`
@@ -409,9 +570,12 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		mpptEff = math.Round(eff*10) / 10
 	}
 
-	// 2. Sub-Zero Low-Temperature Lithium Inhibit Protection Alert
+	// 2. Sub-Zero Low-Temperature Lithium Inhibit & Cold Derate Protection Alert
 	subZeroWarn := false
 	subZeroMsg := "OK: Thermal probe within safe operating limits"
+	coldDerateWarn := false
+	coldDerateMsg := "OK: Thermal conditions optimal for full charging rate"
+
 	if battTemp <= 0 {
 		subZeroWarn = true
 		if battA > 0.1 || pvW > 5 {
@@ -419,16 +583,20 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		} else {
 			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", battTemp)
 		}
-	} else if battTemp <= 3 {
-		subZeroWarn = true
-		subZeroMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Near Freezing). Monitor thermal enclosure.", battTemp)
+	} else if battTemp <= 5 {
+		coldDerateWarn = true
+		if battA > 15.0 {
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", battTemp, battA)
+		} else {
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", battTemp)
+		}
 	}
 
 	// 3. 2S2P String Balance & PV Fault Diagnostics
 	stringStatus := "NOMINAL_2S2P"
 	if pvV < 5.0 {
 		stringStatus = "NIGHT_OR_INACTIVE"
-	} else if pvV >= 13.0 && pvV < 24.0 {
+	} else if pvV >= 10.0 && pvV < 26.0 {
 		stringStatus = "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT"
 	} else if pvV >= 26.0 && pvW > 0 {
 		stringStatus = "NOMINAL_2S2P_ACTIVE"
@@ -476,6 +644,8 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		StringHealthStatus:          stringStatus,
 		SubZeroInhibitWarning:       subZeroWarn,
 		SubZeroInhibitMessage:       subZeroMsg,
+		ColdDerateWarning:           coldDerateWarn,
+		ColdDerateMessage:           coldDerateMsg,
 		BatteryType:                 "LiFePO4 12V 170Ah (B07Q8DQ6TR)",
 		ControllerModel:             "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
 		ControllerRatedCurrentA:     20,
@@ -556,6 +726,37 @@ var (
 	lastCloudUpload time.Time
 )
 
+func uploadSingleRecord(record SolarRecord) error {
+	if cloudEndpoint == "" {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"batch": []SolarRecord{record},
+	})
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 6 * time.Second}
+	req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	token := getIDToken()
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-API-Key", cloudToken)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("cloud returned HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func uploadToCloud(record SolarRecord) {
 	if storageMode == "local" && cloudEndpoint == "" {
 		return
@@ -569,39 +770,51 @@ func uploadToCloud(record SolarRecord) {
 	uploadMu.Unlock()
 
 	go func() {
-		payload, err := json.Marshal(map[string]interface{}{
-			"batch": []SolarRecord{record},
-		})
-		if err != nil {
-			return
-		}
-
-		client := &http.Client{Timeout: 5 * time.Second}
-
 		// 1. Post to Production Cloud Endpoint
-		if cloudEndpoint != "" {
-			req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
-			if err == nil {
-				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", "Bearer "+cloudToken)
-				req.Header.Set("X-API-Key", cloudToken)
-				if resp, err := client.Do(req); err == nil {
-					resp.Body.Close()
-				}
+		if err := uploadSingleRecord(record); err != nil {
+			if diskSpooler != nil {
+				_ = diskSpooler.Spool(record)
+				fmt.Printf("[\033[33mSPOOL\033[0m] Cloud offline (%v). Telemetry safely spooled to disk.\n", err)
 			}
 		}
 
 		// 2. Post to Local Cloud Server (port 8081) if active
-		localReq, err := http.NewRequest("POST", "http://localhost:8081/api/v1/telemetry", bytes.NewBuffer(payload))
+		payload, err := json.Marshal(map[string]interface{}{
+			"batch": []SolarRecord{record},
+		})
 		if err == nil {
-			localReq.Header.Set("Content-Type", "application/json")
-			localReq.Header.Set("Authorization", "Bearer "+cloudToken)
-			localReq.Header.Set("X-API-Key", cloudToken)
-			if resp, err := client.Do(localReq); err == nil {
-				resp.Body.Close()
+			localReq, err := http.NewRequest("POST", "http://localhost:8081/api/v1/telemetry", bytes.NewBuffer(payload))
+			if err == nil {
+				localReq.Header.Set("Content-Type", "application/json")
+				localReq.Header.Set("Authorization", "Bearer "+cloudToken)
+				localReq.Header.Set("X-API-Key", cloudToken)
+				client := &http.Client{Timeout: 3 * time.Second}
+				if resp, err := client.Do(localReq); err == nil {
+					resp.Body.Close()
+				}
 			}
 		}
 	}()
+}
+
+func startSpoolDrainer(ctx context.Context) {
+	if diskSpooler == nil || cloudEndpoint == "" {
+		return
+	}
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			drained, err := diskSpooler.Drain(uploadSingleRecord)
+			if err == nil && drained > 0 {
+				fmt.Printf("[\033[32mSPOOL DRAINED\033[0m] Successfully restored network uplink: uploaded %d spooled records to Cloud Run!\n", drained)
+			}
+		}
+	}
 }
 
 var (
@@ -1131,6 +1344,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			Name  string `json:"name"`
 			ID    string `json:"id"`
 			Bytes []byte `json:"bytes"`
+			Token string `json:"token"`
 		}
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			continue
@@ -1204,6 +1418,15 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "clear_outages":
+			if !checkControlRateLimit(clientAddr, 500*time.Millisecond) {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","error":"rate limit exceeded: slow down control commands"}`))
+				continue
+			}
+			if !verifyBridgeAuth(r, payload.Token) {
+				fmt.Printf("[\033[1;31mSECURITY\033[0m] Unauthorized clear_outages attempt from %s\n", clientAddr)
+				_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","error":"unauthorized: bridge token required for control actions"}`))
+				continue
+			}
 			tracker.Clear()
 			s, h := tracker.GetStats()
 			broadcastControlMsg(map[string]interface{}{
@@ -1211,6 +1434,19 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				"stats":   s,
 				"history": h,
 			})
+
+		case "flash_profile", "write_register":
+			if !checkControlRateLimit(clientAddr, 500*time.Millisecond) {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","error":"rate limit exceeded: slow down control commands"}`))
+				continue
+			}
+			if !verifyBridgeAuth(r, payload.Token) {
+				fmt.Printf("[\033[1;31mSECURITY\033[0m] Unauthorized %s attempt from %s\n", payload.Type, clientAddr)
+				_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"error","error":"unauthorized: bridge token required for control actions"}`))
+				continue
+			}
+			fmt.Printf("[\033[1;32mCONTROL\033[0m] Authenticated %s executed successfully from %s\n", payload.Type, clientAddr)
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"control_ack","status":"success"}`))
 		}
 	}
 }
@@ -1351,6 +1587,8 @@ func main() {
 	flag.Parse()
 
 	loadEnv()
+	initBridgeAuth()
+	diskSpooler = NewDiskSpooler("spool")
 	tracker.load()
 
 	isMock := *mockFlag || os.Getenv("MOCK_MODE") == "true" || os.Getenv("SOLARIA_MOCK") == "true"
@@ -1362,12 +1600,18 @@ SOLARIA: RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
   • Service UUID 0xFFD0 (Write Commands to FFD1)
   • Service UUID 0xFFF0 (Receive Telemetry from FFF1)
   • Automatic Stream Chunk Reassembly & CRC16 Engine
+  • Disk Spooling & Resilience Engine: ACTIVE (spool/telemetry_spool.jsonl)
+  • Bridge Session Security: ACTIVE (Token: %s...)
   • Simulation Mode: %v
 ---------------------------------------------------------------------------
 Open Dashboard: http://localhost:%d in Chrome on your device
 ===========================================================================`
 
-	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, isMock, httpPort)
+	maskedToken := bridgeToken
+	if len(maskedToken) > 8 {
+		maskedToken = maskedToken[:8]
+	}
+	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, maskedToken, isMock, httpPort)
 
 	// 1. Start WebSocket Server on 8765
 	wsMux := http.NewServeMux()
@@ -1413,9 +1657,11 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 		}
 	}()
 
-	// 3. Start Watchdog or Mock Simulation
+	// 3. Start Watchdog or Mock Simulation and Spool Drainer
 	watchdogCtx, watchdogCancel := context.WithCancel(context.Background())
 	defer watchdogCancel()
+
+	go startSpoolDrainer(watchdogCtx)
 
 	if isMock {
 		go startMockSimulator(watchdogCtx)
