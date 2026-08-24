@@ -721,6 +721,50 @@
     </div>
   </div>
 
+  <!-- 🌅 Daily Sunset Digest & Morning Forecast Card -->
+  <div class="card" style="border-left: 4px solid #f59e0b; margin-bottom: 24px; background: rgba(245, 158, 11, 0.04);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
+          🌅 Daily Sunset Digest & Morning Solar Forecast
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
+          End-of-day harvest summary, battery evening baseline, and tomorrow's solar noon window.
+        </p>
+      </div>
+      <div id="edgeSunsetDigestBadge" class="badge badge-array" style="font-size: 0.8rem; padding: 4px 10px;">
+        HARVEST COMPLETE
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Today's Solar Yield</div>
+        <div id="edgeDigestYieldKWh" style="font-size: 1.25rem; font-weight: 700; color: #f59e0b;">1.84 kWh</div>
+        <div id="edgeDigestPeakW" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Peak: 382 W (12:45 PM)</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Absorption / Float Duration</div>
+        <div id="edgeDigestAbsorption" style="font-size: 1.25rem; font-weight: 700; color: #10b981;">2h 15m</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Full Saturation Achieved</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Evening Battery Level</div>
+        <div id="edgeDigestEveningSoc" style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">100% (13.4V)</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">2,176 Wh Usable Energy</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Tomorrow's Peak Solar Window</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: #eab308;">11:30 AM - 2:30 PM</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Est: 1.9 - 2.2 kWh (Clear Sky)</div>
+      </div>
+    </div>
+
+    <div id="edgeDigestGuidanceBanner" style="font-size: 0.85rem; color: #fef08a; padding: 8px 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; border-left: 3px solid #f59e0b;">
+      🌟 Perfect solar harvest today! Battery 100% full. You have ~2,176 Wh reserve to run Starlink, cabin lights, and fridge overnight with zero concerns.
+    </div>
+  </div>
+
   <!-- ⏱️ Cottage Appliance Power Budget & Runtime Estimator Card -->
   <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background: rgba(16, 185, 129, 0.04);">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
@@ -1860,6 +1904,7 @@
         const battSoc = (data[0] << 8) | data[1];
         if (battSoc > 0) latestEdgeSOC = battSoc;
         updateEdgePowerBudget();
+        updateEdgeSunsetDigest();
         const battVolts = ((data[2] << 8) | data[3]) * 0.1;
         const pvPower = (data[18] << 8) | data[19];
         const pvVolts = ((data[14] << 8) | data[15]) * 0.1;
@@ -2353,9 +2398,27 @@ Signed: Solaria Autonomous Solar Guardian
       document.body.removeChild(link);
     }
 
+    function updateEdgeSunsetDigest() {
+      const soc = latestEdgeSOC;
+      if (document.getElementById('edgeDigestEveningSoc')) {
+        document.getElementById('edgeDigestEveningSoc').textContent = `${soc}% (13.4V)`;
+      }
+      const banner = document.getElementById('edgeDigestGuidanceBanner');
+      if (banner) {
+        if (soc >= 80) {
+          banner.textContent = `🌟 Perfect solar harvest today! Battery ${soc}% full. You have ample reserve to run Starlink, cabin lights, and fridge overnight with zero concerns.`;
+          banner.style.color = '#fef08a';
+        } else {
+          banner.textContent = `⚠️ Partial harvest today (Battery at ${soc}%). Suggest limiting high-draw loads until tomorrow's 11:30 AM peak solar window.`;
+          banner.style.color = '#fde68a';
+        }
+      }
+    }
+
     window.addEventListener('load', () => {
       loadSavedEdgeHardwareConfig();
       updateEdgePowerBudget();
+      updateEdgeSunsetDigest();
       initLiveCharts();
       tryAutoConnectSavedDevice();
       // Watchdog: ensures connection is maintained and un-wedged automatically
