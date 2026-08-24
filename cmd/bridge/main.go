@@ -283,7 +283,11 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 	}
 	s8 := func(offset int) int {
 		if offset < len(data) {
-			return int(int8(data[offset]))
+			b := data[offset]
+			if b > 127 {
+				return int(b) - 256
+			}
+			return int(b)
 		}
 		return 0
 	}
@@ -414,7 +418,7 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 func logToCSV(telem Telemetry) {
 	now := time.Now()
 	logDir := "logs"
-	_ = os.MkdirAll(logDir, 0755)
+	_ = os.MkdirAll(logDir, 0750)
 	logFile := filepath.Join(logDir, fmt.Sprintf("solar_telemetry_%s.csv", now.Format("2006-01-02")))
 
 	isNew := false
@@ -422,7 +426,7 @@ func logToCSV(telem Telemetry) {
 		isNew = true
 	}
 
-	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(filepath.Clean(logFile), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return
 	}
@@ -561,62 +565,62 @@ func processFrame(frame []byte) {
 		return
 	}
 
-		wx := fetchWeather()
-		sunState := classifySunCondition(telem, wx)
+	wx := fetchWeather()
+	sunState := classifySunCondition(telem, wx)
 
-		expectedPower := (wx.DirectRadiationWM2 / 1000.0) * arrayRatedWatts
-		prPct := 0.0
-		if expectedPower > 5.0 {
-			prPct = math.Round((float64(telem.PVPowerW)/expectedPower)*1000) / 10
-		}
-		telem.PerformanceRatioPct = prPct
+	expectedPower := (wx.DirectRadiationWM2 / 1000.0) * arrayRatedWatts
+	prPct := 0.0
+	if expectedPower > 5.0 {
+		prPct = math.Round((float64(telem.PVPowerW)/expectedPower)*1000) / 10
+	}
+	telem.PerformanceRatioPct = prPct
 
-		record := SolarRecord{
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Site:      siteName,
-			Location: map[string]float64{
-				"latitude":  siteLat,
-				"longitude": siteLon,
-			},
-			Telemetry:         telem,
-			Weather:           wx,
-			SunClassification: sunState,
-		}
+	record := SolarRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Site:      siteName,
+		Location: map[string]float64{
+			"latitude":  siteLat,
+			"longitude": siteLon,
+		},
+		Telemetry:         telem,
+		Weather:           wx,
+		SunClassification: sunState,
+	}
 
-		if storageMode != "cloud" && storageMode != "bigquery" {
-			logToCSV(telem)
-		}
-		if storageMode != "local" {
-			uploadToCloud(record)
-		}
+	if storageMode != "cloud" && storageMode != "bigquery" {
+		logToCSV(telem)
+	}
+	if storageMode != "local" {
+		uploadToCloud(record)
+	}
 
-		broadcastControlMsg(map[string]interface{}{
-			"type":   "telemetry_frame",
-			"record": record,
-		})
+	broadcastControlMsg(map[string]interface{}{
+		"type":   "telemetry_frame",
+		"record": record,
+	})
 
-		tempStr := "N/A"
-		if wx.TemperatureC != nil {
-			tempStr = fmt.Sprintf("%.1f", *wx.TemperatureC)
-		}
-		cloudStr := "N/A"
-		if wx.CloudCoverPct != nil {
-			cloudStr = strconv.Itoa(*wx.CloudCoverPct)
-		}
+	tempStr := "N/A"
+	if wx.TemperatureC != nil {
+		tempStr = fmt.Sprintf("%.1f", *wx.TemperatureC)
+	}
+	cloudStr := "N/A"
+	if wx.CloudCoverPct != nil {
+		cloudStr = strconv.Itoa(*wx.CloudCoverPct)
+	}
 
-		fmt.Printf("\n[\033[1;33m%s ☀️ RENOGY LIVE TELEMETRY | %s\033[0m]\n", nowStr, sunState)
-		fmt.Printf("  ├─ Array (400W 2S2P): \033[1;33m%d W\033[0m (%.1fV @ %.2fA) | Util: %.1f%% | Peak: %dW\n",
-			telem.PVPowerW, telem.PVVoltageV, telem.PVCurrentA, telem.ArrayUtilizationPct, telem.DailyMaxPVWatts)
-		fmt.Printf("  ├─ Battery:           \033[1;32m%.1f V\033[0m | SOC: \033[1;36m%d%%\033[0m | Charge: %.2fA\n",
-			telem.BatteryVoltageV, telem.BatterySOCPct, telem.BatteryCurrentA)
-		fmt.Printf("  ├─ State:             \033[1;35m%s\033[0m | Health: \033[1;32m%s\033[0m\n",
-			telem.ChargingState, telem.FaultFlags)
-		fmt.Printf("  ├─ Dorset Wx:         %s°C | Clouds: %s%% | Rad: %.1f W/m² (PR: %.1f%%)\n",
-			tempStr, cloudStr, wx.DirectRadiationWM2, prPct)
-		fmt.Printf("  ├─ Temps:             Controller %d°C | Battery %d°C\n",
-			telem.ControllerTempC, telem.BatteryTempC)
-		fmt.Printf("  └─ Daily Yield:       \033[1;32m%d Wh\033[0m | Lifetime: %d kWh\n",
-			telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
+	fmt.Printf("\n[\033[1;33m%s ☀️ RENOGY LIVE TELEMETRY | %s\033[0m]\n", nowStr, sunState)
+	fmt.Printf("  ├─ Array (400W 2S2P): \033[1;33m%d W\033[0m (%.1fV @ %.2fA) | Util: %.1f%% | Peak: %dW\n",
+		telem.PVPowerW, telem.PVVoltageV, telem.PVCurrentA, telem.ArrayUtilizationPct, telem.DailyMaxPVWatts)
+	fmt.Printf("  ├─ Battery:           \033[1;32m%.1f V\033[0m | SOC: \033[1;36m%d%%\033[0m | Charge: %.2fA\n",
+		telem.BatteryVoltageV, telem.BatterySOCPct, telem.BatteryCurrentA)
+	fmt.Printf("  ├─ State:             \033[1;35m%s\033[0m | Health: \033[1;32m%s\033[0m\n",
+		telem.ChargingState, telem.FaultFlags)
+	fmt.Printf("  ├─ Dorset Wx:         %s°C | Clouds: %s%% | Rad: %.1f W/m² (PR: %.1f%%)\n",
+		tempStr, cloudStr, wx.DirectRadiationWM2, prPct)
+	fmt.Printf("  ├─ Temps:             Controller %d°C | Battery %d°C\n",
+		telem.ControllerTempC, telem.BatteryTempC)
+	fmt.Printf("  └─ Daily Yield:       \033[1;32m%d Wh\033[0m | Lifetime: %d kWh\n",
+		telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
 }
 
 const outageFilePath = "logs/outages.json"
@@ -715,7 +719,7 @@ func (t *OutageTracker) load() {
 }
 
 func (t *OutageTracker) save() {
-	_ = os.MkdirAll("logs", 0755)
+	_ = os.MkdirAll("logs", 0750)
 	now := time.Now()
 	uptimeSec := int(now.Sub(t.firstStart).Seconds())
 	downSec := int(t.totalDowntime.Seconds())
@@ -732,7 +736,7 @@ func (t *OutageTracker) save() {
 	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err == nil {
-		_ = os.WriteFile(outageFilePath, data, 0644)
+		_ = os.WriteFile(outageFilePath, data, 0600)
 	}
 }
 
@@ -1164,10 +1168,17 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 	// 1. Start WebSocket Server on 8765
 	wsMux := http.NewServeMux()
 	wsMux.HandleFunc("/", handleWebSocket)
+	wsServer := &http.Server{
+		Addr:              fmt.Sprintf(":%d", wsPort),
+		Handler:           wsMux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	go func() {
-		wsAddr := fmt.Sprintf(":%d", wsPort)
 		fmt.Printf("[WS] WebSocket Gateway listening on: ws://localhost:%d\n", wsPort)
-		if err := http.ListenAndServe(wsAddr, wsMux); err != nil && err != http.ErrServerClosed {
+		if err := wsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("WebSocket listener failed: %v", err)
 		}
 	}()
@@ -1183,8 +1194,12 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 	})
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", httpPort),
-		Handler: httpMux,
+		Addr:              fmt.Sprintf(":%d", httpPort),
+		Handler:           httpMux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {

@@ -88,8 +88,14 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 	battVolts := float64(binary.BigEndian.Uint16(data[2:4])) * 0.1
 	battAmps := float64(binary.BigEndian.Uint16(data[4:6])) * 0.01
 
-	ctrlTemp := int(int8(data[6]))
-	battTemp := int(int8(data[7]))
+	decodeTemp := func(b byte) int {
+		if b > 127 {
+			return int(b) - 256
+		}
+		return int(b)
+	}
+	ctrlTemp := decodeTemp(data[6])
+	battTemp := decodeTemp(data[7])
 
 	loadVolts := float64(binary.BigEndian.Uint16(data[8:10])) * 0.1
 	loadAmps := float64(binary.BigEndian.Uint16(data[10:12])) * 0.01

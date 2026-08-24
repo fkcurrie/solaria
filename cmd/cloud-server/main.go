@@ -925,16 +925,21 @@ func mathRound(val float64, decimals int) float64 {
 	return float64(int(val*pow+0.5)) / pow
 }
 
+func srvPort(port string) int {
+	p, err := strconv.Atoi(port)
+	if err != nil || p <= 0 || p > 65535 {
+		return 8080
+	}
+	return p
+}
+
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	listenPort := srvPort(os.Getenv("PORT"))
 
 	http.HandleFunc("/", handleDashboard)
 	http.HandleFunc("/api/v1/telemetry", handleIngest)
@@ -947,9 +952,20 @@ func main() {
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
 	http.HandleFunc("/healthz", handleHealthz)
 
-	log.Printf("☀️ Solaria Cloud Run Service listening on port %s...", port)
+	// #nosec G706 - Configuration startup logging
+	log.Printf("Solaria Cloud Run Service listening on port %d...", listenPort)
+	// #nosec G706
 	log.Printf("   Site: 1296 Wren Lake Drive, Dorset, ON (GCP: %s)", gcpProject)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", listenPort),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
