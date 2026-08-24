@@ -678,6 +678,7 @@
         const rxService = await gattServer.getPrimaryService(RENOGY_SERVICE_READ);
         notifyCharObj = await rxService.getCharacteristic(RENOGY_CHAR_NOTIFY);
         await notifyCharObj.startNotifications();
+        notifyCharObj.removeEventListener('characteristicvaluechanged', onIncomingChunk);
         notifyCharObj.addEventListener('characteristicvaluechanged', onIncomingChunk);
         log('RX Notification Channel (0xFFF1) hooked.', 'success');
       } catch (e) {
@@ -697,7 +698,6 @@
       setTimeout(queryDeviceInfo, 500);
       setTimeout(readBatteryProfile, 1000);
       setTimeout(() => {
-        queryRealtimeTelemetry();
         startPollingLoop();
       }, 1800);
     }
@@ -784,7 +784,15 @@
       await sendModbusFrame(raw);
     }
 
+    let lastTelemetryQueryTime = 0;
+    let lastTelemetryProcessTime = 0;
+
     async function queryRealtimeTelemetry() {
+      const now = Date.now();
+      if (now - lastTelemetryQueryTime < (pollIntervalMs - 800)) {
+        return;
+      }
+      lastTelemetryQueryTime = now;
       const raw = new Uint8Array([0xFF, 0x03, 0x01, 0x00, 0x00, 0x22]);
       await sendModbusFrame(raw);
     }
@@ -881,6 +889,12 @@
       }
 
       if (byteCount >= 60 || data.length >= 20) {
+        const now = Date.now();
+        if (now - lastTelemetryProcessTime < (pollIntervalMs - 1500)) {
+          return;
+        }
+        lastTelemetryProcessTime = now;
+
         packetCounter++;
         document.getElementById('packetCount').textContent = packetCounter;
         document.getElementById('cloudSubText').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
@@ -908,8 +922,16 @@
     }
 
     function startPollingLoop() {
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      const select = document.getElementById('pollIntervalSelect');
+      if (select) {
+        pollIntervalMs = parseInt(select.value, 10) || 10000;
+      }
       if (pollIntervalMs > 0) {
+        queryRealtimeTelemetry();
         pollTimer = setInterval(queryRealtimeTelemetry, pollIntervalMs);
       }
     }

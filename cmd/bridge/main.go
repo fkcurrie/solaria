@@ -454,19 +454,29 @@ func getIDToken() string {
 	out, err := cmd.Output()
 	if err == nil && len(bytes.TrimSpace(out)) > 0 {
 		token := strings.TrimSpace(string(out))
-		mu.Lock()
-		idTokenCache = token
-		idTokenExpires = time.Now().Add(30 * time.Minute)
 		mu.Unlock()
 		return token
 	}
 	return cloudToken
 }
 
+var (
+	uploadMu        sync.Mutex
+	lastCloudUpload time.Time
+)
+
 func uploadToCloud(record SolarRecord) {
 	if cloudEndpoint == "" {
 		return
 	}
+	uploadMu.Lock()
+	if time.Since(lastCloudUpload) < 8*time.Second {
+		uploadMu.Unlock()
+		return
+	}
+	lastCloudUpload = time.Now()
+	uploadMu.Unlock()
+
 	go func() {
 		payload, err := json.Marshal(map[string]interface{}{
 			"batch": []SolarRecord{record},
@@ -492,18 +502,34 @@ func uploadToCloud(record SolarRecord) {
 	}()
 }
 
+var (
+	frameMu          sync.Mutex
+	lastFrameProcess time.Time
+)
+
 func processFrame(frame []byte) {
 	if len(frame) < 5 || frame[1] != 0x03 {
 		return
 	}
 	byteCount := frame[2]
+	if byteCount < 60 && len(frame) < 65 {
+		return
+	}
+
+	frameMu.Lock()
+	if time.Since(lastFrameProcess) < 8*time.Second {
+		frameMu.Unlock()
+		return
+	}
+	lastFrameProcess = time.Now()
+	frameMu.Unlock()
+
 	nowStr := time.Now().Format("15:04:05.000")
 
-	if byteCount >= 60 || len(frame) >= 65 {
-		telem, err := decodeTelemetry(frame)
-		if err != nil {
-			return
-		}
+	telem, err := decodeTelemetry(frame)
+	if err != nil {
+		return
+	}
 
 		wx := fetchWeather()
 		sunState := classifySunCondition(telem, wx)
@@ -552,7 +578,6 @@ func processFrame(frame []byte) {
 			telem.ControllerTempC, telem.BatteryTempC)
 		fmt.Printf("  └─ Daily Yield:       \033[1;32m%d Wh\033[0m | Lifetime: %d kWh\n",
 			telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
-	}
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -652,10 +677,15 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 		}
 	}()
 
-	// 2. Start HTTP Dashboard Server on 8080
+	// 2. Start HTTP Dashboard Server on 8080 (No-cache for instant UI updates)
 	httpMux := http.NewServeMux()
 	fs := http.FileServer(http.Dir("static"))
-	httpMux.Handle("/", fs)
+	httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+		fs.ServeHTTP(w, r)
+	})
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", httpPort),
