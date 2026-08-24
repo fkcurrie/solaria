@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solaria: Dorset Solar & Atmospheric Intelligence (400W 2S2P)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230b0f19'/%3E%3Ccircle cx='50' cy='50' r='36' fill='%23f59e0b'/%3E%3Cpolygon points='63,2 35,50 49,50 37,98 65,50 51,50' fill='%230b0f19' stroke='%230b0f19' stroke-width='4'/%3E%3Cpolygon points='63,2 35,50 49,50 37,98 65,50 51,50' fill='%2338bdf8'/%3E%3C/svg%3E">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -365,13 +366,16 @@
   </div>
 
   <!-- Tab Navigation -->
-  <div class="nav-tabs">
+  <div class="nav-tabs" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
     <button class="nav-tab-btn active" onclick="switchTab('tab-live', this)">⚡ Live Monitor</button>
     <button class="nav-tab-btn" onclick="switchTab('tab-day', this)">📅 Day View (Hourly)</button>
     <button class="nav-tab-btn" onclick="switchTab('tab-week', this)">🗓️ Week View (7 Days)</button>
     <button class="nav-tab-btn" onclick="switchTab('tab-month', this)">📆 Month View (30 Days)</button>
     <button class="nav-tab-btn" onclick="switchTab('tab-year', this)">📈 Year View (Seasonal)</button>
     <button class="nav-tab-btn" onclick="switchTab('tab-specs', this)">⚙️ System Specs & Hardware</button>
+    <button class="nav-tab-btn" id="demoDataBtn" onclick="loadSampleDayDemo()" style="margin-left: auto; background: rgba(56, 189, 248, 0.12); border-color: #38bdf8; color: #38bdf8; font-weight: 700;">
+      ⚡ Load 24h Sample Day
+    </button>
   </div>
 
   <!-- TAB 1: LIVE MONITOR -->
@@ -689,6 +693,64 @@
     let yearYieldChart = null;
     let yearCumulativeChart = null;
     let activeTabId = 'tab-live';
+
+    async function loadSampleDayDemo() {
+      const btn = document.getElementById('demoDataBtn');
+      if (btn) btn.innerText = '⏳ Loading...';
+      try {
+        const res = await fetch('/api/v1/sample-day');
+        const records = await res.json();
+        if (!records || !records.length) throw new Error('No records returned');
+
+        // Map 1440 minute records into 24 hourly summary bins for Day View
+        const hourly = [];
+        for (let h = 0; h < 24; h++) {
+          const slice = records.filter(r => new Date(r.timestamp).getUTCHours() === h);
+          if (slice.length > 0) {
+            const avgPv = Math.round(slice.reduce((acc, c) => acc + c.pv_power_w, 0) / slice.length);
+            const maxPv = Math.max(...slice.map(c => c.pv_power_w));
+            const avgBattV = Math.round((slice.reduce((acc, c) => acc + c.battery_voltage_v, 0) / slice.length) * 10) / 10;
+            const avgSoc = Math.round(slice.reduce((acc, c) => acc + c.battery_soc_pct, 0) / slice.length);
+            const avgTemp = Math.round((slice.reduce((acc, c) => acc + c.temperature_c, 0) / slice.length) * 10) / 10;
+            const avgCloud = Math.round(slice.reduce((acc, c) => acc + c.cloud_cover_pct, 0) / slice.length);
+            const totalYield = Math.round(avgPv * (slice.length / 60));
+
+            hourly.push({
+              hour: `${String(h).padStart(2, '0')}:00`,
+              avg_pv_power_w: avgPv,
+              peak_pv_power_w: maxPv,
+              avg_battery_voltage_v: avgBattV,
+              avg_battery_soc_pct: avgSoc,
+              avg_temp_c: avgTemp,
+              avg_cloud_cover_pct: avgCloud,
+              yield_wh: totalYield,
+              sample_count: slice.length
+            });
+          }
+        }
+
+        // Switch to Day tab and render full diurnal curve
+        const dayTabBtn = document.querySelector("button[onclick*='tab-day']");
+        if (dayTabBtn) switchTab('tab-day', dayTabBtn);
+        renderDayTab({ hourly_stats: hourly, records: records.slice(0, 100) });
+
+        // Update top metrics to solar noon peak
+        const noonRec = records[720] || records[records.length - 1];
+        updateLiveMetrics({
+          telemetry: noonRec,
+          weather: noonRec,
+          sun_classification: noonRec.sun_condition || 'FULL_SUN'
+        });
+
+        if (btn) {
+          btn.innerText = '✓ 24h Model Loaded';
+          setTimeout(() => { btn.innerText = '⚡ Load 24h Sample Day'; }, 3000);
+        }
+      } catch (err) {
+        console.error('Failed to load sample day demo:', err);
+        if (btn) btn.innerText = '❌ Failed to load';
+      }
+    }
 
     function getWeatherMeta(item) {
       if (!item) return { icon: '🌤️', text: 'Daytime', cloud: 0, temp: '--' };

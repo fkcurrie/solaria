@@ -22,6 +22,9 @@ import (
 //go:embed templates/*
 var templateFS embed.FS
 
+//go:embed testdata/sample_day.json
+var sampleDayJSON []byte
+
 type Telemetry struct {
 	PVPowerW        int     `json:"pv_power_w"`
 	PVVoltageV      float64 `json:"pv_voltage_v"`
@@ -989,6 +992,13 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+func handleSampleDay(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(sampleDayJSON)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1001,6 +1011,7 @@ func main() {
 	http.HandleFunc("/api/v1/stats/month", handleMonthStats)
 	http.HandleFunc("/api/v1/stats/year", handleYearStats)
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
+	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
 
