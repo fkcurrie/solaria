@@ -347,4 +347,29 @@ func TestHandleShadingAnalysis(t *testing.T) {
 	}
 }
 
+func TestHandleCommissioningWizard(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/commissioning-wizard", nil)
+	w := httptest.NewRecorder()
+	handleCommissioningWizard(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/commissioning-wizard, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode commissioning wizard response: %v", err)
+	}
+
+	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
+		t.Errorf("Expected Dorset site, got %v", res["site"])
+	}
+
+	steps, ok := res["steps"].([]interface{})
+	if !ok || len(steps) != 5 {
+		t.Errorf("Expected 5 commissioning steps, got %v", res["steps"])
+	}
+}
+
+
 
