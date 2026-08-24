@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -1197,6 +1198,67 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(cfg)
 }
 
+// handlePowerBudget calculates runtime hours and cottage advisory based on selected wattage and battery capacity
+func handlePowerBudget(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	wattsStr := r.URL.Query().Get("watts")
+	watts, err := strconv.ParseFloat(wattsStr, 64)
+	if err != nil || watts <= 0 {
+		watts = 75.0 // default reasonable cottage load (Starlink 45W + Fridge 30W)
+	}
+
+	hardwareConfigMu.RLock()
+	capAh := float64(activeHardwareConfig.BatteryCapacityAh)
+	hardwareConfigMu.RUnlock()
+	if capAh <= 0 {
+		capAh = 170.0
+	}
+
+	soc := 100.0
+	battV := 12.8
+	if ringBuf != nil {
+		latest := ringBuf.GetLatest()
+		if latest.Telemetry.BatterySOCPct > 0 {
+			soc = float64(latest.Telemetry.BatterySOCPct)
+		}
+		if latest.Telemetry.BatteryVoltageV > 10.0 {
+			battV = latest.Telemetry.BatteryVoltageV
+		}
+	}
+
+	totalEnergyWh := capAh * 12.8
+	usableWh := totalEnergyWh * (soc / 100.0)
+	runtimeHours := 0.0
+	if watts > 0 {
+		runtimeHours = math.Round((usableWh/watts)*10) / 10
+	}
+
+	status := "AMPLE"
+	advisory := fmt.Sprintf("Ample battery reserve (%.1f hrs). Safe for overnight operation of Starlink, 12V fridge, and lighting.", runtimeHours)
+	if runtimeHours < 8.0 {
+		status = "CRITICAL"
+		advisory = fmt.Sprintf("⚠️ Heavy load! Battery will deplete in %.1f hrs before morning sunrise. Turn off high-draw appliances.", runtimeHours)
+	} else if runtimeHours < 16.0 {
+		status = "MODERATE"
+		advisory = fmt.Sprintf("Moderate reserve (%.1f hrs). Will sustain current load through the night until ~7:30 AM sunrise.", runtimeHours)
+	}
+
+	resp := map[string]interface{}{
+		"selected_load_watts": watts,
+		"battery_capacity_ah": capAh,
+		"battery_soc_pct":     soc,
+		"battery_voltage_v":   battV,
+		"usable_wh":           math.Round(usableWh*10) / 10,
+		"total_wh":            math.Round(totalEnergyWh*10) / 10,
+		"runtime_hours":       runtimeHours,
+		"status":              status,
+		"advisory":            advisory,
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1210,6 +1272,7 @@ func main() {
 	http.HandleFunc("/api/v1/stats/year", handleYearStats)
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
 	http.HandleFunc("/api/v1/hardware-config", handleHardwareConfig)
+	http.HandleFunc("/api/v1/power-budget", handlePowerBudget)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
