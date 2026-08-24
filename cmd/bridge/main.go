@@ -603,6 +603,8 @@ func processFrame(frame []byte) {
 			telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
 }
 
+const outageFilePath = "logs/outages.json"
+
 type OutageEvent struct {
 	ID           int    `json:"id"`
 	Status       string `json:"status"` // "ACTIVE" or "RESOLVED"
@@ -624,9 +626,19 @@ type OutageStats struct {
 	CurrentOutageSec int     `json:"current_outage_sec"`
 }
 
+type OutagePersistedState struct {
+	FirstStartedAt   time.Time     `json:"first_started_at"`
+	LastSeenAt       time.Time     `json:"last_seen_at"`
+	OutageCount      int           `json:"outage_count"`
+	TotalDowntimeSec int           `json:"total_downtime_sec"`
+	TotalUptimeSec   int           `json:"total_uptime_sec"`
+	History          []OutageEvent `json:"history"`
+}
+
 type OutageTracker struct {
 	mu            sync.Mutex
 	sessionStart  time.Time
+	firstStart    time.Time
 	hasSeenFrame  bool
 	inOutage      bool
 	outageCount   int
@@ -642,16 +654,91 @@ var (
 	lastHealthCheck time.Time
 	tracker         = &OutageTracker{
 		sessionStart: time.Now(),
+		firstStart:   time.Now(),
 		history:      make([]OutageEvent, 0),
 	}
 )
+
+func (t *OutageTracker) load() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	data, err := os.ReadFile(outageFilePath)
+	if err != nil {
+		return
+	}
+	var state OutagePersistedState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+	t.history = state.History
+	t.outageCount = state.OutageCount
+	t.totalDowntime = time.Duration(state.TotalDowntimeSec) * time.Second
+	if !state.FirstStartedAt.IsZero() {
+		t.firstStart = state.FirstStartedAt
+	}
+
+	// If there was an active outage when previous process exited, close it
+	if len(t.history) > 0 && t.history[0].Status == "ACTIVE" {
+		now := time.Now()
+		t.history[0].Status = "RESOLVED"
+		t.history[0].EndTime = now.In(siteLoc).Format("15:04:05")
+		t.history[0].EndISO = now.UTC().Format(time.RFC3339)
+		if t.history[0].DurationSec <= 0 {
+			if parsedStart, pErr := time.Parse(time.RFC3339, t.history[0].StartISO); pErr == nil {
+				dur := int(now.Sub(parsedStart).Seconds())
+				if dur < 0 {
+					dur = 0
+				}
+				t.history[0].DurationSec = dur
+				t.totalDowntime += time.Duration(dur) * time.Second
+			}
+		}
+		t.history[0].RecoveredVia = "Bridge restarted / stream restored"
+	}
+}
+
+func (t *OutageTracker) save() {
+	_ = os.MkdirAll("logs", 0755)
+	now := time.Now()
+	uptimeSec := int(now.Sub(t.firstStart).Seconds())
+	downSec := int(t.totalDowntime.Seconds())
+	if t.inOutage {
+		downSec += int(now.Sub(t.outageStart).Seconds())
+	}
+	state := OutagePersistedState{
+		FirstStartedAt:   t.firstStart,
+		LastSeenAt:       now,
+		OutageCount:      t.outageCount,
+		TotalDowntimeSec: downSec,
+		TotalUptimeSec:   uptimeSec,
+		History:          t.history,
+	}
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err == nil {
+		_ = os.WriteFile(outageFilePath, data, 0644)
+	}
+}
+
+func (t *OutageTracker) Clear() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.sessionStart = time.Now()
+	t.firstStart = time.Now()
+	t.outageCount = 0
+	t.totalDowntime = 0
+	t.inOutage = false
+	t.history = make([]OutageEvent, 0)
+	_ = os.Remove(outageFilePath)
+}
 
 func (t *OutageTracker) GetStats() (OutageStats, []OutageEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	now := time.Now()
-	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	uptimeSec := int(now.Sub(t.firstStart).Seconds())
 	if uptimeSec < 1 {
 		uptimeSec = 1
 	}
@@ -710,12 +797,12 @@ func (t *OutageTracker) RecordOutageStart(reason string) (*OutageEvent, OutageSt
 	}
 
 	t.history = append([]OutageEvent{event}, t.history...)
-	if len(t.history) > 50 {
-		t.history = t.history[:50]
+	if len(t.history) > 100 {
+		t.history = t.history[:100]
 	}
 
 	now := time.Now()
-	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	uptimeSec := int(now.Sub(t.firstStart).Seconds())
 	if uptimeSec < 1 {
 		uptimeSec = 1
 	}
@@ -734,6 +821,7 @@ func (t *OutageTracker) RecordOutageStart(reason string) (*OutageEvent, OutageSt
 		CurrentOutageSec: 0,
 	}
 
+	t.save()
 	return &event, stats
 }
 
@@ -772,7 +860,7 @@ func (t *OutageTracker) RecordOutageEnd(recoveredVia string) (*OutageEvent, Outa
 		t.history[0].RecoveredVia = recoveredVia
 	}
 
-	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	uptimeSec := int(now.Sub(t.firstStart).Seconds())
 	if uptimeSec < 1 {
 		uptimeSec = 1
 	}
@@ -791,6 +879,7 @@ func (t *OutageTracker) RecordOutageEnd(recoveredVia string) (*OutageEvent, Outa
 		CurrentOutageSec: 0,
 	}
 
+	t.save()
 	return &event, stats
 }
 
@@ -906,6 +995,7 @@ func startBluetoothWatchdog(ctx context.Context) {
 					"stats":     stats,
 					"timestamp": time.Now().UTC().Format(time.RFC3339),
 				})
+				tracker.save()
 			}
 		}
 	}
@@ -1024,12 +1114,22 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}); err == nil {
 				_ = conn.WriteMessage(websocket.TextMessage, d)
 			}
+
+		case "clear_outages":
+			tracker.Clear()
+			s, h := tracker.GetStats()
+			broadcastControlMsg(map[string]interface{}{
+				"type":    "outage_sync",
+				"stats":   s,
+				"history": h,
+			})
 		}
 	}
 }
 
 func main() {
 	loadEnv()
+	tracker.load()
 
 	banner := `===========================================================================
 RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY

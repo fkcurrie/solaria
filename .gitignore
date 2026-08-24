@@ -51,6 +51,7 @@ venv.bak/
 # Logs and local buffers
 logs/*.csv
 logs/*.log
+logs/*.json
 *.log
 spool.jsonl
 *.sqlite

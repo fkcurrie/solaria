@@ -544,14 +544,15 @@
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
       <div>
         <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
-          🛡️ Telemetry Stream Uptime & Outages Supervisor
+          Telemetry Stream Uptime & Outages Supervisor
         </h2>
         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
           Autonomous watchdog monitoring, self-healing events & uptime audit log
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span id="streamHealthBadge" class="badge badge-online">🟢 Stream Active</span>
+        <button class="btn-outline" style="font-size: 0.72rem; padding: 4px 10px; color: var(--text-muted);" onclick="clearOutagesLog()">Clear History</button>
+        <span id="streamHealthBadge" class="badge badge-online">Stream Active</span>
       </div>
     </div>
 
@@ -679,11 +680,17 @@
       if (badgeEl) {
         if (stats.in_outage) {
           badgeEl.className = 'badge badge-offline';
-          badgeEl.textContent = `🔴 Outage Detected (${formatSecs(stats.current_outage_sec)})`;
+          badgeEl.textContent = `Outage Detected (${formatSecs(stats.current_outage_sec)})`;
         } else {
           badgeEl.className = 'badge badge-online';
-          badgeEl.textContent = '🟢 Stream Active';
+          badgeEl.textContent = 'Stream Active';
         }
+      }
+    }
+
+    function clearOutagesLog() {
+      if (confirm('Reset outage audit log and availability counters?')) {
+        sendToLinux({ type: 'clear_outages' });
       }
     }
 
