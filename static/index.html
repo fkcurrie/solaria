@@ -631,6 +631,73 @@
     </div>
   </div>
 
+  <!-- ⏱️ Cottage Appliance Power Budget & Runtime Estimator Card -->
+  <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background: rgba(16, 185, 129, 0.04);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="font-size: 1rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
+          ⏱️ Cottage Power Budget & Appliance Runtime Estimator
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
+          Toggle cabin appliances to project battery hours remaining on your 170Ah LiFePO4 bank.
+        </p>
+      </div>
+      <div id="edgeBudgetStatusBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
+        AMPLE RESERVE
+      </div>
+    </div>
+
+    <!-- Appliance Selection Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px;">
+      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+        <input type="checkbox" id="edgeAppStarlink" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
+        <span>🛰️ Starlink (45W)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+        <input type="checkbox" id="edgeAppFridge" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
+        <span>🧊 12V Fridge (30W)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+        <input type="checkbox" id="edgeAppLights" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
+        <span>💡 Cabin LEDs (15W)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+        <input type="checkbox" id="edgeAppPump" onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
+        <span>🚿 Water Pump (60W)</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+        <input type="checkbox" id="edgeAppLaptop" onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
+        <span>💻 Laptop/USB (65W)</span>
+      </label>
+      <div style="display: flex; align-items: center; gap: 6px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); font-size: 0.85rem;">
+        <span>➕ Custom:</span>
+        <input type="number" id="edgeAppCustomWatts" value="0" min="0" max="1500" step="10" oninput="updateEdgePowerBudget()" style="width: 60px; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; text-align: right;">
+        <span>W</span>
+      </div>
+    </div>
+
+    <!-- Live Budget Projection Output -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 12px 16px; background: rgba(15, 23, 42, 0.8); border-radius: 8px; border: 1px solid var(--card-border);">
+      <div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Selected Total Load</div>
+        <div id="edgeBudgetTotalWatts" style="font-size: 1.3rem; font-weight: 700; color: #f59e0b;">90 W</div>
+      </div>
+      <div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Battery Usable Energy</div>
+        <div id="edgeBudgetUsableWh" style="font-size: 1.3rem; font-weight: 700; color: #38bdf8;">1,784 Wh (82% SOC)</div>
+      </div>
+      <div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Projected Continuous Runtime</div>
+        <div id="edgeBudgetRuntimeHours" style="font-size: 1.3rem; font-weight: 700; color: #10b981;">19.8 Hours</div>
+      </div>
+    </div>
+
+    <!-- Plain English Cottage Advisory Banner -->
+    <div id="edgeBudgetAdvisoryText" style="margin-top: 10px; font-size: 0.85rem; color: #93c5fd; padding: 6px 10px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
+      💡 Ample battery reserve (19.8 hrs). Safe for overnight operation of Starlink, 12V fridge, and lighting.
+    </div>
+  </div>
+
   <!-- Live Real-Time Oscilloscope & Telemetry Charts -->
   <div style="margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
@@ -1701,6 +1768,8 @@
         document.getElementById('cloudSubText').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
 
         const battSoc = (data[0] << 8) | data[1];
+        if (battSoc > 0) latestEdgeSOC = battSoc;
+        updateEdgePowerBudget();
         const battVolts = ((data[2] << 8) | data[3]) * 0.1;
         const pvPower = (data[18] << 8) | data[19];
         const pvVolts = ((data[14] << 8) | data[15]) * 0.1;
@@ -2059,8 +2128,82 @@
       } catch (e) {}
     }
 
+    let latestEdgeSOC = 85;
+
+    function updateEdgePowerBudget() {
+      let totalW = 0;
+      if (document.getElementById('edgeAppStarlink')?.checked) totalW += 45;
+      if (document.getElementById('edgeAppFridge')?.checked) totalW += 30;
+      if (document.getElementById('edgeAppLights')?.checked) totalW += 15;
+      if (document.getElementById('edgeAppPump')?.checked) totalW += 60;
+      if (document.getElementById('edgeAppLaptop')?.checked) totalW += 65;
+      const customW = parseFloat(document.getElementById('edgeAppCustomWatts')?.value) || 0;
+      totalW += customW;
+
+      if (document.getElementById('edgeBudgetTotalWatts')) {
+        document.getElementById('edgeBudgetTotalWatts').textContent = `${Math.round(totalW)} W`;
+      }
+
+      const soc = latestEdgeSOC;
+      let capAh = 170;
+      try {
+        const saved = localStorage.getItem('solaria_hardware_config');
+        if (saved) {
+          const cfg = JSON.parse(saved);
+          if (cfg.ah) capAh = parseFloat(cfg.ah) || 170;
+        }
+      } catch(e) {}
+
+      const totalWh = capAh * 12.8;
+      const usableWh = Math.round(totalWh * (soc / 100));
+
+      if (document.getElementById('edgeBudgetUsableWh')) {
+        document.getElementById('edgeBudgetUsableWh').textContent = `${usableWh.toLocaleString()} Wh (${soc}% SOC)`;
+      }
+
+      const runtimeH = totalW > 0 ? (usableWh / totalW) : 999;
+      const runtimeDisplay = runtimeH > 100 ? '> 100 Hours' : `${runtimeH.toFixed(1)} Hours`;
+
+      if (document.getElementById('edgeBudgetRuntimeHours')) {
+        document.getElementById('edgeBudgetRuntimeHours').textContent = runtimeDisplay;
+      }
+
+      const badge = document.getElementById('edgeBudgetStatusBadge');
+      const adv = document.getElementById('edgeBudgetAdvisoryText');
+
+      if (runtimeH >= 16) {
+        if (badge) {
+          badge.className = 'badge badge-online';
+          badge.textContent = 'AMPLE RESERVE';
+        }
+        if (adv) {
+          adv.style.color = '#93c5fd';
+          adv.textContent = `💡 Ample battery reserve (${runtimeH.toFixed(1)} hrs). Safe for overnight operation of Starlink, 12V fridge, and lighting.`;
+        }
+      } else if (runtimeH >= 8) {
+        if (badge) {
+          badge.className = 'badge badge-array';
+          badge.textContent = 'MODERATE RESERVE';
+        }
+        if (adv) {
+          adv.style.color = '#fde68a';
+          adv.textContent = `⚠️ Moderate reserve (${runtimeH.toFixed(1)} hrs). Will sustain selected loads through the night until ~7:30 AM sunrise.`;
+        }
+      } else {
+        if (badge) {
+          badge.className = 'badge badge-alert';
+          badge.textContent = 'CRITICAL RESERVE';
+        }
+        if (adv) {
+          adv.style.color = '#fca5a5';
+          adv.textContent = `🚨 High Load Warning! Battery projected to deplete in ${runtimeH.toFixed(1)} hrs before morning sunrise. Turn off high-draw appliances.`;
+        }
+      }
+    }
+
     window.addEventListener('load', () => {
       loadSavedEdgeHardwareConfig();
+      updateEdgePowerBudget();
       initLiveCharts();
       tryAutoConnectSavedDevice();
       // Watchdog: ensures connection is maintained and un-wedged automatically

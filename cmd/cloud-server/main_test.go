@@ -225,3 +225,40 @@ func TestHandleHardwareConfig(t *testing.T) {
 	}
 }
 
+func TestHandlePowerBudget(t *testing.T) {
+	// Test default / 75W load
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/power-budget?watts=75", nil)
+	w := httptest.NewRecorder()
+	handlePowerBudget(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/power-budget, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode power budget response: %v", err)
+	}
+
+	runtimeHours, ok := res["runtime_hours"].(float64)
+	if !ok || runtimeHours <= 0 {
+		t.Errorf("Expected positive runtime_hours, got %v", res["runtime_hours"])
+	}
+
+	usableWh, ok := res["usable_wh"].(float64)
+	if !ok || usableWh <= 0 {
+		t.Errorf("Expected positive usable_wh, got %v", res["usable_wh"])
+	}
+
+	// Test high load (e.g. 1000W -> critical warning)
+	reqCrit := httptest.NewRequest(http.MethodGet, "/api/v1/power-budget?watts=1000", nil)
+	wCrit := httptest.NewRecorder()
+	handlePowerBudget(wCrit, reqCrit)
+	var resCrit map[string]interface{}
+	if err := json.NewDecoder(wCrit.Body).Decode(&resCrit); err != nil {
+		t.Fatalf("Failed to decode critical power budget: %v", err)
+	}
+	if resCrit["status"] != "CRITICAL" {
+		t.Errorf("Expected status CRITICAL for 1000W load, got %v", resCrit["status"])
+	}
+}
