@@ -1,14 +1,18 @@
 {
   "ignorePatterns": [
     {
+      "pattern": "^https://solaria-dashboard-"
+    },
+    {
       "pattern": "^http://localhost"
     },
     {
-      "pattern": "^ws://localhost"
+      "pattern": "^file://"
     }
   ],
-  "timeout": "15s",
+  "timeout": "10s",
   "retryOn429": true,
   "retryCount": 2,
+  "fallbackRetryDelay": "30s",
   "aliveStatusCodes": [200, 206]
 }
