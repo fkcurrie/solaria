@@ -1418,6 +1418,62 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// CommissioningStep defines one physical commissioning requirement
+type CommissioningStep struct {
+	StepIndex int    `json:"step_index"`
+	Title     string `json:"title"`
+	Warning   string `json:"warning,omitempty"`
+	Detail    string `json:"detail"`
+	CheckItem string `json:"check_item"`
+}
+
+// handleCommissioningWizard returns the authoritative hardware wiring sequence and verification checks
+func handleCommissioningWizard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	steps := []CommissioningStep{
+		{
+			StepIndex: 1,
+			Title:     "Step 1: Connect Battery Bank FIRST (Crucial Rule)",
+			Warning:   "CRITICAL: Always connect battery before solar panels! Connecting PV first destroys MPPT voltage regulators.",
+			Detail:    "Wire Renogy 12V 170Ah LiFePO4 battery positive (+) to Controller Battery (+) and negative (-) to Controller Battery (-). Ensure 30A inline ANL fuse is seated.",
+			CheckItem: "Rover 20A LCD screen turns on and recognizes 12V battery system.",
+		},
+		{
+			StepIndex: 2,
+			Title:     "Step 2: Connect RTS Temperature Sensor Probe",
+			Detail:    "Plug the 3.5mm jack of the Renogy RTS probe into the temperature sensor port. Tape probe copper lug directly to the LiFePO4 cell casing.",
+			CheckItem: "Sub-zero charge inhibit (0°C cutoff) is now armed for winter protection.",
+		},
+		{
+			StepIndex: 3,
+			Title:     "Step 3: Connect BT-1 Bluetooth RS232 Module",
+			Detail:    "Plug the RJ12 communications cable from the BT-1 Bluetooth module into the RS232 port of the Rover MPPT. Ensure the green indicator LED blinks.",
+			CheckItem: "BT-1 module is broadcasting BLE advertising packets.",
+		},
+		{
+			StepIndex: 4,
+			Title:     "Step 4: Wire 4x100W 2S2P Solar Array & Close DC Breaker",
+			Detail:    "Connect PV panels in 2 Series x 2 Parallel (2S2P). Connect array MC4 output through the 20A DC circuit breaker into Controller PV (+) and PV (-). Close the breaker.",
+			CheckItem: "Controller PV indicator illuminates and Voc reads ~36V to 40V.",
+		},
+		{
+			StepIndex: 5,
+			Title:     "Step 5: Commissioning Telemetry Verification",
+			Detail:    "Verify MPPT bulk charging begins, Bluetooth telemetry streams to Solaria Bridge, and BigQuery data pipeline syncs.",
+			CheckItem: "Live dashboard displays active watts, battery SOC%, and green status indicators.",
+		},
+	}
+
+	resp := map[string]interface{}{
+		"wizard_title": "Renogy Rover 20A & 170Ah LiFePO4 First-Time Commissioning Wizard",
+		"site":         "1296 Wren Lake Drive, Dorset, ON",
+		"steps":        steps,
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1435,6 +1491,7 @@ func main() {
 	http.HandleFunc("/api/v1/winterize-status", handleWinterizeStatus)
 	http.HandleFunc("/api/v1/sunset-digest", handleSunsetDigest)
 	http.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
+	http.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)

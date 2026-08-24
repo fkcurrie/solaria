@@ -334,6 +334,9 @@
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <button onclick="openCommissioningModal()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; font-weight: 600;">
+        🔌 Commissioning Wizard
+      </button>
       <button onclick="openWinterizeModal()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
         ❄️ Winterize Cottage
       </button>
@@ -349,6 +352,83 @@
       <span id="chargeStateBadge" class="badge badge-float">MPPT</span>
     </div>
   </header>
+
+  <!-- First-Time Commissioning & Safe Wiring Sequence Modal -->
+  <div id="commissioningModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="card" style="max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; background: #0b1120; border: 1px solid #10b981; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
+        <h2 style="font-size: 1.15rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
+          🔌 Safe Wiring Sequence & Commissioning Wizard
+        </h2>
+        <button onclick="closeCommissioningModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px;">
+        <strong style="color: #f87171; font-size: 0.88rem;">⚠️ Golden Rule of Solar Commissioning:</strong>
+        <p style="font-size: 0.8rem; color: #fca5a5; margin: 3px 0 0 0;">
+          ALWAYS connect the 12V Battery Bank to the MPPT Controller BEFORE connecting solar panels. Connecting PV first without a battery reference voltage can permanently destroy internal buck converters.
+        </p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #10b981; font-size: 0.9rem;">Step 1: Connect 170Ah LiFePO4 Battery Bank</strong>
+            <span class="badge badge-online">MANDATORY 1ST</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Connect battery (+) to Controller Battery (+) and (-) to Battery (-). Ensure 30A inline ANL fuse is installed. Controller LCD will power on.
+          </p>
+        </div>
+
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #38bdf8; font-size: 0.9rem;">Step 2: Connect Renogy RTS Temperature Sensor</strong>
+            <span class="badge badge-array">STEP 2</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Plug 3.5mm RTS probe into the temperature port and tape copper sensor lug directly to the LiFePO4 casing. Arms sub-zero freeze protection (0°C cutoff).
+          </p>
+        </div>
+
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #f59e0b; font-size: 0.9rem;">Step 3: Connect Renogy BT-1 Bluetooth Module</strong>
+            <span class="badge badge-retry">STEP 3</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Plug RJ12 cable from BT-1 module into RS232 port of Rover MPPT. Green LED will flash to broadcast Bluetooth Modbus RTU telemetry.
+          </p>
+        </div>
+
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #38bdf8; font-size: 0.9rem;">Step 4: Wire 4x100W 2S2P Array & Close PV Breaker</strong>
+            <span class="badge badge-array">STEP 4</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Verify MC4 branch Y-connectors (2 series pairs paralleled). Close 20A DC breaker. MPPT solar indicator illuminates and reads ~36-40V Voc.
+          </p>
+        </div>
+
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #10b981; font-size: 0.9rem;">Step 5: Verify Live Sync & Autonomous Guardian</strong>
+            <span class="badge badge-online">STEP 5</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Check that Solaria dashboard displays real-time watts, battery SOC%, and green health badges.
+          </p>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button onclick="closeCommissioningModal()" class="btn-solar" style="font-weight: 700; padding: 8px 18px; border: none;">
+          ✓ Commissioning Understood
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Winterization & Freeze-Proof Departure Modal -->
   <div id="winterizeModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
@@ -2053,6 +2133,16 @@
           }
         }
       } catch (e) {}
+    }
+
+    function openCommissioningModal() {
+      const modal = document.getElementById('commissioningModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeCommissioningModal() {
+      const modal = document.getElementById('commissioningModal');
+      if (modal) modal.style.display = 'none';
     }
 
     function closeWinterizeModal() {
