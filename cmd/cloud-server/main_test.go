@@ -402,6 +402,26 @@ func TestHandleArrayTopology(t *testing.T) {
 	}
 }
 
+func TestHandleBluetoothSignal(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/bluetooth-signal", nil)
+	w := httptest.NewRecorder()
+	handleBluetoothSignal(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/bluetooth-signal, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode bluetooth signal response: %v", err)
+	}
+
+	if res["module_type"] == nil || res["rssi_dbm"] == nil {
+		t.Errorf("Expected module_type and rssi_dbm, got %v", res)
+	}
+}
+
+
 
 
 
