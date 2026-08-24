@@ -576,19 +576,26 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 	coldDerateWarn := false
 	coldDerateMsg := "OK: Thermal conditions optimal for full charging rate"
 
-	if battTemp <= 0 {
+	// Check if external RTS probe is unconnected: Renogy reports 0°C on register 0x0103 byte 7 when no probe is plugged in.
+	// If controller temperature is warm (> 10°C) and battTemp reads 0°C, estimate battery temp from controller.
+	effectiveBattTemp := battTemp
+	if battTemp == 0 && ctrlTemp > 10 {
+		effectiveBattTemp = ctrlTemp - 3
+	}
+
+	if effectiveBattTemp < 0 {
 		subZeroWarn = true
 		if battA > 0.1 || pvW > 5 {
-			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", battTemp)
+			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", effectiveBattTemp)
 		} else {
-			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", battTemp)
+			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", effectiveBattTemp)
 		}
-	} else if battTemp <= 5 {
+	} else if effectiveBattTemp <= 5 {
 		coldDerateWarn = true
 		if battA > 15.0 {
-			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", battTemp, battA)
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", effectiveBattTemp, battA)
 		} else {
-			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", battTemp)
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", effectiveBattTemp)
 		}
 	}
 

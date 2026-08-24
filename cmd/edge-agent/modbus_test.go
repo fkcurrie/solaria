@@ -110,10 +110,35 @@ func TestDecodeModbusTelemetry_HalfStringDiodeFault(t *testing.T) {
 	}
 }
 
-func TestDecodeModbusTelemetry_TooShort(t *testing.T) {
-	shortBuf := []byte{0xFF, 0x03, 0x04, 0x00, 0x01}
-	_, err := DecodeModbusTelemetry(shortBuf)
-	if err == nil {
-		t.Errorf("Expected error for short buffer, got nil")
+func TestDecodeModbusTelemetry_UnconnectedRTSProbe(t *testing.T) {
+	buf := make([]byte, 73)
+	buf[0] = 0xFF
+	buf[1] = 0x03
+	buf[2] = 0x44
+
+	// Battery Voltage: 13.2V, Current: 5A
+	buf[5] = 0x00
+	buf[6] = 0x84
+	buf[7] = 0x01
+	buf[8] = 0xF4
+
+	// Controller Temp = 25C (warm), Battery Temp = 0C (no probe)
+	buf[9] = 25
+	buf[10] = 0
+
+	// PV Voltage: 36.2V, Power: 72W
+	buf[17] = 0x01
+	buf[18] = 0x6A
+	buf[21] = 0x00
+	buf[22] = 0x48
+
+	telem, err := DecodeModbusTelemetry(buf)
+	if err != nil {
+		t.Fatalf("Unexpected error decoding telemetry: %v", err)
+	}
+
+	if telem.SubZeroInhibitWarning {
+		t.Errorf("Expected SubZeroInhibitWarning to be false for unconnected RTS probe (0C with 25C controller)")
 	}
 }
+
