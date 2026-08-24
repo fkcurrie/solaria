@@ -28,15 +28,26 @@ STATIC_DIR = BASE_DIR / "static"
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-# Dorset, Ontario, Canada Coordinates
-SITE_LAT = 45.186
-SITE_LON = -78.863
-SITE_NAME = "1296 Wren Lake Drive, Dorset, ON"
+# Load .env if present
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    with open(env_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+
+# Site & Solar Configuration (configurable via environment variables or .env)
+SITE_LAT = float(os.environ.get("SITE_LATITUDE", "45.186"))
+SITE_LON = float(os.environ.get("SITE_LONGITUDE", "-78.863"))
+SITE_NAME = os.environ.get("SITE_NAME", "1296 Wren Lake Drive, Dorset, ON")
+ARRAY_RATED_WATTS = float(os.environ.get("PANEL_RATED_WATTS", "400.0"))
 
 # Cloud Ingestion Settings
 CLOUD_ENDPOINT = os.environ.get(
     "SOLARIA_CLOUD_ENDPOINT",
-    "https://solaria-dashboard-qgcwwot4tq-uc.a.run.app/api/v1/telemetry",
+    "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry",
 )
 CLOUD_TOKEN = os.environ.get("SOLARIA_API_TOKEN", "solaria_cottage_secret_token_2026")
 
@@ -388,7 +399,7 @@ def process_assembled_frame(frame: bytes):
             weather = fetch_dorset_weather()
             sun_state = classify_sun_condition(metrics, weather)
 
-            array_cap_w = 400
+            array_cap_w = int(ARRAY_RATED_WATTS)
             pv_w = metrics.get("pv_power_w", 0)
             util_pct = round((pv_w / float(array_cap_w)) * 100.0, 1)
             metrics["array_capacity_w"] = array_cap_w

@@ -269,7 +269,7 @@
   <div class="controls-panel">
     <div class="btn-group">
       <button class="btn-solar" id="connectBtn" onclick="connectRenogyByService()">
-        ⚡ Connect Bluetooth (BT-TH-66F984D6)
+        ⚡ Connect Renogy Controller (BLE)
       </button>
       <button class="btn-outline" onclick="connectAnyBle()">
         🔍 Pick Any Device
@@ -412,7 +412,7 @@
       if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
         if (!hasLoggedNoGetDevices) {
           hasLoggedNoGetDevices = true;
-          log('👉 Ready: Click "⚡ Connect Bluetooth (BT-TH-66F984D6)" to start the persistent streaming session.', 'info');
+          log('👉 Ready: Click "⚡ Connect Renogy Controller (BLE)" to start the persistent streaming session.', 'info');
         }
         return;
       }
@@ -420,12 +420,12 @@
         const devices = await navigator.bluetooth.getDevices();
         if (devices.length > 0) {
           const renogy = devices.find(d => d.name && (d.name.includes('BT') || d.name.includes('RN') || d.name.includes('Rover'))) || devices[0];
-          const devName = renogy.name || 'BT-TH-66F984D6';
+          const devName = renogy.name || 'Renogy Controller';
           log(`⚡ Authorized controller found (${devName}). Auto-connecting...`, 'info');
           await startRenogySession(renogy);
         } else if (!hasLoggedNoGetDevices) {
           hasLoggedNoGetDevices = true;
-          log('👉 Click "⚡ Connect Bluetooth (BT-TH-66F984D6)" to pair and start streaming.', 'info');
+          log('👉 Click "⚡ Connect Renogy Controller (BLE)" to pair and start streaming.', 'info');
         }
       } catch (e) {
         if (!hasLoggedNoGetDevices) {
@@ -437,7 +437,7 @@
 
     async function connectRenogyByService() {
       try {
-        log('Scanning specifically for Renogy BT-1 / BT-2 (Service 0xFFD0)...', 'info');
+        log('Scanning specifically for Renogy Controller (Service 0xFFD0)...', 'info');
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ services: [RENOGY_SERVICE_WRITE] }],
           optionalServices: ALL_SERVICES
