@@ -437,10 +437,10 @@
         <div class="metric-sub" id="stringBalanceSub" style="font-size: 0.75rem;">Voc Tracking: -- V (Expected ~36-40V)</div>
       </div>
       <!-- Renogy Hardware & Profile Card -->
-      <div class="card" style="border-left: 3px solid #f59e0b;">
+      <div class="card" style="border-left: 3px solid #f59e0b; cursor: pointer;" onclick="switchTab('tab-specs', document.querySelectorAll('.nav-tab-btn')[5])">
         <div class="metric-title">🏷️ Controller & Battery Chemistry</div>
-        <div class="metric-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem; font-weight: 700;">Renogy Rover 40A MPPT</div>
-        <div class="metric-sub" id="batteryTypeText" style="font-size: 0.75rem; color: #94a3b8;">Profile: LiFePO4 12V 4S</div>
+        <div class="metric-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem; font-weight: 700;">Renogy Rover 20A MPPT</div>
+        <div class="metric-sub" id="batteryTypeText" style="font-size: 0.75rem; color: #94a3b8;">Profile: Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</div>
       </div>
     </div>
 
@@ -608,8 +608,103 @@
     </div>
   </div>
 
-  <!-- TAB 6: STATIC SYSTEM SPECS & HARDWARE (INFREQUENTLY CHANGING) -->
+  <!-- TAB 6: STATIC SYSTEM SPECS & HARDWARE CONFIGURATION -->
   <div id="tab-specs" class="tab-content">
+    <!-- Interactive Hardware Configuration Card -->
+    <div class="card" style="margin-bottom: 24px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.04);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <h3 style="font-size: 1.1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
+            ⚙️ Hardware Profile & Renogy Model Configuration
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
+            Adjust controller hardware model, battery bank capacity, and array specifications for 1296 Wren Lake Drive.
+          </p>
+        </div>
+        <button class="btn-outline" onclick="saveHardwareConfig()" style="border-color: #f59e0b; color: #f59e0b; font-weight: 700; padding: 8px 18px; font-size: 0.85rem;">
+          💾 Save & Apply Profile
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px; font-weight: 600;">
+            ⚡ RENOGY CHARGE CONTROLLER MODEL:
+          </label>
+          <select id="cfgControllerSelect" onchange="onConfigModelChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+            <option value="RVR20" selected>Renogy Rover 20A MPPT (RNG-CTRL-RVR20) [Installed]</option>
+            <option value="RVR30">Renogy Rover 30A MPPT (RNG-CTRL-RVR30)</option>
+            <option value="RVR40">Renogy Rover 40A MPPT (RNG-CTRL-RVR40)</option>
+            <option value="RVR60">Renogy Rover 60A MPPT (RNG-CTRL-RVR60)</option>
+            <option value="RCC20RVE">Renogy Rover Elite 20A MPPT (RCC20RVE)</option>
+            <option value="RCC40RVE">Renogy Rover Elite 40A MPPT (RCC40RVE)</option>
+            <option value="WND10">Renogy Wanderer 10A PWM</option>
+            <option value="WND30">Renogy Wanderer 30A PWM</option>
+            <option value="ADV30">Renogy Adventurer 30A Flush Mount PWM</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px; font-weight: 600;">
+            🔋 BATTERY TYPE & MODEL:
+          </label>
+          <select id="cfgBatterySelect" onchange="onConfigBatteryChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+            <option value="RENOGY_170_LFP" selected>Renogy 12V 170Ah LiFePO4 Smart Battery (B07Q8DQ6TR) [Installed]</option>
+            <option value="RENOGY_100_LFP">Renogy 12V 100Ah LiFePO4 Smart Battery (RBT100LFP12-BT)</option>
+            <option value="RENOGY_200_LFP">Renogy 12V 200Ah LiFePO4 Core Battery</option>
+            <option value="RENOGY_50_LFP">Renogy 12V 50Ah LiFePO4 Battery</option>
+            <option value="CUSTOM_LFP">Custom 12V LiFePO4 Bank</option>
+            <option value="AGM">Deep-Cycle AGM Sealed Lead-Acid (12V)</option>
+            <option value="GEL">Gel Cell Deep Cycle (12V)</option>
+            <option value="FLOODED">Flooded Lead-Acid Deep Cycle (12V)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px; font-weight: 600;">
+            📦 BATTERY BANK CAPACITY (Amp-Hours):
+          </label>
+          <input type="number" id="cfgBatteryAh" value="170" min="10" max="2000" oninput="updateConfigDerivedFields()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+        </div>
+
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px; font-weight: 600;">
+            ☀️ ARRAY CAPACITY & TOPOLOGY:
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <input type="number" id="cfgArrayW" value="400" min="50" max="5000" oninput="updateConfigDerivedFields()" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;" placeholder="Watts (e.g. 400)">
+            <select id="cfgTopologySelect" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;">
+              <option value="2S2P" selected>2S2P (4x100W)</option>
+              <option value="4S">4S (4 in series)</option>
+              <option value="4P">4P (4 in parallel)</option>
+              <option value="2S">2S (2 in series)</option>
+              <option value="1S">Single Panel</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Derived Hardware Summary Ribbon -->
+      <div style="margin-top: 16px; padding: 12px 16px; background: rgba(15, 23, 42, 0.7); border-radius: 6px; border: 1px solid var(--card-border); display: flex; justify-content: space-around; flex-wrap: wrap; gap: 12px;">
+        <div style="text-align: center;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Nominal Storage</div>
+          <div id="cfgDerivedStorageWh" style="font-size: 1.1rem; font-weight: 800; color: #10b981; font-family: var(--mono);">2,176 Wh</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Max Controller Output</div>
+          <div id="cfgDerivedMaxOutput" style="font-size: 1.1rem; font-weight: 800; color: #f59e0b; font-family: var(--mono);">288 W (20A @ 14.4V)</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Over-Paneling Ratio</div>
+          <div id="cfgDerivedRatio" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8; font-family: var(--mono);">138.8%</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">LiFePO4 Low Cutoff / Boost</div>
+          <div id="cfgDerivedVoltages" style="font-size: 1.1rem; font-weight: 800; color: #cbd5e1; font-family: var(--mono);">11.2V / 14.4V</div>
+        </div>
+      </div>
+    </div>
+
     <div class="spec-grid">
       <!-- Hardware Controller Card -->
       <div class="card">
@@ -619,14 +714,14 @@
         <table class="spec-table">
           <tr><th>Parameter</th><th>Specification</th></tr>
           <tr><td>Controller Model</td><td class="val" id="specModel">Renogy Rover 20A MPPT</td></tr>
-          <tr><td>Controller Part #</td><td class="val">RNG-CTRL-RVR20</td></tr>
+          <tr><td>Controller Part #</td><td class="val" id="specPartNum">RNG-CTRL-RVR20</td></tr>
           <tr><td>Bluetooth Module</td><td class="val">Renogy BT-1 (BT-TH-66F984D6)</td></tr>
           <tr><td>Protocol & Channels</td><td class="val">BLE GATT 0xFFD0 / Modbus RTU</td></tr>
           <tr><td>Software Firmware</td><td class="val" id="specSwVer">v1.0.4</td></tr>
           <tr><td>Hardware Version</td><td class="val" id="specHwVer">v1.0.0</td></tr>
           <tr><td>Max PV Input Voltage</td><td class="val" style="color: #ef4444;">100V DC Max</td></tr>
-          <tr><td>Rated Charging Current</td><td class="val" style="color: #10b981;">20A DC Max</td></tr>
-          <tr><td>Rated Load Current</td><td class="val">20A DC Max</td></tr>
+          <tr><td>Rated Charging Current</td><td class="val" id="specRatedCurrent" style="color: #10b981;">20A DC Max</td></tr>
+          <tr><td>Rated Load Current</td><td class="val" id="specRatedLoad">20A DC Max</td></tr>
         </table>
       </div>
 
@@ -637,13 +732,13 @@
         </h3>
         <table class="spec-table">
           <tr><th>Array Spec</th><th>Engineering Value</th></tr>
-          <tr><td>Array Peak Rating</td><td class="val" style="color: #fbbf24;">400 Watts Peak (400 Wp)</td></tr>
-          <tr><td>Panels Installed</td><td class="val">4 x 100W Monocrystalline</td></tr>
-          <tr><td>Wiring Topology</td><td class="val" style="color: #38bdf8;">2S2P (2 Strings of 2 Panels)</td></tr>
+          <tr><td>Array Peak Rating</td><td class="val" id="specArrayWatts" style="color: #fbbf24;">400 Watts Peak (400 Wp)</td></tr>
+          <tr><td>Panels Installed</td><td class="val" id="specPanelsInstalled">4 x 100W Monocrystalline</td></tr>
+          <tr><td>Wiring Topology</td><td class="val" id="specWiringTopology" style="color: #38bdf8;">2S2P (2 Strings of 2 Panels)</td></tr>
           <tr><td>Nominal String Vmp</td><td class="val">~36.0V - 40.8V DC</td></tr>
           <tr><td>Array Open Circuit Voc</td><td class="val">~43.2V - 48.6V DC</td></tr>
           <tr><td>Array Nominal Current Imp</td><td class="val">~9.8A - 11.0A DC</td></tr>
-          <tr><td>Over-Paneling Ratio</td><td class="val" style="color: #10b981;">138% on 20A Controller</td></tr>
+          <tr><td>Over-Paneling Ratio</td><td class="val" id="specOverPanelRatio" style="color: #10b981;">138.8% on 20A Controller</td></tr>
           <tr><td>Site Location</td><td class="val">1296 Wren Lake Dr, Dorset, ON</td></tr>
           <tr><td>GPS Coordinates</td><td class="val">45.186° N, -78.863° W</td></tr>
         </table>
@@ -656,14 +751,14 @@
         </h3>
         <table class="spec-table">
           <tr><th>Threshold</th><th>Voltage Setting</th></tr>
-          <tr><td>Nominal Voltage</td><td class="val">12V DC</td></tr>
-          <tr><td>Battery Chemistry</td><td class="val">Deep-Cycle AGM / Lithium</td></tr>
-          <tr><td>Boost Charging Setpoint</td><td class="val" style="color: #10b981;">14.4 V</td></tr>
-          <tr><td>Float Charging Setpoint</td><td class="val" style="color: #38bdf8;">13.8 V</td></tr>
-          <tr><td>Equalize Charging Setpoint</td><td class="val">14.6 V</td></tr>
-          <tr><td>Over-Voltage Disconnect</td><td class="val" style="color: #ef4444;">16.0 V</td></tr>
-          <tr><td>Low-Voltage Disconnect (LVD)</td><td class="val" style="color: #f59e0b;">11.1 V</td></tr>
-          <tr><td>Over-Voltage Reconnect</td><td class="val">15.0 V</td></tr>
+          <tr><td>Battery Model</td><td class="val" id="specBatteryModel" style="color: #10b981;">Renogy 12V 170Ah LiFePO4</td></tr>
+          <tr><td>Nominal Voltage & Capacity</td><td class="val" id="specNominalCapacity">12.8V / 170 Ah (2,176 Wh)</td></tr>
+          <tr><td>Battery Chemistry</td><td class="val" id="specBatteryChemistry">LiFePO4 (Lithium Iron Phosphate)</td></tr>
+          <tr><td>Boost / Absorption Setpoint</td><td class="val" id="specBoostSetpoint" style="color: #10b981;">14.4 V</td></tr>
+          <tr><td>Float Charging Setpoint</td><td class="val" id="specFloatSetpoint" style="color: #38bdf8;">13.6 V</td></tr>
+          <tr><td>Low-Voltage Cutoff (LVD)</td><td class="val" id="specLvdSetpoint" style="color: #f59e0b;">11.2 V</td></tr>
+          <tr><td>Sub-Zero Inhibit Cutoff</td><td class="val" style="color: #38bdf8;">≤ 0°C (32°F)</td></tr>
+          <tr><td>Over-Voltage Disconnect</td><td class="val" style="color: #ef4444;">15.0 V</td></tr>
         </table>
       </div>
 
@@ -1468,6 +1563,124 @@
       } catch (e) {}
     }
 
+    const CONTROLLER_PRESETS = {
+      'RVR20': { name: 'Renogy Rover 20A MPPT', part: 'RNG-CTRL-RVR20', amps: 20, maxPvV: 100 },
+      'RVR30': { name: 'Renogy Rover 30A MPPT', part: 'RNG-CTRL-RVR30', amps: 30, maxPvV: 100 },
+      'RVR40': { name: 'Renogy Rover 40A MPPT', part: 'RNG-CTRL-RVR40', amps: 40, maxPvV: 100 },
+      'RVR60': { name: 'Renogy Rover 60A MPPT', part: 'RNG-CTRL-RVR60', amps: 60, maxPvV: 150 },
+      'RCC20RVE': { name: 'Renogy Rover Elite 20A MPPT', part: 'RCC20RVE', amps: 20, maxPvV: 100 },
+      'RCC40RVE': { name: 'Renogy Rover Elite 40A MPPT', part: 'RCC40RVE', amps: 40, maxPvV: 100 },
+      'WND10': { name: 'Renogy Wanderer 10A PWM', part: 'RNG-CTRL-WND10', amps: 10, maxPvV: 25 },
+      'WND30': { name: 'Renogy Wanderer 30A PWM', part: 'RNG-CTRL-WND30', amps: 30, maxPvV: 25 },
+      'ADV30': { name: 'Renogy Adventurer 30A Flush Mount PWM', part: 'RNG-CTRL-ADV30', amps: 30, maxPvV: 25 }
+    };
+
+    const BATTERY_PRESETS = {
+      'RENOGY_170_LFP': { name: 'Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)', chemistry: 'LiFePO4 (Lithium Iron Phosphate)', ah: 170, boostV: 14.4, floatV: 13.6, lvdV: 11.2 },
+      'RENOGY_100_LFP': { name: 'Renogy 12V 100Ah LiFePO4 (RBT100LFP12-BT)', chemistry: 'LiFePO4 (Lithium Iron Phosphate)', ah: 100, boostV: 14.4, floatV: 13.6, lvdV: 11.2 },
+      'RENOGY_200_LFP': { name: 'Renogy 12V 200Ah LiFePO4 Core', chemistry: 'LiFePO4 (Lithium Iron Phosphate)', ah: 200, boostV: 14.4, floatV: 13.6, lvdV: 11.2 },
+      'RENOGY_50_LFP': { name: 'Renogy 12V 50Ah LiFePO4', chemistry: 'LiFePO4 (Lithium Iron Phosphate)', ah: 50, boostV: 14.4, floatV: 13.6, lvdV: 11.2 },
+      'CUSTOM_LFP': { name: 'Custom 12V LiFePO4 Bank', chemistry: 'LiFePO4 (Lithium Iron Phosphate)', ah: 170, boostV: 14.4, floatV: 13.6, lvdV: 11.2 },
+      'AGM': { name: 'Deep-Cycle AGM Sealed Lead-Acid (12V)', chemistry: 'Sealed Lead-Acid (AGM)', ah: 100, boostV: 14.4, floatV: 13.8, lvdV: 10.8 },
+      'GEL': { name: 'Gel Cell Deep Cycle (12V)', chemistry: 'Gel Lead-Acid', ah: 100, boostV: 14.2, floatV: 13.8, lvdV: 10.8 },
+      'FLOODED': { name: 'Flooded Lead-Acid Deep Cycle (12V)', chemistry: 'Flooded Lead-Acid', ah: 100, boostV: 14.6, floatV: 13.8, lvdV: 10.8 }
+    };
+
+    function onConfigModelChange() {
+      updateConfigDerivedFields();
+    }
+
+    function onConfigBatteryChange() {
+      const bKey = document.getElementById('cfgBatterySelect').value;
+      const bPreset = BATTERY_PRESETS[bKey];
+      if (bPreset) {
+        document.getElementById('cfgBatteryAh').value = bPreset.ah;
+      }
+      updateConfigDerivedFields();
+    }
+
+    function updateConfigDerivedFields() {
+      const cKey = document.getElementById('cfgControllerSelect').value;
+      const bKey = document.getElementById('cfgBatterySelect').value;
+      const cPreset = CONTROLLER_PRESETS[cKey] || CONTROLLER_PRESETS['RVR20'];
+      const bPreset = BATTERY_PRESETS[bKey] || BATTERY_PRESETS['RENOGY_170_LFP'];
+      
+      const ah = parseFloat(document.getElementById('cfgBatteryAh').value) || 170;
+      const arrayW = parseFloat(document.getElementById('cfgArrayW').value) || 400;
+
+      const storageWh = Math.round(ah * 12.8);
+      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
+      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
+
+      if (document.getElementById('cfgDerivedStorageWh')) document.getElementById('cfgDerivedStorageWh').textContent = `${storageWh.toLocaleString()} Wh`;
+      if (document.getElementById('cfgDerivedMaxOutput')) document.getElementById('cfgDerivedMaxOutput').textContent = `${maxCtrlOutputW} W (${cPreset.amps}A @ ${bPreset.boostV}V)`;
+      if (document.getElementById('cfgDerivedRatio')) document.getElementById('cfgDerivedRatio').textContent = `${ratio}%`;
+      if (document.getElementById('cfgDerivedVoltages')) document.getElementById('cfgDerivedVoltages').textContent = `${bPreset.lvdV}V / ${bPreset.boostV}V`;
+    }
+
+    function saveHardwareConfig() {
+      const cKey = document.getElementById('cfgControllerSelect').value;
+      const bKey = document.getElementById('cfgBatterySelect').value;
+      const ah = parseFloat(document.getElementById('cfgBatteryAh').value) || 170;
+      const arrayW = parseFloat(document.getElementById('cfgArrayW').value) || 400;
+      const topo = document.getElementById('cfgTopologySelect').value;
+
+      const cfg = { controllerKey: cKey, batteryKey: bKey, ah, arrayW, topo };
+      localStorage.setItem('solaria_hardware_config', JSON.stringify(cfg));
+      applyHardwareConfigToUI(cfg);
+      alert('✅ Hardware profile applied & saved successfully!');
+    }
+
+    function applyHardwareConfigToUI(cfg) {
+      if (!cfg) return;
+      const cPreset = CONTROLLER_PRESETS[cfg.controllerKey] || CONTROLLER_PRESETS['RVR20'];
+      const bPreset = BATTERY_PRESETS[cfg.batteryKey] || BATTERY_PRESETS['RENOGY_170_LFP'];
+      const ah = cfg.ah || 170;
+      const arrayW = cfg.arrayW || 400;
+      const topo = cfg.topo || '2S2P';
+
+      const storageWh = Math.round(ah * 12.8);
+      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
+      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
+
+      // Update Spec Table Elements
+      if (document.getElementById('specModel')) document.getElementById('specModel').textContent = cPreset.name;
+      if (document.getElementById('specPartNum')) document.getElementById('specPartNum').textContent = cPreset.part;
+      if (document.getElementById('specRatedCurrent')) document.getElementById('specRatedCurrent').textContent = `${cPreset.amps}A DC Max`;
+      if (document.getElementById('specArrayWatts')) document.getElementById('specArrayWatts').textContent = `${arrayW} Watts Peak (${arrayW} Wp)`;
+      if (document.getElementById('specWiringTopology')) document.getElementById('specWiringTopology').textContent = `${topo} String Config`;
+      if (document.getElementById('specOverPanelRatio')) document.getElementById('specOverPanelRatio').textContent = `${ratio}% on ${cPreset.amps}A Controller`;
+
+      if (document.getElementById('specBatteryModel')) document.getElementById('specBatteryModel').textContent = bPreset.name;
+      if (document.getElementById('specNominalCapacity')) document.getElementById('specNominalCapacity').textContent = `12.8V / ${ah} Ah (${storageWh.toLocaleString()} Wh)`;
+      if (document.getElementById('specBatteryChemistry')) document.getElementById('specBatteryChemistry').textContent = bPreset.chemistry;
+      if (document.getElementById('specBoostSetpoint')) document.getElementById('specBoostSetpoint').textContent = `${bPreset.boostV} V`;
+      if (document.getElementById('specFloatSetpoint')) document.getElementById('specFloatSetpoint').textContent = `${bPreset.floatV} V`;
+      if (document.getElementById('specLvdSetpoint')) document.getElementById('specLvdSetpoint').textContent = `${bPreset.lvdV} V`;
+
+      // Update Live Overview Badges
+      if (document.getElementById('controllerModelText')) document.getElementById('controllerModelText').textContent = cPreset.name;
+      if (document.getElementById('batteryTypeText')) document.getElementById('batteryTypeText').textContent = `Profile: ${bPreset.name}`;
+    }
+
+    function loadSavedHardwareConfig() {
+      try {
+        const saved = localStorage.getItem('solaria_hardware_config');
+        if (saved) {
+          const cfg = JSON.parse(saved);
+          if (document.getElementById('cfgControllerSelect')) document.getElementById('cfgControllerSelect').value = cfg.controllerKey || 'RVR20';
+          if (document.getElementById('cfgBatterySelect')) document.getElementById('cfgBatterySelect').value = cfg.batteryKey || 'RENOGY_170_LFP';
+          if (document.getElementById('cfgBatteryAh')) document.getElementById('cfgBatteryAh').value = cfg.ah || 170;
+          if (document.getElementById('cfgArrayW')) document.getElementById('cfgArrayW').value = cfg.arrayW || 400;
+          if (document.getElementById('cfgTopologySelect')) document.getElementById('cfgTopologySelect').value = cfg.topo || '2S2P';
+          updateConfigDerivedFields();
+          applyHardwareConfigToUI(cfg);
+        } else {
+          updateConfigDerivedFields();
+        }
+      } catch (e) {}
+    }
+
     async function fetchSystemSpecs() {
       try {
         const resp = await fetch('/api/v1/system-info');
@@ -1476,7 +1689,7 @@
         const life = data.lifetime_statistics || {};
         const dev = data.device || {};
 
-        if (dev.model) document.getElementById('specModel').textContent = dev.model;
+        if (dev.model && !localStorage.getItem('solaria_hardware_config')) document.getElementById('specModel').textContent = dev.model;
         if (dev.software_version) document.getElementById('specSwVer').textContent = dev.software_version;
         if (dev.hardware_version) document.getElementById('specHwVer').textContent = dev.hardware_version;
         if (life.operating_days) document.getElementById('specDays').textContent = `${life.operating_days} Days`;
@@ -1820,6 +2033,7 @@
     }
 
     window.addEventListener('load', () => {
+      loadSavedHardwareConfig();
       initLiveCharts();
       fetchLiveData();
       fetchHistoryData();

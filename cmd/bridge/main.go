@@ -476,9 +476,9 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		StringHealthStatus:          stringStatus,
 		SubZeroInhibitWarning:       subZeroWarn,
 		SubZeroInhibitMessage:       subZeroMsg,
-		BatteryType:                 "LiFePO4 (Lithium Iron Phosphate)",
-		ControllerModel:             "Renogy Rover 40A MPPT (RNG-CTRL-RVR40)",
-		ControllerRatedCurrentA:     40,
+		BatteryType:                 "LiFePO4 12V 170Ah (B07Q8DQ6TR)",
+		ControllerModel:             "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
+		ControllerRatedCurrentA:     20,
 		ControllerRatedVoltageV:     12,
 	}, nil
 }

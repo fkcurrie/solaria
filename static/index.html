@@ -469,9 +469,9 @@
     <div class="card">
       <div class="card-label">Hardware Controller</div>
       <div class="card-val" id="hwModelVal" style="color: #f59e0b; font-size: 1.05rem;">
-        Renogy Rover 40A MPPT
+        Renogy Rover 20A MPPT
       </div>
-      <div class="card-sub" id="hwSubText">400W 2S2P Monocrystalline</div>
+      <div class="card-sub" id="hwSubText">400W 2S2P Monocrystalline (138.8% Over-Paneled)</div>
     </div>
   </div>
 
@@ -490,10 +490,10 @@
       <div class="card-sub" id="stringBalanceSub">Voc Tracking: -- V (Expected ~36-40V)</div>
     </div>
     <!-- Renogy Hardware & Profile Card -->
-    <div class="card" style="border-left: 3px solid #f59e0b;">
+    <div class="card" style="border-left: 3px solid #f59e0b; cursor: pointer;" onclick="toggleHwConfig()">
       <div class="card-label">🏷️ Controller & Battery Chemistry</div>
-      <div class="card-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem;">Renogy Rover 40A MPPT</div>
-      <div class="card-sub" id="batteryTypeText">Profile: LiFePO4 12V 4S</div>
+      <div class="card-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem;">Renogy Rover 20A MPPT</div>
+      <div class="card-sub" id="batteryTypeText">Profile: Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</div>
     </div>
   </div>
 
@@ -515,6 +515,9 @@
       <button class="btn-outline" id="simBtn" onclick="toggleLocalSimulation()" style="border-color: #f59e0b; color: #f59e0b; font-weight: 600;">
         ⚡ Offline Simulation
       </button>
+      <button class="btn-outline" onclick="toggleHwConfig()" style="border-color: #f59e0b; color: #f59e0b; font-weight: 600;">
+        ⚙️ Hardware Settings
+      </button>
       <button class="btn-outline" onclick="exportEdgeTelemetryCSV()" style="border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
         📥 Export CSV
       </button>
@@ -533,6 +536,65 @@
         <option value="30000">Poll 30s</option>
         <option value="60000">Poll 60s</option>
       </select>
+    </div>
+  </div>
+
+  <!-- Hardware Configuration & Renogy Profile Card -->
+  <div id="hwConfigCard" class="card" style="display: none; margin-bottom: 24px; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
+        ⚙️ Edge Hardware Profile & Renogy Model Configuration
+      </h3>
+      <button onclick="toggleHwConfig()" style="background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer;">✕</button>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
+          ⚡ CONTROLLER MODEL:
+        </label>
+        <select id="edgeControllerSelect" onchange="onEdgeConfigChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;">
+          <option value="RVR20" selected>Renogy Rover 20A MPPT (RNG-CTRL-RVR20)</option>
+          <option value="RVR30">Renogy Rover 30A MPPT (RNG-CTRL-RVR30)</option>
+          <option value="RVR40">Renogy Rover 40A MPPT (RNG-CTRL-RVR40)</option>
+          <option value="RVR60">Renogy Rover 60A MPPT (RNG-CTRL-RVR60)</option>
+          <option value="RCC20RVE">Renogy Rover Elite 20A MPPT</option>
+          <option value="RCC40RVE">Renogy Rover Elite 40A MPPT</option>
+          <option value="WND10">Renogy Wanderer 10A PWM</option>
+          <option value="WND30">Renogy Wanderer 30A PWM</option>
+          <option value="ADV30">Renogy Adventurer 30A Flush Mount</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
+          🔋 BATTERY BANK PROFILE:
+        </label>
+        <select id="edgeBatterySelect" onchange="onEdgeConfigChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;">
+          <option value="RENOGY_170_LFP" selected>Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</option>
+          <option value="RENOGY_100_LFP">Renogy 12V 100Ah LiFePO4 (RBT100LFP12-BT)</option>
+          <option value="RENOGY_200_LFP">Renogy 12V 200Ah LiFePO4 Core</option>
+          <option value="CUSTOM_LFP">Custom 12V LiFePO4</option>
+          <option value="AGM">Deep-Cycle Sealed AGM (12V)</option>
+          <option value="GEL">Gel Cell Deep Cycle (12V)</option>
+          <option value="FLOODED">Flooded Lead-Acid (12V)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
+          📦 CAPACITY (Ah) & ARRAY (W):
+        </label>
+        <div style="display: flex; gap: 6px;">
+          <input type="number" id="edgeBatteryAh" value="170" min="10" max="2000" oninput="onEdgeConfigChange()" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;" placeholder="Ah">
+          <input type="number" id="edgeArrayW" value="400" min="50" max="5000" oninput="onEdgeConfigChange()" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;" placeholder="Watts">
+        </div>
+      </div>
+    </div>
+    <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <span id="edgeDerivedStats" style="font-size: 0.8rem; color: #38bdf8; font-family: var(--mono);">
+        Reserve: 2,176 Wh | Max Ctrl: 288W (20A) | Over-Panel: 138.8%
+      </span>
+      <button class="btn-outline" onclick="saveEdgeHardwareConfig()" style="border-color: #f59e0b; color: #f59e0b; font-size: 0.75rem; padding: 4px 12px; font-weight: 700;">
+        💾 Save Profile
+      </button>
     </div>
   </div>
 
@@ -1884,7 +1946,101 @@
       });
     }
 
+    const EDGE_CONTROLLER_PRESETS = {
+      'RVR20': { name: 'Renogy Rover 20A MPPT', amps: 20 },
+      'RVR30': { name: 'Renogy Rover 30A MPPT', amps: 30 },
+      'RVR40': { name: 'Renogy Rover 40A MPPT', amps: 40 },
+      'RVR60': { name: 'Renogy Rover 60A MPPT', amps: 60 },
+      'RCC20RVE': { name: 'Renogy Rover Elite 20A MPPT', amps: 20 },
+      'RCC40RVE': { name: 'Renogy Rover Elite 40A MPPT', amps: 40 },
+      'WND10': { name: 'Renogy Wanderer 10A PWM', amps: 10 },
+      'WND30': { name: 'Renogy Wanderer 30A PWM', amps: 30 },
+      'ADV30': { name: 'Renogy Adventurer 30A Flush Mount', amps: 30 }
+    };
+
+    const EDGE_BATTERY_PRESETS = {
+      'RENOGY_170_LFP': { name: 'Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)', ah: 170, boostV: 14.4 },
+      'RENOGY_100_LFP': { name: 'Renogy 12V 100Ah LiFePO4 (RBT100LFP12-BT)', ah: 100, boostV: 14.4 },
+      'RENOGY_200_LFP': { name: 'Renogy 12V 200Ah LiFePO4 Core', ah: 200, boostV: 14.4 },
+      'CUSTOM_LFP': { name: 'Custom 12V LiFePO4', ah: 170, boostV: 14.4 },
+      'AGM': { name: 'Deep-Cycle Sealed AGM (12V)', ah: 100, boostV: 14.4 },
+      'GEL': { name: 'Gel Cell Deep Cycle (12V)', ah: 100, boostV: 14.2 },
+      'FLOODED': { name: 'Flooded Lead-Acid (12V)', ah: 100, boostV: 14.6 }
+    };
+
+    function toggleHwConfig() {
+      const c = document.getElementById('hwConfigCard');
+      if (c) c.style.display = c.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function onEdgeConfigChange() {
+      const cKey = document.getElementById('edgeControllerSelect').value;
+      const bKey = document.getElementById('edgeBatterySelect').value;
+      const cPreset = EDGE_CONTROLLER_PRESETS[cKey] || EDGE_CONTROLLER_PRESETS['RVR20'];
+      const bPreset = EDGE_BATTERY_PRESETS[bKey] || EDGE_BATTERY_PRESETS['RENOGY_170_LFP'];
+
+      const ah = parseFloat(document.getElementById('edgeBatteryAh').value) || 170;
+      const arrayW = parseFloat(document.getElementById('edgeArrayW').value) || 400;
+
+      const storageWh = Math.round(ah * 12.8);
+      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
+      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
+
+      const statsEl = document.getElementById('edgeDerivedStats');
+      if (statsEl) {
+        statsEl.textContent = `Reserve: ${storageWh.toLocaleString()} Wh | Max Ctrl: ${maxCtrlOutputW}W (${cPreset.amps}A) | Over-Panel: ${ratio}%`;
+      }
+    }
+
+    function saveEdgeHardwareConfig() {
+      const cKey = document.getElementById('edgeControllerSelect').value;
+      const bKey = document.getElementById('edgeBatterySelect').value;
+      const ah = parseFloat(document.getElementById('edgeBatteryAh').value) || 170;
+      const arrayW = parseFloat(document.getElementById('edgeArrayW').value) || 400;
+
+      const cfg = { controllerKey: cKey, batteryKey: bKey, ah, arrayW };
+      localStorage.setItem('solaria_hardware_config', JSON.stringify(cfg));
+      applyEdgeHardwareConfig(cfg);
+      toggleHwConfig();
+      log(`⚙️ Hardware profile updated: ${EDGE_CONTROLLER_PRESETS[cKey]?.name || cKey} + ${EDGE_BATTERY_PRESETS[bKey]?.name || bKey} (${ah}Ah)`, 'success');
+    }
+
+    function applyEdgeHardwareConfig(cfg) {
+      if (!cfg) return;
+      const cPreset = EDGE_CONTROLLER_PRESETS[cfg.controllerKey] || EDGE_CONTROLLER_PRESETS['RVR20'];
+      const bPreset = EDGE_BATTERY_PRESETS[cfg.batteryKey] || EDGE_BATTERY_PRESETS['RENOGY_170_LFP'];
+      const ah = cfg.ah || 170;
+      const arrayW = cfg.arrayW || 400;
+
+      const storageWh = Math.round(ah * 12.8);
+      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
+      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
+
+      if (document.getElementById('hwModelVal')) document.getElementById('hwModelVal').textContent = cPreset.name;
+      if (document.getElementById('hwSubText')) document.getElementById('hwSubText').textContent = `${arrayW}W Array (${ratio}% Over-Paneled)`;
+      if (document.getElementById('controllerModelText')) document.getElementById('controllerModelText').textContent = cPreset.name;
+      if (document.getElementById('batteryTypeText')) document.getElementById('batteryTypeText').textContent = `Profile: ${bPreset.name}`;
+    }
+
+    function loadSavedEdgeHardwareConfig() {
+      try {
+        const saved = localStorage.getItem('solaria_hardware_config');
+        if (saved) {
+          const cfg = JSON.parse(saved);
+          if (document.getElementById('edgeControllerSelect')) document.getElementById('edgeControllerSelect').value = cfg.controllerKey || 'RVR20';
+          if (document.getElementById('edgeBatterySelect')) document.getElementById('edgeBatterySelect').value = cfg.batteryKey || 'RENOGY_170_LFP';
+          if (document.getElementById('edgeBatteryAh')) document.getElementById('edgeBatteryAh').value = cfg.ah || 170;
+          if (document.getElementById('edgeArrayW')) document.getElementById('edgeArrayW').value = cfg.arrayW || 400;
+          onEdgeConfigChange();
+          applyEdgeHardwareConfig(cfg);
+        } else {
+          onEdgeConfigChange();
+        }
+      } catch (e) {}
+    }
+
     window.addEventListener('load', () => {
+      loadSavedEdgeHardwareConfig();
       initLiveCharts();
       tryAutoConnectSavedDevice();
       // Watchdog: ensures connection is maintained and un-wedged automatically
