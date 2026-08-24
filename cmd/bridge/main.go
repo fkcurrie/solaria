@@ -475,20 +475,20 @@ func uploadToCloud(record SolarRecord) {
 			return
 		}
 
-		token := getIDToken()
 		req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
 		if err != nil {
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", "Bearer "+cloudToken)
 		req.Header.Set("X-API-Key", cloudToken)
 
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Do(req)
-		if err == nil {
-			_ = resp.Body.Close()
+		if err != nil {
+			return
 		}
+		defer resp.Body.Close()
 	}()
 }
 

@@ -284,12 +284,15 @@ func init() {
 }
 
 func verifyAuth(r *http.Request) bool {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		return false
+	if apiKey := r.Header.Get("X-API-Key"); apiKey != "" && apiKey == apiToken {
+		return true
 	}
-	token := strings.TrimPrefix(auth, "Bearer ")
-	return token == apiToken
+	auth := r.Header.Get("Authorization")
+	if auth != "" {
+		token := strings.TrimPrefix(auth, "Bearer ")
+		return token == apiToken
+	}
+	return false
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
