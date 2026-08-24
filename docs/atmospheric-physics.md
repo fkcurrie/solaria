@@ -1,48 +1,42 @@
-# 🌤️ Atmospheric Intelligence & Performance Ratio Engine
+# Atmospheric Intelligence & Performance Ratio
 
-Solaria enriches every 10-second Modbus telemetry packet with real-time atmospheric data fetched from Open-Meteo for the site coordinates (`45.186°N, -78.863°W`).
+Solaria pairs real-time Modbus telemetry with atmospheric data retrieved from Open-Meteo for site coordinates `45.186°N, -78.863°W`.
 
----
+## Radiometry Metrics
 
-## Solar Radiometry Parameters
+* **Global Horizontal Irradiance (GHI, $\text{W/m}^2$):** Total solar radiation received on a horizontal surface.
+* **Direct Normal Irradiance (DNI, $\text{W/m}^2$):** Radiation coming directly from the sun perpendicular to rays.
+* **Diffuse Horizontal Irradiance (DHI, $\text{W/m}^2$):** Radiation scattered by clouds and atmospheric particles.
+* **Cloud Cover ($N, \%$):** Percentage of total sky covered by cloud layers.
+* **Solar Elevation ($\alpha, ^\circ$):** Angular height of the sun above the geometric horizon.
 
-| Metric | Symbol | Unit | Meaning |
-| :--- | :--- | :--- | :--- |
-| **Global Horizontal Irradiance** | $\text{GHI}$ | $\text{W/m}^2$ | Total solar radiation incident on a horizontal surface (Direct + Diffuse) |
-| **Direct Normal Irradiance** | $\text{DNI}$ | $\text{W/m}^2$ | Beam radiation coming directly from the sun perpendicular to rays |
-| **Diffuse Horizontal Irradiance** | $\text{DHI}$ | $\text{W/m}^2$ | Solar radiation scattered by clouds, aerosols, and atmosphere |
-| **Cloud Cover Fraction** | $N$ | $\%$ | Fractional cloud coverage of the sky dome ($0\% - 100\%$) |
-| **Solar Elevation Angle** | $\alpha$ | Degrees | Angle of the sun above the geometric horizon |
+## Calculated Performance Metrics
 
----
+### 1. Array Utilization (%)
 
-## Mathematical Formulations
+Compares instantaneous output against the nominal 400 W array peak capacity:
 
-### 1. Array Capacity Utilization
-Measures instantaneous power generated relative to the theoretical $400\text{W}$ nameplate peak:
+$$\text{Utilization (\%)} = \left( \frac{P_{\text{pv}}}{400\,\text{W}} \right) \times 100$$
 
-$$\text{Capacity Utilization (\%)} = \left( \frac{P_{\text{pv}}}{400\,\text{W}} \right) \times 100\%$$
+### 2. Atmospheric Performance Ratio (PR %)
 
-### 2. Atmospheric Performance Ratio (PR)
-Measures harvesting efficiency compared to the theoretical irradiance currently available from the atmosphere:
+Compares actual generation against theoretical power expected from current ambient irradiance:
 
 $$P_{\text{expected}} = \left( \frac{\text{GHI}}{1000\,\text{W/m}^2} \right) \times 400\,\text{W}$$
 
-$$\text{Performance Ratio (\%)} = \begin{cases} 
-\left( \frac{P_{\text{pv}}}{P_{\text{expected}}} \right) \times 100\% & \text{if } \text{GHI} \ge 50\,\text{W/m}^2 \\
-0\% & \text{if } \text{GHI} < 50\,\text{W/m}^2 
+$$\text{PR (\%)} = \begin{cases}
+\left( \frac{P_{\text{pv}}}{P_{\text{expected}}} \right) \times 100 & \text{for } \text{GHI} \ge 50\,\text{W/m}^2 \\
+0 & \text{for } \text{GHI} < 50\,\text{W/m}^2
 \end{cases}$$
 
----
+## Sun Condition Classification
 
-## Sun Condition Classification Matrix
+Every telemetry record is categorized using deterministic threshold rules:
 
-Every telemetry frame is dynamically categorized by the atmospheric inference engine:
-
-| Condition Code | Visual Badge | Diagnostic Rules | Interpretation |
-| :--- | :--- | :--- | :--- |
-| `FULL_SUN` | ☀️ Full Sun | $P_{\text{pv}} \ge 0.65 \times P_{\text{rated}}$ AND $\text{GHI} > 300\,\text{W/m}^2$ AND Clouds $< 25\%$ | Optimal unobstructed direct sunlight |
-| `PARTIAL_SUN_OR_SHADE` | ⛅ Partial Sun / Shading | $\text{PR} < 60\%$ OR Cloud Cover $25\% - 80\%$ | Intermittent clouds, cloud-edge lensing, tree obstruction |
-| `DIFFUSE_OVERCAST` | ☁️ Overcast | $\text{GHI} < 200\,\text{W/m}^2$ AND $\text{DHI} \approx \text{GHI}$ AND Clouds $> 80\%$ | Dense overcast sky producing pure diffuse scattering |
-| `ABSORPTION_FLOAT_CLIPPED` | 🔋 Float / Clipped | $\text{SOC} \ge 99\%$ AND State $\in \{\text{Boost}, \text{Float}\}$ | Generation throttled by controller because battery bank is fully charged |
-| `NIGHT` | 🌙 Night | Solar Elevation $< 0^\circ$ OR $V_{\text{pv}} < 5.0\,\text{V}$ | Dormant array during night hours |
+| Condition | Criteria | Description |
+| :--- | :--- | :--- |
+| `FULL_SUN` | $P_{\text{pv}} \ge 0.65 \cdot P_{\text{rated}}$ AND $\text{GHI} > 300\,\text{W/m}^2$ AND Clouds $< 25\%$ | Clear sky, direct insolation. |
+| `PARTIAL_SUN_OR_SHADE` | $\text{PR} < 60\%$ OR Cloud Cover $25\% - 80\%$ | Intermittent clouds or physical obstruction. |
+| `DIFFUSE_OVERCAST` | $\text{GHI} < 200\,\text{W/m}^2$ AND $\text{DHI} \approx \text{GHI}$ AND Clouds $> 80\%$ | Heavy overcast conditions. |
+| `ABSORPTION_FLOAT_CLIPPED` | $\text{SOC} \ge 99\%$ AND Charging State $\in \{\text{Boost}, \text{Float}\}$ | Throttled output due to full battery bank. |
+| `NIGHT` | Solar Elevation $< 0^\circ$ OR $V_{\text{pv}} < 5.0\,\text{V}$ | Dormant array (nighttime). |

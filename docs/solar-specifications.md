@@ -1,58 +1,51 @@
-# ⚡ Solar Array & Charge Controller Engineering Specifications
+# Solar Array & Hardware Specifications
 
-## Solar Array Topology: 4x100W 2S2P
+## PV Array Configuration
 
-The solar generation array at the Dorset, ON site (1296 Wren Lake Dr) consists of four 100W monocrystalline photovoltaic panels arranged in a **2-Series, 2-Parallel (2S2P)** configuration.
+The site at 1296 Wren Lake Drive, Dorset, ON uses a 400W array consisting of four 100W monocrystalline panels wired in a **2-Series, 2-Parallel (2S2P)** configuration.
 
-```
-       [ Panel 1: 100W ] (+) --- (-) [ Panel 2: 100W ]  (Series String 1: ~36V-40V, ~5.5A)
-              |                                  |
-              +-----------(+)     (-)------------+
-                           |       |
-                         [+]     [-] ====> Combined 2S2P Input to Rover (36-40V Vmp, 11A Imp)
-                           |       |
-              +-----------(+)     (-)------------+
-              |                                  |
-       [ Panel 3: 100W ] (+) --- (-) [ Panel 4: 100W ]  (Series String 2: ~36V-40V, ~5.5A)
+```text
+  String 1: [Panel 1 (100W)] ──(Series)── [Panel 2 (100W)]  (~36V–40V Vmp, 5.5A)
+                   │                                │
+                   ├───────────────(+)──────────────┤
+                   │                                │  ===> Combined 2S2P Array
+                   ├───────────────(-)──────────────┤       (36V–40V Vmp, 11.0A Imp)
+                   │                                │
+  String 2: [Panel 3 (100W)] ──(Series)── [Panel 4 (100W)]  (~36V–40V Vmp, 5.5A)
 ```
 
----
+## Electrical Specifications
 
-## Technical Specifications Table
+| Parameter | Single Panel | 2-Panel Series String | Combined 2S2P Array |
+| :--- | :--- | :--- | :--- |
+| **Peak Power ($P_{\text{max}}$)** | 100 W | 200 W | **400 W** |
+| **Voltage at Max Power ($V_{\text{mp}}$)** | 18.0 V – 20.4 V | 36.0 V – 40.8 V | **36.0 V – 40.8 V** |
+| **Current at Max Power ($I_{\text{mp}}$)** | 4.9 A – 5.5 A | 4.9 A – 5.5 A | **9.8 A – 11.0 A** |
+| **Open-Circuit Voltage ($V_{\text{oc}}$)** | 21.6 V – 24.3 V | 43.2 V – 48.6 V | **43.2 V – 48.6 V** |
+| **Short-Circuit Current ($I_{\text{sc}}$)** | 5.4 A – 5.9 A | 5.4 A – 5.9 A | **10.8 A – 11.8 A** |
 
-| Parameter | Single Panel (100W) | 2S String (200W) | Array Total (2S2P, 400W) | Notes |
+## Charge Controller: Renogy Rover 20A MPPT
+
+* **Model:** `RNG-CTRL-RVR20-CAN`
+* **Max Solar Input Voltage ($V_{\text{oc}}$):** 100 V DC
+* **Max Battery Charge Current:** 20 A
+* **Nominal System Voltage:** 12 V / 24 V auto-sensing
+* **Max Charging Power (12V Bank):** ~260 W – 288 W
+
+### Over-Paneling Analysis
+
+* **Nameplate Ratio:** 400 W array on a 20 A / 288 W max controller represents a **138% over-paneling ratio**.
+* **Operational Benefit:** In northern climates (Dorset, ON: 45.186°N), over-paneling raises harvesting yields during morning/evening shoulder periods and heavy cloud cover. During clear summer midday hours, the controller automatically limits current to 20 A.
+
+## Battery Chemistry Profiles
+
+Default setpoints for a 12V system:
+
+| Parameter | LiFePO4 (Lithium) | Sealed (AGM) | Gel | Flooded |
 | :--- | :--- | :--- | :--- | :--- |
-| **Peak Power ($P_{\text{max}}$)** | $100\,\text{W}$ | $200\,\text{W}$ | **$400\,\text{W}$** | Total nominal array capacity |
-| **Optimum Operating Voltage ($V_{\text{mp}}$)** | $18.0\,\text{V} - 20.4\,\text{V}$ | $36.0\,\text{V} - 40.8\,\text{V}$ | **$36.0\,\text{V} - 40.8\,\text{V}$** | Optimal MPPT tracking window |
-| **Optimum Operating Current ($I_{\text{mp}}$)** | $4.9\,\text{A} - 5.5\,\text{A}$ | $4.9\,\text{A} - 5.5\,\text{A}$ | **$9.8\,\text{A} - 11.0\,\text{A}$** | Within 10AWG wiring capacity |
-| **Open-Circuit Voltage ($V_{\text{oc}}$)** | $21.6\,\text{V} - 24.3\,\text{V}$ | $43.2\,\text{V} - 48.6\,\text{V}$ | **$43.2\,\text{V} - 48.6\,\text{V}$** | Safely below Rover 100V limit |
-| **Short-Circuit Current ($I_{\text{sc}}$)** | $5.4\,\text{A} - 5.9\,\text{A}$ | $5.4\,\text{A} - 5.9\,\text{A}$ | **$10.8\,\text{A} - 11.8\,\text{A}$** | Fused with 15A inline MC4 fuses |
-
----
-
-## Charge Controller: Renogy Rover 20A MPPT (`RNG-CTRL-RVR20-CAN`)
-
-* **Maximum PV Input Voltage:** $100\,\text{V DC}$ (absolute maximum).
-* **Maximum Battery Charging Current:** $20\,\text{A}$ to nominal 12V battery bank ($\approx 288\,\text{W}$ charging limit).
-* **Over-Paneling Ratio:** $\frac{400\,\text{W}}{288\,\text{W}} \approx 138\%$.
-  * **Engineering Rationale:** In the Dorset, Ontario climate, overcast and shoulder hours are common. An over-paneled 400W array delivers earlier wake-up voltages and higher harvest yields in low-light and diffuse conditions, while the controller smoothly clips power at its 20A charging ceiling during peak summer noon hours.
-
----
-
-## Battery Bank Chemistry Profiles
-
-The Renogy Rover supports 4 standard battery types and a customizable user profile:
-
-1. **LiFePO4 (Lithium Iron Phosphate):**
-   * Nominal Voltage: `12.8V` (4S)
-   * Boost Charging: `14.4V`
-   * Overvoltage Disconnect: `14.8V`
-   * Low Voltage Warning: `12.0V`
-   * Low Voltage Cutoff: `11.1V`
-   * *Cold Weather Protection:* Charging must be inhibited below $0^\circ\text{C}$ ($32^\circ\text{F}$) to prevent lithium plating.
-2. **Sealed (AGM):**
-   * Boost Charging: `14.4V`, Float: `13.8V`
-3. **Gel:**
-   * Boost Charging: `14.2V`, Float: `13.8V`
-4. **Flooded:**
-   * Boost Charging: `14.6V`, Float: `13.8V`, Equalize: `14.8V`
+| **High Voltage Disconnect** | 14.8 V | 16.0 V | 16.0 V | 16.0 V |
+| **Equalize Voltage** | — | — | — | 14.8 V |
+| **Boost Charge Voltage** | 14.4 V | 14.4 V | 14.2 V | 14.6 V |
+| **Float Charge Voltage** | — | 13.8 V | 13.8 V | 13.8 V |
+| **Boost Return Voltage** | 13.2 V | 13.2 V | 13.2 V | 13.2 V |
+| **Low Voltage Disconnect** | 11.1 V | 11.1 V | 11.1 V | 11.1 V |

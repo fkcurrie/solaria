@@ -1,80 +1,76 @@
-# ☀️ Solaria
+# Solaria
 
-> **High-Performance Renogy Solar & Atmospheric Intelligence Platform (Pure Go)**
+Solaria streams telemetry from Renogy solar charge controllers (Rover, Wanderer, Adventurer) via Bluetooth Low Energy (BT-1 / BT-2) to Google BigQuery, correlating solar harvest against local atmospheric weather data in real time.
 
-Solaria connects Renogy Solar MPPT Charge Controllers (Rover, Wanderer, Adventurer) via BT-1/BT-2 Bluetooth Low Energy modules to live atmospheric radiometry and Google BigQuery analytics.
+```text
+[Renogy Controller] ──(BT-1 BLE)──> [Go Bridge / Edge Agent] ──(HTTPS)──> [Cloud Run] ──> [BigQuery]
+                                            │
+                                  [Open-Meteo Weather]
+```
 
----
+## Quickstart
 
-## ⚡ Quick Start (One-Liner Install)
+### Automated Install
 
-Run the universal installer on Linux, macOS, or Raspberry Pi:
+Run the installer on Linux, macOS, or Raspberry Pi:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fkcurrie/solaria/main/setup.sh | bash
 ```
 
-Or clone and start locally:
+### Manual Setup
 
 ```bash
 git clone https://github.com/fkcurrie/solaria.git
 cd solaria
-./setup.sh --start-bridge
+go run ./cmd/bridge
 ```
 
-Open **[http://localhost:8080](http://localhost:8080)** in Chrome to connect to your Renogy BT-1 module and view live telemetry.
+Open `http://localhost:8080` in Chrome to pair with the Renogy BT-1 module.
 
 ---
 
-## 🤖 AI Agent & Automation Quickstart
+## AI Agent Integration
 
-Point **Antigravity**, **Gemini CLI**, **Claude Code**, or **Cursor** directly at this repository. The setup script provides native machine-readable discovery and execution modes:
+This repository supports automated discovery for agentic coding tools (Gemini CLI, Antigravity, Claude Code, Cursor):
 
 ```bash
-# Discover system capabilities, Go version, and config defaults
+# Print machine-readable environment & config schema
 ./setup.sh --agent-mode
 
-# Execute non-interactive setup with environment variables
+# Run non-interactive configuration
 ./setup.sh --non-interactive
 
-# Automatically install Go if missing and start bridge
+# Install dependencies and start bridge daemon
 ./setup.sh --install-deps --start-bridge
 ```
 
 ---
 
-## 🌟 Key Capabilities
+## System Overview
 
-* **🏎️ High-Speed Go Engine:** Real-time Modbus RTU chunk reassembly and CRC16 verification running on a sub-millisecond Go runtime.
-* **🌤️ Atmospheric Solar Intelligence:** Enriches every 10s telemetry frame with Open-Meteo radiometry ($\text{GHI}, \text{DHI}, \text{DNI}$, Cloud Cover %, Solar Elevation) and calculates real-time **Atmospheric Performance Ratio (PR %)**.
-* **🛡️ Remote Resilience & Outages Supervisor:** Self-healing watchdog with Linux Bluetooth auto-recovery, Web Bluetooth WakeLock, and continuous outage/availability audit logging.
-* **🗄️ Google Cloud BigQuery Streaming:** Zero-data-loss buffered streaming into partitioned BigQuery tables (`solaria-solar.solaria.telemetry`).
-* **📊 Modern Responsive UI:** Clean live telemetry dashboard with 400W array utilization gauges, battery SOC tracking, and historical trend analysis.
-
----
-
-## 📚 Detailed Engineering Documentation
-
-Deep technical guides, hardware schematics, and schema references are organized in the [`docs/`](docs/) directory:
-
-| Document | Description |
-| :--- | :--- |
-| **[🏛️ System Architecture](docs/architecture.md)** | End-to-end data pipeline, Web Bluetooth GATT characteristics, Modbus registers, and microservices. |
-| **[⚡ Solar Array Specifications](docs/solar-specifications.md)** | 400W 2S2P panel wiring topology, Rover 20A MPPT window, over-paneling ratio, and battery chemistry profiles. |
-| **[🌤️ Atmospheric Physics](docs/atmospheric-physics.md)** | Solar irradiance math, Performance Ratio (PR) formulation, and Sun Condition classification rules. |
-| **[🗄️ BigQuery Schema](docs/bigquery-schema.md)** | Complete 34-register schema definition and analytical SQL query examples. |
-| **[🚀 Deployment & Services](docs/deployment.md)** | Google Cloud Run microservice deployment and headless systemd service configuration for Raspberry Pi. |
-| **[🛡️ Resilience & Outages](docs/troubleshooting-resilience.md)** | Outage tracking engine, autonomous BlueZ supervisor, and remote troubleshooting guide. |
+* **Modbus RTU Engine (`cmd/bridge`):** Go-based BLE packet reassembly, CRC16 validation, and WebSocket gateway.
+* **Atmospheric Correlation:** Enriches telemetry with solar radiometry (GHI, DHI, DNI, cloud cover) from Open-Meteo to compute real-time Performance Ratio (PR).
+* **Connection Resilience:** Background watchdog with automatic BlueZ power cycling, Web Bluetooth WakeLock, and continuous outage logging.
+* **Storage & Analytics:** Buffered streaming inserts into date-partitioned BigQuery tables (`solaria-solar.solaria.telemetry`).
 
 ---
 
-## 🌐 Live Cloud Dashboard
+## Documentation
 
-The production cloud service is hosted on Google Cloud Run:
-👉 **[https://solaria-dashboard-952659886764.us-central1.run.app](https://solaria-dashboard-952659886764.us-central1.run.app)**
+* [System Architecture](docs/architecture.md) — BLE GATT services, data pipeline, and Modbus frame format.
+* [Solar Hardware Specifications](docs/solar-specifications.md) — 400W 2S2P electrical wiring, Rover 20A MPPT limits, and battery profiles.
+* [Atmospheric Formulas & PR](docs/atmospheric-physics.md) — Irradiance math, Performance Ratio formulas, and classification states.
+* [BigQuery Telemetry Schema](docs/bigquery-schema.md) — 34-column schema reference and analytical SQL queries.
+* [Deployment Guide](docs/deployment.md) — Google Cloud Run setup and Raspberry Pi systemd service units.
+* [Resilience & Troubleshooting](docs/troubleshooting-resilience.md) — Watchdog mechanics, outage tracking, and recovery procedures.
 
 ---
 
-## 📜 License
+## Live Dashboard
 
-MIT License © Frank Currie
+Production Cloud Run instance: [https://solaria-dashboard-952659886764.us-central1.run.app](https://solaria-dashboard-952659886764.us-central1.run.app)
+
+## License
+
+MIT © Frank Currie

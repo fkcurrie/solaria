@@ -5,6 +5,7 @@
 ---
 
 ## 🧭 The Core Mission
+
 To build a resilient, highly accurate, edge-to-cloud solar monitoring and intelligence platform for off-grid and battery systems powered by Renogy charge controllers (BT-1/BT-2 RS232/RS485). The system continuously correlates actual photovoltaic energy harvest with localized atmospheric conditions at **1296 Wren Lake Drive, Dorset, Ontario, Canada (45.186° N, 78.863° W)** to provide actionable insights on solar performance, shading, cloud attenuation, and battery health, streaming real-time and historical analytics into **Google BigQuery** (`solaria-solar.solaria.telemetry`).
 
 ---
@@ -12,6 +13,7 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 ## ⚡ Solar Array & Hardware Profile
 
 ### Photovoltaic Array Specifications
+
 - **Total Array Capacity:** **400 Watts Peak ($400\text{Wp}$)**
 - **Modules:** $4 \times 100\text{W}$ Monocrystalline Panels
 - **Array Topology:** **2S2P (2 Series $\times$ 2 Parallel Strings)**
@@ -30,11 +32,13 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 ## 🏛️ Guiding Architectural Tenets
 
 ### 1. Edge-First Resilience (Never Drop a Watt-Hour)
+
 - **Offline Autonomy:** The edge node (Raspberry Pi or Linux micro-server) operates autonomously. If cottage Wi-Fi drops, telemetry spools locally with zero data loss.
 - **Self-Healing BLE Link:** Bluetooth Low Energy links to the BT-1 module implement automatic reconnection and chunk reassembly without human intervention.
 - **Pure Modbus RTU:** Communication uses standard Modbus RTU frames over transparent BLE characteristics (`0xFFD1` TX / `0xFFF1` RX).
 
 ### 2. Environmental & Performance Fusion
+
 - **Solar Irradiance Fusion:** Every telemetry packet is paired with real-time solar physics data for Dorset:
   - **GHI (Global Horizontal Irradiance in $W/m^2$)**
   - **DNI (Direct Normal Irradiance in $W/m^2$)**
@@ -52,12 +56,14 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
   - `NIGHT`: Sun elevation $< 0^\circ$ or PV Voltage $< 5\text{V}$.
 
 ### 3. Serverless Analytical Store
+
 - **Google Cloud BigQuery:** Telemetry is streamed directly into `solaria-solar.solaria.telemetry` with daily time-partitioning on `timestamp` and clustering on `site` and `sun_classification`.
 - **Google Cloud Run:** Go dashboard microservice providing real-time ring buffer streaming and analytical visualization.
 
 ---
 
 ## 📍 Site Profile: Dorset, Ontario Installation
+
 - **Location:** 1296 Wren Lake Drive, Dorset, Ontario, Canada
 - **Coordinates:** `45.186° N, 78.863° W` (Algonquin Highlands)
 - **Elevation:** ~350m above sea level

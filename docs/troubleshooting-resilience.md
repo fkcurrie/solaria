@@ -1,61 +1,41 @@
-# 🛡️ Troubleshooting & Remote Resilience System
+# Resilience & Troubleshooting
 
-Solaria is built for remote, unattended cottage installations where physical access to the charge controller or gateway is limited.
+Solaria incorporates automated recovery mechanisms for remote, unattended deployments.
 
----
+## Supervisor Architecture
 
-## 🔄 Dual-Layer Resilience Architecture
+1. **Watchdog Timer:** If no valid Modbus frame arrives for 30 seconds, the bridge flags an outage, logs downtime, and executes host BlueZ recovery (`bluetoothctl power off/on`).
+2. **Web Bluetooth Auto-Reconnect:** The dashboard acquires a browser Screen WakeLock and runs an infinite reconnection loop against the BT-1 module (`BT-TH-66F984D6`).
+3. **Chunk Buffer Reset:** Modbus frame assembly buffers reset automatically on connection changes to prevent packet corruption.
 
-Solaria implements a multi-layer supervisor to guarantee continuous data streaming and prevent telemetry freeze:
+## Outage Metrics & Logging
 
-```
-+--------------------------------------------------------------------------------+
-|                             SUPERVISOR ENGINE                                  |
-|                                                                                |
-|  [Layer 1: Go Outage & Watchdog Engine]                                        |
-|  - Tracks elapsed seconds since last valid Modbus RTU packet                   |
-|  - If quiet > 30s: Emits outage_start event, flags outage, and ticks downtime   |
-|  - Triggers Linux BlueZ auto-heal: bluetoothctl power off/on, service reload    |
-|  - Sends watchdog_reconnect signal over ws://localhost:8765                    |
-|                                                                                |
-|  [Layer 2: Browser Web Bluetooth Watchdog & WakeLock]                          |
-|  - Acquires Screen WakeLock to prevent OS sleeping                             |
-|  - Auto-reconnects GATT session to Renogy BT-1 (BT-TH-66F984D6)                |
-|  - Auto-subscribes to FFF1 notify characteristic with infinite retry loop      |
-|  - Resets Modbus chunk reassembly buffer on any GATT state change              |
-+--------------------------------------------------------------------------------+
-```
+The supervisor tracks uptime and records interruptions in a ring buffer exposed on `http://localhost:8080`:
 
----
+* **System Availability (%):** Operational uptime divided by total session time.
+* **Total Outages:** Count of communication drop events.
+* **Total Downtime:** Accumulated offline seconds.
+* **Audit Log:** Timestamped log of disconnects, recovery actions, and durations.
 
-## 📊 Resilience & Outages Supervisor UI
+## Troubleshooting
 
-The local web dashboard (`http://localhost:8080`) provides a dedicated Outage Supervisor Panel:
+### GATT Disconnection / Device Out of Range
 
-* **System Availability Gauge:** Real-time uptime score (e.g. `99.8%`).
-* **Total Outages Counter:** Total count of communication interruptions.
-* **Total Downtime Counter:** Cumulative duration of downtime.
-* **Session Uptime:** Continuous uninterrupted operational time.
-* **Live Outage Audit Log Table:** Historical ring-buffer capturing:
-  * `#` Outage Number
-  * `Status` (`Active (Healing...)` or `Resolved`)
-  * `Interrupted At` / `Restored At` timestamps
-  * `Duration` formatted in minutes/seconds
-  * `Root Cause & Self-Healing Action` (e.g., `Linux BLE stack power-cycle & GATT reconnection`)
+* **Cause:** BLE radio interference or host adapter freeze.
+* **Automated Action:** Watchdog automatically cycles host Bluetooth power after 30 seconds of silence.
+* **Manual Reset:**
 
----
+  ```bash
+  sudo systemctl restart bluetooth
+  bluetoothctl power off && sleep 1 && bluetoothctl power on
+  ```
 
-## 🛠️ Common Troubleshooting Scenarios
+### Missing Irradiance Data
 
-### 1. Bluetooth Device Is No Longer In Range / GATT Disconnect
-* **Symptom:** Browser shows `GATT attempt failed: Bluetooth Device is no longer in range`.
-* **Automatic Resolution:** The Go watchdog detects no frames for > 30s and automatically initiates BlueZ host power recycling. The browser client retries GATT acquisition every 3 seconds until re-paired.
-* **Manual Trigger:** Run `bluetoothctl power off && sleep 1 && bluetoothctl power on` or click **"Disconnect"** and then **"Scan for Renogy BT-1"** on `http://localhost:8080`.
+* **Cause:** Outbound HTTP failure to Open-Meteo API.
+* **Check:** Verify network connectivity to `https://api.open-meteo.com`.
 
-### 2. Missing Weather Irradiance / Overcast Data
-* **Symptom:** Irradiance shows `0.0 W/m²` during daytime or cloud cover shows `--`.
-* **Check:** Ensure outbound HTTPS connectivity to Open-Meteo (`https://api.open-meteo.com/v1/forecast`).
+### Ingestion Authorization Failures
 
-### 3. BigQuery Streaming Ingestion Errors
-* **Symptom:** Dashboard logs show `401 Unauthorized` or `BigQuery insert failed`.
-* **Check:** Ensure `SOLARIA_API_TOKEN` matches the secret configured in Cloud Run and that `GOOGLE_APPLICATION_CREDENTIALS` (or Cloud Run Default Service Account) has `roles/bigquery.dataEditor` permissions.
+* **Cause:** Mismatched API tokens.
+* **Check:** Verify `SOLARIA_API_TOKEN` matches in both `.env` and Cloud Run environment settings.
