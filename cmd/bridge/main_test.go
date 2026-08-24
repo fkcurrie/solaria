@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -257,6 +259,29 @@ func TestDecodeTelemetry_ColdDeratingAndStringImbalance(t *testing.T) {
 		t.Errorf("Expected POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT, got %s", telemImbalance.StringHealthStatus)
 	}
 }
+
+func TestHandleNetworkDiscovery(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network-discovery", nil)
+	w := httptest.NewRecorder()
+	handleNetworkDiscovery(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var info NetworkDiscoveryInfo
+	if err := json.NewDecoder(w.Body).Decode(&info); err != nil {
+		t.Fatalf("Failed to decode discovery info: %v", err)
+	}
+
+	if info.MDNSDomain != "solaria.local" {
+		t.Errorf("Expected solaria.local, got %s", info.MDNSDomain)
+	}
+	if len(info.LocalIPs) == 0 {
+		t.Errorf("Expected at least one local IP address")
+	}
+}
+
 
 
 

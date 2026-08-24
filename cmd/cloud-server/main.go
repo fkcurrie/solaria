@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -1577,6 +1578,58 @@ func handleBluetoothSignal(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// NetworkDiscoveryInfo contains mDNS zero-config network discovery details
+type NetworkDiscoveryInfo struct {
+	Hostname        string   `json:"hostname"`
+	MDNSDomain      string   `json:"mdns_domain"`
+	MDNSURL         string   `json:"mdns_url"`
+	ServiceType     string   `json:"service_type"`
+	Port            int      `json:"port"`
+	AvahiService    string   `json:"avahi_service"`
+	BroadcastStatus string   `json:"broadcast_status"`
+	LocalIPs        []string `json:"local_ips"`
+}
+
+func getLocalIPAddresses() []string {
+	var ips []string
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					ips = append(ips, ipnet.IP.String())
+				}
+			}
+		}
+	}
+	if len(ips) == 0 {
+		ips = append(ips, "127.0.0.1")
+	}
+	return ips
+}
+
+func handleNetworkDiscovery(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "solaria"
+	}
+
+	info := NetworkDiscoveryInfo{
+		Hostname:        hostname,
+		MDNSDomain:      "solaria.local",
+		MDNSURL:         "http://solaria.local:8080",
+		ServiceType:     "_http._tcp",
+		Port:            8080,
+		AvahiService:    "/etc/avahi/services/solaria.service",
+		BroadcastStatus: "ACTIVE (Multicast DNS / Bonjour / Avahi Daemon)",
+		LocalIPs:        getLocalIPAddresses(),
+	}
+	_ = json.NewEncoder(w).Encode(info)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1597,6 +1650,7 @@ func main() {
 	http.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
 	http.HandleFunc("/api/v1/array-topology", handleArrayTopology)
 	http.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)
+	http.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)

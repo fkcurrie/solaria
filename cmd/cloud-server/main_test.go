@@ -421,6 +421,26 @@ func TestHandleBluetoothSignal(t *testing.T) {
 	}
 }
 
+func TestHandleNetworkDiscovery(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/network-discovery", nil)
+	w := httptest.NewRecorder()
+	handleNetworkDiscovery(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/network-discovery, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode network discovery response: %v", err)
+	}
+
+	if res["mdns_domain"] != "solaria.local" {
+		t.Errorf("Expected solaria.local, got %v", res["mdns_domain"])
+	}
+}
+
+
 
 
 
