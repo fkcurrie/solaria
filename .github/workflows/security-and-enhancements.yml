@@ -65,7 +65,7 @@ jobs:
           go mod tidy
 
       - name: 🚀 Create Pull Request with Enhancements
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(automated): Apply Go formatting, tidy, and security fixes"
