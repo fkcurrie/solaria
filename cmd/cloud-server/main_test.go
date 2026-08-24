@@ -319,3 +319,32 @@ func TestHandleSunsetDigest(t *testing.T) {
 	}
 }
 
+func TestHandleShadingAnalysis(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/shading-analysis", nil)
+	w := httptest.NewRecorder()
+	handleShadingAnalysis(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/shading-analysis, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode shading analysis response: %v", err)
+	}
+
+	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
+		t.Errorf("Expected Dorset site, got %v", res["site"])
+	}
+
+	patterns, ok := res["shading_patterns"].([]interface{})
+	if !ok || len(patterns) == 0 {
+		t.Errorf("Expected non-empty shading_patterns, got %v", res["shading_patterns"])
+	}
+
+	if res["total_shading_loss_kwh_day"] == nil {
+		t.Errorf("Expected total_shading_loss_kwh_day in response")
+	}
+}
+
+
