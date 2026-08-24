@@ -25,6 +25,9 @@ var templateFS embed.FS
 //go:embed testdata/sample_day.json
 var sampleDayJSON []byte
 
+//go:embed static/*
+var staticFS embed.FS
+
 type Telemetry struct {
 	PVPowerW        int     `json:"pv_power_w"`
 	PVVoltageV      float64 `json:"pv_voltage_v"`
@@ -1014,6 +1017,43 @@ func main() {
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
+
+	http.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		b, err := staticFS.ReadFile("static/manifest.json")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(b)
+	})
+
+	http.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Service-Worker-Allowed", "/")
+		b, err := staticFS.ReadFile("static/sw.js")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(b)
+	})
+
+	http.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
+		filePath := strings.TrimPrefix(r.URL.Path, "/")
+		b, err := staticFS.ReadFile("static/" + filePath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if strings.HasSuffix(filePath, ".svg") {
+			w.Header().Set("Content-Type", "image/svg+xml")
+		} else if strings.HasSuffix(filePath, ".png") {
+			w.Header().Set("Content-Type", "image/png")
+		}
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(b)
+	})
 
 	// #nosec G706 - Configuration startup logging
 	log.Printf("Solaria Cloud Run Service listening on port %d...", listenPort)

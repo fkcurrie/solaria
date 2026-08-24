@@ -105,3 +105,39 @@ func TestHandleIngest_Valid(t *testing.T) {
 		t.Errorf("Expected latest PV power 280W, got %dW", latest.Telemetry.PVPowerW)
 	}
 }
+
+func TestHandleSampleDay(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sample-day", nil)
+	w := httptest.NewRecorder()
+
+	handleSampleDay(w, req)
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200 OK, got %d", resp.StatusCode)
+	}
+
+	var records []map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
+		t.Fatalf("Failed to decode sample day json: %v", err)
+	}
+	if len(records) == 0 {
+		t.Errorf("Expected non-empty sample day records")
+	}
+}
+
+func TestPWAStaticFiles(t *testing.T) {
+	manifest, err := staticFS.ReadFile("static/manifest.json")
+	if err != nil || len(manifest) == 0 {
+		t.Fatalf("Failed to read embedded manifest.json: %v", err)
+	}
+
+	sw, err := staticFS.ReadFile("static/sw.js")
+	if err != nil || len(sw) == 0 {
+		t.Fatalf("Failed to read embedded sw.js: %v", err)
+	}
+
+	logo, err := staticFS.ReadFile("static/assets/solaria-logo.svg")
+	if err != nil || len(logo) == 0 {
+		t.Fatalf("Failed to read embedded logo: %v", err)
+	}
+}
