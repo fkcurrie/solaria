@@ -199,6 +199,65 @@
       flex-wrap: wrap;
       gap: 12px;
     }
+
+    .battery-config-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .profile-card {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .profile-card:hover {
+      border-color: #38bdf8;
+      background: #0f172a;
+    }
+    .profile-card.active {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.08);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+    }
+    .profile-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .profile-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      line-height: 1.4;
+    }
+    .config-banner-alert {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
@@ -289,6 +348,108 @@
         <option value="2000" selected>Poll 2s</option>
         <option value="5000">Poll 5s</option>
       </select>
+    </div>
+  </div>
+
+  <!-- Battery Chemistry & Profile Configurator -->
+  <div class="battery-config-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
+          🔋 Battery Chemistry & Profile Configurator
+        </h2>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+          Remotely reconfigure Rover charge profile over Bluetooth (Modbus Function Code 0x06 / Register 0xE004)
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Active Setting:</span>
+        <span id="currentBattTypeBadge" class="badge badge-retry" style="font-size: 0.85rem;">Checking Rover...</span>
+        <button class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem;" onclick="readBatteryProfile()">
+          🔄 Read Setting
+        </button>
+      </div>
+    </div>
+
+    <!-- Presets Selector Grid -->
+    <div class="profile-grid">
+      <div class="profile-card active" id="pCard-4" onclick="selectProfile(4, 'LI (Lithium / LiFePO4)')">
+        <div class="profile-title">
+          <span>🚀 LiFePO4 (Lithium)</span>
+          <span style="color: #10b981; font-size: 0.8rem;">Preset 0x04</span>
+        </div>
+        <div class="profile-desc">
+          Boost: 14.4V<br>
+          Float: Rest / Cutoff<br>
+          Equalize: <strong>Disabled</strong><br>
+          Temp Comp: <strong>0 mV/°C</strong>
+        </div>
+      </div>
+
+      <div class="profile-card" id="pCard-1" onclick="selectProfile(1, 'SLD (Sealed / AGM)')">
+        <div class="profile-title">
+          <span>🛡️ AGM / Sealed</span>
+          <span style="color: #fbbf24; font-size: 0.8rem;">Preset 0x01</span>
+        </div>
+        <div class="profile-desc">
+          Boost: 14.4V<br>
+          Float: 13.8V<br>
+          Equalize: 14.6V (2h)<br>
+          Temp Comp: -30 mV/°C
+        </div>
+      </div>
+
+      <div class="profile-card" id="pCard-2" onclick="selectProfile(2, 'GEL (Gel Cell)')">
+        <div class="profile-title">
+          <span>💧 Gel Battery</span>
+          <span style="color: #38bdf8; font-size: 0.8rem;">Preset 0x02</span>
+        </div>
+        <div class="profile-desc">
+          Boost: 14.2V<br>
+          Float: 13.8V<br>
+          Equalize: <strong>Disabled</strong><br>
+          Temp Comp: -30 mV/°C
+        </div>
+      </div>
+
+      <div class="profile-card" id="pCard-3" onclick="selectProfile(3, 'FLD (Flooded)')">
+        <div class="profile-title">
+          <span>⚡ Flooded Lead</span>
+          <span style="color: #a855f7; font-size: 0.8rem;">Preset 0x03</span>
+        </div>
+        <div class="profile-desc">
+          Boost: 14.6V<br>
+          Float: 13.8V<br>
+          Equalize: 14.8V (2h)<br>
+          Temp Comp: -30 mV/°C
+        </div>
+      </div>
+
+      <div class="profile-card" id="pCard-0" onclick="selectProfile(0, 'USER (Custom)')">
+        <div class="profile-title">
+          <span>⚙️ User Custom</span>
+          <span style="color: #94a3b8; font-size: 0.8rem;">Preset 0x00</span>
+        </div>
+        <div class="profile-desc">
+          Manual Voltage Map<br>
+          Individual Registers<br>
+          0xE005 - 0xE015<br>
+          Custom Thresholds
+        </div>
+      </div>
+    </div>
+
+    <!-- Apply Button & Cold Warning -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="btn-solar" style="font-size: 0.88rem; padding: 10px 20px;" onclick="applySelectedProfile()">
+          ⚡ Flash Selected Profile to Rover Controller
+        </button>
+        <span id="writeStatusMsg" style="font-size: 0.82rem; font-family: var(--mono); color: #34d399;"></span>
+      </div>
+      <div class="config-banner-alert" style="margin-top: 0; padding: 6px 12px;">
+        <span>❄️ <strong>Cold Weather Notice:</strong> If using LiFePO4, never charge cells below 0°C (32°F).</span>
+      </div>
     </div>
   </div>
 
@@ -531,10 +692,11 @@
       sendToLinux({ type: 'gatt_connected', name: devName, id: device.id });
 
       setTimeout(queryDeviceInfo, 500);
+      setTimeout(readBatteryProfile, 1000);
       setTimeout(() => {
         queryRealtimeTelemetry();
         startPollingLoop();
-      }, 1500);
+      }, 1800);
     }
 
     async function sendModbusFrame(rawCommand) {
@@ -548,6 +710,70 @@
           await writeCharObj.writeValueWithoutResponse(fullFrame);
         }
       } catch (e) {}
+    }
+
+    let selectedProfileVal = 4;
+    let selectedProfileName = 'LI (Lithium / LiFePO4)';
+    const PROFILE_NAMES = {
+      0: 'USER (Custom)',
+      1: 'SLD (Sealed / AGM)',
+      2: 'GEL (Gel)',
+      3: 'FLD (Flooded)',
+      4: 'LI (Lithium / LiFePO4)'
+    };
+
+    function selectProfile(val, name) {
+      selectedProfileVal = val;
+      selectedProfileName = name;
+      [0, 1, 2, 3, 4].forEach(p => {
+        const el = document.getElementById(`pCard-${p}`);
+        if (el) el.classList.remove('active');
+      });
+      const activeEl = document.getElementById(`pCard-${val}`);
+      if (activeEl) activeEl.classList.add('active');
+      log(`Selected Battery Profile candidate: ${name} (Reg 0xE004 = 0x0${val})`, 'info');
+    }
+
+    async function applySelectedProfile() {
+      if (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected || !writeCharObj) {
+        log('⚠️ Cannot write profile: Bluetooth is not connected to Renogy controller.', 'warn');
+        alert('Please connect to the Renogy controller via Bluetooth first.');
+        return;
+      }
+      const confirmMsg = `⚡ Are you sure you want to write battery profile:\n\n👉 "${selectedProfileName}"\n\nto the Renogy Rover controller over Modbus RTU?`;
+      if (!confirm(confirmMsg)) return;
+
+      const raw = new Uint8Array([0x01, 0x06, 0xE0, 0x04, 0x00, selectedProfileVal]);
+      await sendModbusFrame(raw);
+      log(`⚡ Transmitted Modbus 0x06 Write Frame: Reg 0xE004 ➔ 0x0${selectedProfileVal} (${selectedProfileName})`, 'solar');
+      document.getElementById('writeStatusMsg').textContent = 'Flashing EEPROM...';
+      setTimeout(readBatteryProfile, 1000);
+    }
+
+    async function readBatteryProfile() {
+      if (!writeCharObj) return;
+      const raw = new Uint8Array([0x01, 0x03, 0xE0, 0x04, 0x00, 0x01]);
+      await sendModbusFrame(raw);
+      log('🔍 Querying active Battery Profile register (0xE004)...', 'info');
+    }
+
+    function updateProfileBadge(val) {
+      const badge = document.getElementById('currentBattTypeBadge');
+      const name = PROFILE_NAMES[val] || `Profile #${val}`;
+      if (badge) {
+        badge.textContent = name;
+        if (val === 4) {
+          badge.className = 'badge badge-online';
+          badge.style.color = '#34d399';
+        } else {
+          badge.className = 'badge badge-retry';
+          badge.style.color = '#fbbf24';
+        }
+      }
+      const statusMsg = document.getElementById('writeStatusMsg');
+      if (statusMsg) {
+        statusMsg.textContent = `Active: ${name}`;
+      }
     }
 
     async function queryDeviceInfo() {
@@ -576,6 +802,23 @@
 
       if (rxTimeout) clearTimeout(rxTimeout);
 
+      // Modbus 0x06 Write Echo (8 bytes)
+      if (rxBuffer.length >= 8 && rxBuffer[1] === 0x06) {
+        const fullFrame = rxBuffer.slice(0, 8);
+        rxBuffer = rxBuffer.slice(8);
+        parseCompleteModbusFrame(fullFrame);
+        return;
+      }
+
+      // Modbus Exception Response (5 bytes)
+      if (rxBuffer.length >= 5 && (rxBuffer[1] === 0x86 || rxBuffer[1] === 0x83)) {
+        const fullFrame = rxBuffer.slice(0, 5);
+        rxBuffer = rxBuffer.slice(5);
+        parseCompleteModbusFrame(fullFrame);
+        return;
+      }
+
+      // Modbus 0x03 Read Response
       if (rxBuffer.length >= 3 && rxBuffer[1] === 0x03) {
         const expectedLen = 3 + rxBuffer[2] + 2;
         if (rxBuffer.length >= expectedLen) {
@@ -595,9 +838,44 @@
     }
 
     function parseCompleteModbusFrame(bytes) {
-      if (bytes.length < 5 || bytes[1] !== 0x03) return;
+      if (bytes.length < 5) return;
+
+      // Handle Modbus 0x06 Write Response Echo
+      if (bytes[1] === 0x06 && bytes.length >= 6) {
+        const reg = (bytes[2] << 8) | bytes[3];
+        const val = (bytes[4] << 8) | bytes[5];
+        if (reg === 0xE004) {
+          const pName = PROFILE_NAMES[val] || `Profile #${val}`;
+          log(`🎉 SUCCESS: Renogy Rover Battery Profile updated to [${pName}]!`, 'success');
+          updateProfileBadge(val);
+        } else {
+          log(`✅ Modbus Write 0x06 Echo: Register 0x${reg.toString(16).toUpperCase()} set to ${val}`, 'success');
+        }
+        return;
+      }
+
+      // Handle Modbus Exception responses
+      if (bytes[1] === 0x86 || bytes[1] === 0x83) {
+        const errCode = bytes[2];
+        const errMap = {1: 'Illegal Function', 2: 'Illegal Data Address', 3: 'Illegal Data Value', 4: 'Slave Device Failure'};
+        const errMsg = errMap[errCode] || `Error Code ${errCode}`;
+        log(`❌ Controller Modbus Exception: ${errMsg}`, 'error');
+        return;
+      }
+
+      if (bytes[1] !== 0x03) return;
       const byteCount = bytes[2];
       const data = bytes.slice(3, 3 + byteCount);
+
+      // Handle Single Register 0xE004 Battery Type Read (2 bytes payload)
+      if (byteCount === 2) {
+        const val = (data[0] << 8) | data[1];
+        if (val >= 0 && val <= 4) {
+          updateProfileBadge(val);
+          log(`🔋 Rover Active Setting Confirmed: ${PROFILE_NAMES[val]} (Reg 0xE004 = 0x0${val})`, 'success');
+          return;
+        }
+      }
 
       if (byteCount >= 60 || data.length >= 20) {
         packetCounter++;
