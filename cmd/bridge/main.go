@@ -1640,6 +1640,7 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 
 	// 2. Start HTTP Dashboard Server on 8080 (No-cache for instant UI updates)
 	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
 	fs := http.FileServer(http.Dir("static"))
 	httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -1687,3 +1688,56 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 	defer cancel()
 	_ = server.Shutdown(ctx)
 }
+
+// NetworkDiscoveryInfo contains mDNS zero-config network discovery details
+type NetworkDiscoveryInfo struct {
+	Hostname        string   `json:"hostname"`
+	MDNSDomain      string   `json:"mdns_domain"`
+	MDNSURL         string   `json:"mdns_url"`
+	ServiceType     string   `json:"service_type"`
+	Port            int      `json:"port"`
+	AvahiService    string   `json:"avahi_service"`
+	BroadcastStatus string   `json:"broadcast_status"`
+	LocalIPs        []string `json:"local_ips"`
+}
+
+func getLocalIPAddresses() []string {
+	var ips []string
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					ips = append(ips, ipnet.IP.String())
+				}
+			}
+		}
+	}
+	if len(ips) == 0 {
+		ips = append(ips, "127.0.0.1")
+	}
+	return ips
+}
+
+func handleNetworkDiscovery(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "solaria"
+	}
+
+	info := NetworkDiscoveryInfo{
+		Hostname:        hostname,
+		MDNSDomain:      "solaria.local",
+		MDNSURL:         fmt.Sprintf("http://solaria.local:%d", httpPort),
+		ServiceType:     "_http._tcp",
+		Port:            httpPort,
+		AvahiService:    "/etc/avahi/services/solaria.service",
+		BroadcastStatus: "ACTIVE (Multicast DNS / Bonjour / Avahi Daemon)",
+		LocalIPs:        getLocalIPAddresses(),
+	}
+	_ = json.NewEncoder(w).Encode(info)
+}
+

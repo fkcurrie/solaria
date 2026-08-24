@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">Solaria Solar Monitor on %h</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>8080</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>app=solaria</txt-record>
+    <txt-record>model=Renogy Rover 20A MPPT</txt-record>
+    <txt-record>battery=170Ah LiFePO4</txt-record>
+    <txt-record>pv_array=400W 2S2P</txt-record>
+  </service>
+</service-group>

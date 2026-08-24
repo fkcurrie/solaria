@@ -236,8 +236,16 @@ SYSTEMD_EOF
         $SUDO systemctl enable solaria-bridge.service
         $SUDO systemctl restart solaria-bridge.service || true
         echo -e "  [OK] systemd service ${GREEN}solaria-bridge.service${NC} enabled and started."
+
+        # Configure Avahi mDNS Service
+        if [ -d "/etc/avahi/services" ] && [ -f "deploy/solaria.service" ]; then
+            $SUDO cp deploy/solaria.service /etc/avahi/services/solaria.service
+            $SUDO systemctl restart avahi-daemon 2>/dev/null || true
+            echo -e "  [OK] mDNS discovery enabled at ${GREEN}http://solaria.local:8080${NC}"
+        fi
     else
         echo -e "  [DRY-RUN] Would install and start /etc/systemd/system/solaria-bridge.service"
+        echo -e "  [DRY-RUN] Would configure /etc/avahi/services/solaria.service for http://solaria.local:8080"
     fi
 else
     echo -e "  Skipping systemd service setup."
