@@ -79,6 +79,7 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 * [BigQuery Telemetry Schema](docs/bigquery-schema.md) — 34-column schema reference and analytical SQL queries.
 * [Deployment Guide](docs/deployment.md) — Local edge setup, storage configuration, and Cloud Run deployment.
 * [Resilience & Troubleshooting](docs/troubleshooting-resilience.md) — Watchdog mechanics, outage tracking, and recovery procedures.
+* [System Philosophy & Tenets](docs/SOUL.md) — Hardware profile, site context, and engineering principles.
 
 ---
 

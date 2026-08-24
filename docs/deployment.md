@@ -73,7 +73,7 @@ go build -o /usr/local/bin/solaria-edge ./cmd/edge-agent
 ### 2. Install Systemd Service Unit
 
 ```bash
-sudo cp edge/renogy_edge.service /etc/systemd/system/renogy_edge.service
+sudo cp deploy/renogy_edge.service /etc/systemd/system/renogy_edge.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now renogy_edge.service
 ```

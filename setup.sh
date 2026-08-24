@@ -392,7 +392,7 @@ fi
 # Interactive Menu
 echo -e "  1) Start Local Go Bridge & Dashboard (${CYAN}http://localhost:8080${NC})"
 echo -e "  2) Deploy to Google Cloud Run"
-echo -e "  3) Build all binaries (${CYAN}make all${NC})"
+echo -e "  3) Build all binaries (bridge, edge-agent, cloud-server)"
 echo -e "  4) Exit"
 read -rp "  Select an option [1-4, default: 1]: " OPTION
 OPTION="${OPTION:-1}"
@@ -416,8 +416,11 @@ case "$OPTION" in
         fi
         ;;
     3)
-        echo -e "\n${GREEN}Building all binaries...${NC}"
-        make all
+        echo -e "\n${GREEN}Building all binaries into bin/...${NC}"
+        mkdir -p bin
+        go build -o bin/solaria-bridge ./cmd/bridge
+        go build -o bin/solaria-edge ./cmd/edge-agent
+        go build -o bin/solaria-cloud ./cmd/cloud-server
         echo -e "${GREEN}[OK] Binaries generated in bin/${NC}"
         ;;
     *)

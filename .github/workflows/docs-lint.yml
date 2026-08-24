@@ -6,16 +6,16 @@ on:
     paths:
       - '**.md'
       - 'docs/**'
-      - '.markdownlint*'
-      - '.markdown-link-check.json'
+      - '.github/.markdownlint*'
+      - '.github/.markdown-link-check.json'
       - '.github/workflows/docs-lint.yml'
   pull_request:
     branches: [ main ]
     paths:
       - '**.md'
       - 'docs/**'
-      - '.markdownlint*'
-      - '.markdown-link-check.json'
+      - '.github/.markdownlint*'
+      - '.github/.markdown-link-check.json'
       - '.github/workflows/docs-lint.yml'
   workflow_dispatch:
 
@@ -33,6 +33,7 @@ jobs:
       - name: Run markdownlint-cli2
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
+          config: '.github/.markdownlint-cli2.yaml'
           globs: |
             **/*.md
             !node_modules
@@ -50,4 +51,4 @@ jobs:
           use-quiet-mode: 'yes'
           use-verbose-mode: 'no'
           folder-path: '.'
-          config-file: '.markdown-link-check.json'
+          config-file: '.github/.markdown-link-check.json'
