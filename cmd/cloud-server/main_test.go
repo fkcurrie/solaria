@@ -440,6 +440,26 @@ func TestHandleNetworkDiscovery(t *testing.T) {
 	}
 }
 
+func TestHandleGCPOnboarding(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/gcp-onboarding", nil)
+	w := httptest.NewRecorder()
+	handleGCPOnboarding(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/gcp-onboarding, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode GCP onboarding response: %v", err)
+	}
+
+	if res["setup_script"] != "./setup-gcp.sh" {
+		t.Errorf("Expected ./setup-gcp.sh, got %v", res["setup_script"])
+	}
+}
+
+
 
 
 
