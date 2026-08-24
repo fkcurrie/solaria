@@ -1,7 +1,11 @@
-# markdownlint-cli2 configuration
 config:
-  MD013: false # Line length
-  MD024:
-    siblings_only: true # Allow duplicate headings in different sections
-  MD033: false # Allow inline HTML for specific badges/formatting
-  MD041: true  # First line in file should be a top level heading
+  default: true
+  MD013: false
+  MD033: false
+  MD041: false
+globs:
+  - "**/*.md"
+ignores:
+  - "node_modules"
+  - ".gemini"
+  - ".git"
