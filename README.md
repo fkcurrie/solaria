@@ -18,7 +18,7 @@ flowchart TD
 
     subgraph Edge["📡 Edge Layer (Raspberry Pi / Linux Gateway)"]
         Rover -->|"BT-1 Module (RS232)"| BT["BLE GATT (0xFFD0)\n(BT-TH-66F984D6)"]
-        BT -->|"Modbus RTU over BLE\n(FFD1 TX / FFF1 RX)"| Agent["Go Edge Agent / Python Gateway\n(10s query loop)"]
+        BT -->|"Modbus RTU over BLE\n(FFD1 TX / FFF1 RX)"| Agent["Go Gateway & Edge Agent\n(solaria-bridge / solaria-edge)"]
         Weather["Open-Meteo Weather API\n(45.186° N, -78.863° W)"] -->|"Solar Irradiance GHI/DNI\nCloud Cover %"| Agent
         Agent -->|"Offline Buffer"| Spooler[("Disk Spooler (spool.jsonl)\nZero Data Loss")]
         Spooler -->|"Replay On Connect"| Uploader["HTTPS Cloud Ingest Client"]

@@ -1,6 +1,11 @@
-.PHONY: all build-edge build-cloud build-arm run-edge run-cloud clean
+.PHONY: all build-bridge build-edge build-cloud build-arm run-bridge run-edge run-cloud clean
 
-all: build-edge build-cloud
+all: build-bridge build-edge build-cloud
+
+# Build local Web Bluetooth & WebSocket gateway
+build-bridge:
+	@echo "🔨 Building Go BLE Bridge..."
+	go build -o bin/solaria-bridge ./cmd/bridge
 
 # Build edge agent for local Linux
 build-edge:
@@ -16,6 +21,10 @@ build-arm:
 build-cloud:
 	@echo "🔨 Building Go Cloud Run Server..."
 	go build -o bin/solaria-cloud ./cmd/cloud-server
+
+# Run bridge locally
+run-bridge: build-bridge
+	./bin/solaria-bridge
 
 # Run edge agent locally with config
 run-edge: build-edge

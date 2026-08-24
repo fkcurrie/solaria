@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ☀️ SOLARIA: Interactive Setup & Deployment Wizard
+# ☀️ SOLARIA: Interactive Setup & Deployment Wizard (Pure Go Edition)
 # ==============================================================================
 set -e
 
@@ -15,24 +15,15 @@ echo -e "${CYAN}================================================================
 echo -e "${YELLOW}   ☀️  SOLARIA: Renogy Solar & Atmospheric Intelligence Platform       ${NC}"
 echo -e "${CYAN}======================================================================${NC}"
 echo -e "This wizard configures your environment, site coordinates, solar array"
-echo -e "specifications, Google Cloud BigQuery pipeline, and edge BLE bridge.\n"
+echo -e "specifications, Google Cloud BigQuery pipeline, and Go edge bridge.\n"
 
 # ------------------------------------------------------------------------------
 # 1. Dependency Checks
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[1/5] Checking System Prerequisites...${NC}"
 
-has_python=false
 has_go=false
 has_gcloud=false
-
-if command -v python3 &>/dev/null; then
-    py_ver=$(python3 --version 2>&1)
-    echo -e "  ${GREEN}✓${NC} Python: ${py_ver}"
-    has_python=true
-else
-    echo -e "  ${RED}✗${NC} Python 3 not found."
-fi
 
 if command -v go &>/dev/null || [ -f "$HOME/.local/go/bin/go" ]; then
     export PATH="$HOME/.local/go/bin:$PATH"
@@ -40,7 +31,7 @@ if command -v go &>/dev/null || [ -f "$HOME/.local/go/bin/go" ]; then
     echo -e "  ${GREEN}✓${NC} Go: ${go_ver}"
     has_go=true
 else
-    echo -e "  ${YELLOW}!${NC} Go not found (Required for building Go cloud server from source)."
+    echo -e "  ${RED}✗${NC} Go 1.21+ not found."
 fi
 
 if command -v gcloud &>/dev/null; then
@@ -140,12 +131,12 @@ echo -e "  ${GREEN}✓${NC} Configuration saved to ${CYAN}.env${NC}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# 5. Optional Actions
+# 5. Build & Launch Options
 # ------------------------------------------------------------------------------
 echo -e "${CYAN}[5/5] Deployment & Launch Options:${NC}"
-echo -e "  1) Start Local Bluetooth Gateway (${CYAN}python3 server.py${NC})"
-echo -e "  2) Deploy Cloud Dashboard to Google Cloud Run"
-echo -e "  3) Install Python dependencies (${CYAN}pip install -r edge/requirements.txt${NC})"
+echo -e "  1) Build & Start Go Gateway Bridge (${CYAN}go run ./cmd/bridge${NC})"
+echo -e "  2) Deploy Go Cloud Dashboard to Google Cloud Run"
+echo -e "  3) Build all binaries (${CYAN}make all${NC})"
 echo -e "  4) Exit setup"
 
 read -rp "  Select an option [1-4, default: 1]: " OPTION
@@ -153,8 +144,8 @@ OPTION="${OPTION:-1}"
 
 case "$OPTION" in
     1)
-        echo -e "\n${GREEN}🚀 Starting Solaria Local Gateway...${NC}"
-        python3 server.py
+        echo -e "\n${GREEN}🚀 Starting Solaria Go Bridge...${NC}"
+        go run ./cmd/bridge
         ;;
     2)
         if [ "$has_gcloud" = true ]; then
@@ -170,9 +161,9 @@ case "$OPTION" in
         fi
         ;;
     3)
-        echo -e "\n${GREEN}📦 Installing Python requirements...${NC}"
-        pip install --break-system-packages -r edge/requirements.txt websockets requests
-        echo -e "${GREEN}✓ Dependencies installed successfully!${NC}"
+        echo -e "\n${GREEN}🔨 Building all Go binaries...${NC}"
+        make all
+        echo -e "${GREEN}✓ Binaries built in bin/${NC}"
         ;;
     *)
         echo -e "\n${GREEN}Setup complete! You can run './setup.sh' at any time.${NC}"

@@ -1,13 +1,13 @@
 [Unit]
-Description=Solaria Renogy Solar BLE Edge Daemon
+Description=Solaria Renogy Solar Go Edge Daemon
 After=network-online.target bluetooth.target
 Wants=network-online.target bluetooth.target
 
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/solar-edge/edge
-ExecStart=/home/pi/solar-edge/edge/venv/bin/python3 edge_agent.py --config config.yaml
+WorkingDirectory=/opt/solaria
+ExecStart=/opt/solaria/bin/solaria-edge --config /opt/solaria/config.yaml
 Restart=always
 RestartSec=5s
 StandardOutput=journal
