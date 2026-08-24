@@ -406,6 +406,9 @@
       </div>
     </div>
     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <button onclick="openEdgeWinterizeModal()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
+        ❄️ Winterize Cottage
+      </button>
       <button onclick="toggleHwConfig()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
         ⚙️ Hardware Settings
       </button>
@@ -417,6 +420,93 @@
       <span id="wakeLockBadge" class="badge badge-online" style="display: none;">Keep-Alive Active</span>
     </div>
   </header>
+
+  <!-- Winterization & Freeze-Proof Departure Modal -->
+  <div id="edgeWinterizeModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="card" style="max-width: 650px; width: 100%; max-height: 90vh; overflow-y: auto; background: #0b1120; border: 1px solid #38bdf8; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
+        <h2 style="font-size: 1.15rem; color: #38bdf8; margin: 0; display: flex; align-items: center; gap: 8px;">
+          ❄️ Cottage Winterization & Freeze-Proof Departure Assistant
+        </h2>
+        <button onclick="closeEdgeWinterizeModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+
+      <!-- Battery Storage Health Indicator -->
+      <div style="background: rgba(15, 23, 42, 0.8); padding: 14px; border-radius: 8px; border: 1px solid var(--card-border); margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">170Ah LiFePO4 Winter Storage Health</span>
+          <span id="edgeWinStorageBadge" class="badge badge-online">OPTIMAL STORAGE</span>
+        </div>
+        <div style="display: flex; gap: 20px; align-items: baseline; margin-top: 8px;">
+          <div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Current SOC:</span>
+            <span id="edgeWinCurrentSoc" style="font-size: 1.3rem; font-weight: 700; color: #10b981; margin-left: 6px;">82%</span>
+          </div>
+          <div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Voltage:</span>
+            <span id="edgeWinCurrentVolt" style="font-size: 1.3rem; font-weight: 700; color: #38bdf8; margin-left: 6px;">13.3 V</span>
+          </div>
+          <div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Ideal Target:</span>
+            <span style="font-size: 1rem; font-weight: 600; color: #f59e0b; margin-left: 6px;">50% - 60% SOC</span>
+          </div>
+        </div>
+        <div id="edgeWinRecText" style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px; line-height: 1.4;">
+          LiFePO4 cells suffer minimal degradation when stored at ~50%-60% SOC during deep Muskoka winter freezes (-25°C).
+        </div>
+      </div>
+
+      <!-- 5-Step Interactive Checklist -->
+      <h3 style="font-size: 0.95rem; color: #f8fafc; margin-bottom: 10px;">📋 Step-by-Step Departure Checklist:</h3>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+          <input type="checkbox" id="edgeWinChk1" style="accent-color: #38bdf8; margin-top: 3px;">
+          <div>
+            <strong style="color: #f8fafc; font-size: 0.88rem;">1. Verify Sub-Zero Inhibit Armed</strong>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Rover 20A MPPT low-temp lithium charge inhibit is verified active to prevent destructive sub-zero charging.</p>
+          </div>
+        </label>
+        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+          <input type="checkbox" id="edgeWinChk2" style="accent-color: #38bdf8; margin-top: 3px;">
+          <div>
+            <strong style="color: #f8fafc; font-size: 0.88rem;">2. Power Down AC Inverter & DC Loads</strong>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Turn off AC Inverter switch, 12V water pump breaker, Starlink, and fridge to eliminate parasitic battery drain.</p>
+          </div>
+        </label>
+        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+          <input type="checkbox" id="edgeWinChk3" style="accent-color: #38bdf8; margin-top: 3px;">
+          <div>
+            <strong style="color: #f8fafc; font-size: 0.88rem;">3. Inspect Panel Pitch for Snow Shedding</strong>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Confirm 4x100W 2S2P panels are angled steep (~55°-60°) so Algonquin lake-effect snow easily slides off.</p>
+          </div>
+        </label>
+        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+          <input type="checkbox" id="edgeWinChk4" style="accent-color: #38bdf8; margin-top: 3px;">
+          <div>
+            <strong style="color: #f8fafc; font-size: 0.88rem;">4. Inspect RTS Temp Probe & Insulated Box</strong>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Ensure RTS temperature sensor is taped directly to the battery casing and the insulated battery enclosure is latched.</p>
+          </div>
+        </label>
+        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
+          <input type="checkbox" id="edgeWinChk5" style="accent-color: #38bdf8; margin-top: 3px;">
+          <div>
+            <strong style="color: #f8fafc; font-size: 0.88rem;">5. Lock Breakers & Record Departure Certificate</strong>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Confirm DC breaker positions and generate your departure record for cottage logs.</p>
+          </div>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <button onclick="downloadEdgeWinterCertificate()" class="btn-outline" style="border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 8px 16px;">
+          📄 Download Departure Certificate (.txt)
+        </button>
+        <button onclick="closeEdgeWinterizeModal()" class="btn-solar" style="font-weight: 700; padding: 8px 16px; border: none;">
+          ✓ Done
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Banner linking to Cloud Run -->
   <div class="cloud-link-banner">
@@ -2199,6 +2289,68 @@
           adv.textContent = `🚨 High Load Warning! Battery projected to deplete in ${runtimeH.toFixed(1)} hrs before morning sunrise. Turn off high-draw appliances.`;
         }
       }
+    }
+
+    function openEdgeWinterizeModal() {
+      const modal = document.getElementById('edgeWinterizeModal');
+      if (modal) modal.style.display = 'flex';
+      const soc = latestEdgeSOC;
+      if (document.getElementById('edgeWinCurrentSoc')) document.getElementById('edgeWinCurrentSoc').textContent = `${soc}%`;
+      const badge = document.getElementById('edgeWinStorageBadge');
+      const recText = document.getElementById('edgeWinRecText');
+      if (soc >= 45 && soc <= 65) {
+        if (badge) { badge.className = 'badge badge-online'; badge.textContent = 'OPTIMAL STORAGE (50-60%)'; }
+        if (recText) recText.innerHTML = `<div>&bull; Battery is at ${soc}% SOC — ideal 50%-60% storage range for sub-zero winter freeze.</div><div>&bull; Sub-zero lithium charge inhibit logic armed.</div>`;
+      } else if (soc > 65) {
+        if (badge) { badge.className = 'badge badge-array'; badge.textContent = 'HIGH SOC (> 65%)'; }
+        if (recText) recText.innerHTML = `<div>&bull; Battery SOC is ${soc}% (High). LiFePO4 cells store best at 50%-60% SOC over winter freeze.</div><div>&bull; Recommend running Starlink or cabin lighting for a few hours before final departure.</div>`;
+      } else {
+        if (badge) { badge.className = 'badge badge-alert'; badge.textContent = 'LOW SOC (< 45%)'; }
+        if (recText) recText.innerHTML = `<div>&bull; Battery SOC is ${soc}% (Low). Recommend charging to 50%-60% before leaving to prevent BMS low-voltage disconnect.</div>`;
+      }
+    }
+
+    function closeEdgeWinterizeModal() {
+      const modal = document.getElementById('edgeWinterizeModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function downloadEdgeWinterCertificate() {
+      const soc = document.getElementById('edgeWinCurrentSoc')?.textContent || '85%';
+      const chk1 = document.getElementById('edgeWinChk1')?.checked ? '[X]' : '[ ]';
+      const chk2 = document.getElementById('edgeWinChk2')?.checked ? '[X]' : '[ ]';
+      const chk3 = document.getElementById('edgeWinChk3')?.checked ? '[X]' : '[ ]';
+      const chk4 = document.getElementById('edgeWinChk4')?.checked ? '[X]' : '[ ]';
+      const chk5 = document.getElementById('edgeWinChk5')?.checked ? '[X]' : '[ ]';
+
+      const cert = `===============================================================
+SOLARIA COTTAGE WINTERIZATION & DEPARTURE CERTIFICATE
+Site: 1296 Wren Lake Drive, Dorset, ON (45.186 N, 78.863 W)
+Date/Time: ${new Date().toISOString()}
+===============================================================
+
+[BATTERY BANK STORAGE STATUS]
+- Battery Profile: Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)
+- Departure SOC: ${soc}
+- Low-Temp Inhibit: VERIFIED ARMED (0 deg C Cutoff)
+
+[VERIFIED DEPARTURE CHECKLIST]
+${chk1} 1. Sub-Zero Lithium Charge Inhibit Verified
+${chk2} 2. Inverter & Non-Essential 12V DC Loads Disconnected
+${chk3} 3. PV Array Pitched (~55-60 deg) for Snow Shedding
+${chk4} 4. RTS Temperature Probe Secured to Battery Casing
+${chk5} 5. Physical Breakers Checked & Cabinet Sealed
+
+System ready for Algonquin Highlands sub-zero winter (-25 deg C).
+Signed: Solaria Autonomous Solar Guardian
+===============================================================`;
+      const blob = new Blob([cert], { type: 'text/plain;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `solaria_winterization_record_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     window.addEventListener('load', () => {

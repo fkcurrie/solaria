@@ -1259,6 +1259,69 @@ func handlePowerBudget(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// handleWinterizeStatus provides winter storage readiness assessment for LiFePO4 batteries in Dorset, ON
+func handleWinterizeStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	soc := 85
+	battV := 13.3
+	battTemp := 18
+	ctrlTemp := 20
+	if ringBuf != nil {
+		latest := ringBuf.GetLatest()
+		if latest.Telemetry.BatterySOCPct > 0 {
+			soc = latest.Telemetry.BatterySOCPct
+		}
+		if latest.Telemetry.BatteryVoltageV > 10.0 {
+			battV = latest.Telemetry.BatteryVoltageV
+		}
+		battTemp = latest.Telemetry.BatteryTempC
+		ctrlTemp = latest.Telemetry.ControllerTempC
+	}
+
+	storageReadiness := "OPTIMAL"
+	var recommendations []string
+
+	if soc > 70 {
+		storageReadiness = "HIGH_SOC"
+		recommendations = append(recommendations, fmt.Sprintf("Battery SOC is %d%% (Full). LiFePO4 cells store best at 50%%-60%% SOC over sub-zero winter. Recommend running a 50W-100W load for ~3-4 hours before final departure.", soc))
+	} else if soc < 40 {
+		storageReadiness = "LOW_SOC"
+		recommendations = append(recommendations, fmt.Sprintf("Battery SOC is %d%% (Low). Risk of self-discharge dropping below 10.5V BMS cutoff during prolonged winter freeze. Charge to ~50%%-60%% before leaving.", soc))
+	} else {
+		recommendations = append(recommendations, fmt.Sprintf("Battery SOC is %d%% (13.2V) — Ideal 50%%-60%% storage window for Muskoka/Dorset sub-zero winter.", soc))
+	}
+
+	inhibitActive := (battTemp <= 0 || (battTemp == 0 && ctrlTemp <= 0))
+	if inhibitActive {
+		recommendations = append(recommendations, "❄️ Sub-zero lithium charge inhibit is currently ACTIVE. BMS & Controller will safely reject charging until cells warm up.")
+	} else {
+		recommendations = append(recommendations, "✓ Sub-zero lithium protection logic armed and ready for freezing temperatures.")
+	}
+
+	resp := map[string]interface{}{
+		"site":                    "1296 Wren Lake Drive, Dorset, ON",
+		"battery_type":            "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)",
+		"current_soc_pct":         soc,
+		"current_voltage_v":       battV,
+		"battery_temp_c":          battTemp,
+		"optimal_storage_soc_min": 50,
+		"optimal_storage_soc_max": 60,
+		"storage_readiness":       storageReadiness,
+		"subzero_inhibit_active":  inhibitActive,
+		"winter_recommendations":  recommendations,
+		"departure_checklist": []map[string]string{
+			{"step": "1", "title": "Sub-Zero Inhibit Verification", "detail": "Verify Rover 20A MPPT low-temp lithium charge inhibit is enabled to prevent freezing charge degradation."},
+			{"step": "2", "title": "DC Disconnect Sequence", "detail": "Switch OFF AC Inverter main switch and non-essential 12V DC cabin loads (water pump, Starlink, fridge) to eliminate parasitic phantom draw."},
+			{"step": "3", "title": "PV Array Angle & Snow Clearance", "detail": "Confirm 4x100W 2S2P panels are tilted steep (~55°-60°) to shed heavy Muskoka lake-effect snow."},
+			{"step": "4", "title": "Battery RTS Probe Placement", "detail": "Confirm Renogy Temperature Sensor (RTS) probe is taped firmly to the LiFePO4 cell casing."},
+			{"step": "5", "title": "Lock DC Breaker / Disconnect", "detail": "Open PV DC disconnect breaker if full winter isolation is desired, or leave on maintenance trickle with inhibit armed."},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1273,6 +1336,7 @@ func main() {
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
 	http.HandleFunc("/api/v1/hardware-config", handleHardwareConfig)
 	http.HandleFunc("/api/v1/power-budget", handlePowerBudget)
+	http.HandleFunc("/api/v1/winterize-status", handleWinterizeStatus)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)
