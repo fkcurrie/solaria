@@ -1,95 +1,80 @@
-# ☀️ Solaria: Renogy Solar & Atmospheric Intelligence Platform (Go Edition)
+# ☀️ Solaria
 
-An end-to-end, high-performance **Golang** telemetry, weather correlation, and BigQuery analytics platform for Renogy Solar Charge Controllers (Rover, Wanderer, Adventurer) using **BT-1 (RS232)** and **BT-2 (RS485)** Bluetooth Low Energy modules.
+> **High-Performance Renogy Solar & Atmospheric Intelligence Platform (Pure Go)**
+
+Solaria connects Renogy Solar MPPT Charge Controllers (Rover, Wanderer, Adventurer) via BT-1/BT-2 Bluetooth Low Energy modules to live atmospheric radiometry and Google BigQuery analytics.
 
 ---
 
-## 🏛️ System Architecture
+## ⚡ Quick Start (One-Liner Install)
 
-```mermaid
-flowchart TD
-    subgraph Array["☀️ PV Array (1296 Wren Lake Dr, Dorset, ON)"]
-        P1["100W Panel A1"] --- P2["100W Panel A2\n(Series String 1: ~36V-40V)"]
-        P3["100W Panel B1"] --- P4["100W Panel B2\n(Series String 2: ~36V-40V)"]
-        P2 -->|"Parallel Join (2S2P = 400Wp)"| Rover["Renogy Rover 20A MPPT\n(100V PV max, 20A charge)"]
-        P4 -->|"Parallel Join (2S2P = 400Wp)"| Rover
-        Rover -->|"12V DC"| Batt["Battery Bank (12V)"]
-    end
+Run the universal installer on Linux, macOS, or Raspberry Pi:
 
-    subgraph Edge["📡 Edge Layer (Raspberry Pi / Linux Gateway)"]
-        Rover -->|"BT-1 Module (RS232)"| BT["BLE GATT (0xFFD0)\n(BT-TH-66F984D6)"]
-        BT -->|"Modbus RTU over BLE\n(FFD1 TX / FFF1 RX)"| Agent["Go Gateway & Edge Agent\n(solaria-bridge / solaria-edge)"]
-        Weather["Open-Meteo Weather API\n(45.186° N, -78.863° W)"] -->|"Solar Irradiance GHI/DNI\nCloud Cover %"| Agent
-        Agent -->|"Offline Buffer"| Spooler[("Disk Spooler (spool.jsonl)\nZero Data Loss")]
-        Spooler -->|"Replay On Connect"| Uploader["HTTPS Cloud Ingest Client"]
-    end
+```bash
+curl -fsSL https://raw.githubusercontent.com/fkcurrie/solaria/main/setup.sh | bash
+```
 
-    subgraph GCP["☁️ Google Cloud Platform (Project: solaria-solar)"]
-        Uploader -->|"HTTPS POST /api/v1/telemetry\n(Bearer Token Auth)"| CloudRun["Go Cloud Run Microservice\n(solaria-dashboard)"]
-        CloudRun -->|"Asynchronous Streaming Insert"| BigQuery[("Google BigQuery\nsolaria-solar.solaria.telemetry\n(Time-Partitioned by Day)")]
-        CloudRun -->|"Live Web UI & REST APIs"| Dashboard["Live Go Dashboard\n(Chart.js, 400W Array Gauge, Wx Overlay)"]
-    end
+Or clone and start locally:
 
-    subgraph User["📱 User & Monitoring Clients"]
-        Dashboard --> Browser["Chrome Browser / Mobile Web\n(Live 400W Utilization %, SOC %, Sun Condition)"]
-    end
+```bash
+git clone https://github.com/fkcurrie/solaria.git
+cd solaria
+./setup.sh --start-bridge
+```
+
+Open **[http://localhost:8080](http://localhost:8080)** in Chrome to connect to your Renogy BT-1 module and view live telemetry.
+
+---
+
+## 🤖 AI Agent & Automation Quickstart
+
+Point **Antigravity**, **Gemini CLI**, **Claude Code**, or **Cursor** directly at this repository. The setup script provides native machine-readable discovery and execution modes:
+
+```bash
+# Discover system capabilities, Go version, and config defaults
+./setup.sh --agent-mode
+
+# Execute non-interactive setup with environment variables
+./setup.sh --non-interactive
+
+# Automatically install Go if missing and start bridge
+./setup.sh --install-deps --start-bridge
 ```
 
 ---
 
-## ⚡ Solar Array Specifications (4x100W 2S2P)
+## 🌟 Key Capabilities
 
-| Specification | Value | Engineering Notes |
-| :--- | :--- | :--- |
-| **Total Array Peak Capacity** | **400 Watts Peak ($400\text{Wp}$)** | $4 \times 100\text{W}$ Monocrystalline Panels |
-| **Wiring Topology** | **2S2P** | 2 panels in series $\times$ 2 parallel strings |
-| **Nominal String $V_{mp}$** | $\approx 36.0\text{V} - 40.8\text{V}$ | High voltage reduces $I^2R$ wire losses and optimizes MPPT tracking buck efficiency |
-| **Array Open-Circuit $V_{oc}$** | $\approx 43.2\text{V} - 48.6\text{V}$ | Safely below the Rover 100V DC maximum input rating even in sub-zero winter temperatures |
-| **Nominal Array $I_{mp}$** | $\approx 9.8\text{A} - 11.0\text{A}$ | Dual string parallel current well within MC4 and 10AWG wire ratings |
-| **Charge Controller** | **Renogy Rover 20A MPPT** | Max 20A charging current to 12V battery bank ($\sim 288\text{W}$ max charging rate) |
-| **Over-Paneling Ratio** | **$138\%$ (400W array on 20A controller)** | Ideal for Dorset, ON northern climate: ensures max harvest during cloudy/shoulder hours |
+* **🏎️ High-Speed Go Engine:** Real-time Modbus RTU chunk reassembly and CRC16 verification running on a sub-millisecond Go runtime.
+* **🌤️ Atmospheric Solar Intelligence:** Enriches every 10s telemetry frame with Open-Meteo radiometry ($\text{GHI}, \text{DHI}, \text{DNI}$, Cloud Cover %, Solar Elevation) and calculates real-time **Atmospheric Performance Ratio (PR %)**.
+* **🛡️ Remote Resilience & Outages Supervisor:** Self-healing watchdog with Linux Bluetooth auto-recovery, Web Bluetooth WakeLock, and continuous outage/availability audit logging.
+* **🗄️ Google Cloud BigQuery Streaming:** Zero-data-loss buffered streaming into partitioned BigQuery tables (`solaria-solar.solaria.telemetry`).
+* **📊 Modern Responsive UI:** Clean live telemetry dashboard with 400W array utilization gauges, battery SOC tracking, and historical trend analysis.
 
 ---
 
-## 🧠 Sun Condition & Performance Ratio Engine
+## 📚 Detailed Engineering Documentation
 
-Every 10 seconds, telemetry is correlated with live atmospheric physics for Dorset:
+Deep technical guides, hardware schematics, and schema references are organized in the [`docs/`](docs/) directory:
 
-- **Array Capacity Utilization %:** $\frac{P_{\text{pv}}}{400\text{W}} \times 100\%$
-- **Performance Ratio (PR %):** $\frac{P_{\text{pv}}}{\text{Theoretical Expected Power}} \times 100\%$ where $P_{\text{expected}} = \frac{GHI}{1000\text{W/m}^2} \times 400\text{W}$
-
-| Condition Code | State Name | Criteria | Diagnostic Interpretation |
-| :--- | :--- | :--- | :--- |
-| `FULL_SUN` | ☀️ Full Sun | $P_{actual} \ge 0.65 \times P_{rated}$ & $GHI > 300 W/m^2$ & Clouds $< 25\%$ | Optimal harvest, unobstructed clear sky |
-| `PARTIAL_SUN_OR_SHADE` | ⛅ Partial Sun / Shading | Harvest ratio $< 60\%$ or Cloud Cover $25\text{--}80\%$ | Passing clouds, cloud-edge lensing, or tree shading |
-| `DIFFUSE_OVERCAST` | ☁️ Diffuse / Overcast | $GHI < 200 W/m^2$ & $DHI \approx GHI$ & Cloud Cover $> 80\%$ | Flat diffuse lighting through overcast clouds |
-| `ABSORPTION_FLOAT_CLIPPED` | 🔋 Float / Clipped | Battery SOC $\ge 99\%$ & State $\in \{\text{Boost}, \text{Float}\}$ | Generation throttled because battery is full |
-| `NIGHT` | 🌙 Night / Dark | Solar Elevation $< 0^\circ$ or $PV_{volts} < 5V$ | Panels dormant |
+| Document | Description |
+| :--- | :--- |
+| **[🏛️ System Architecture](docs/architecture.md)** | End-to-end data pipeline, Web Bluetooth GATT characteristics, Modbus registers, and microservices. |
+| **[⚡ Solar Array Specifications](docs/solar-specifications.md)** | 400W 2S2P panel wiring topology, Rover 20A MPPT window, over-paneling ratio, and battery chemistry profiles. |
+| **[🌤️ Atmospheric Physics](docs/atmospheric-physics.md)** | Solar irradiance math, Performance Ratio (PR) formulation, and Sun Condition classification rules. |
+| **[🗄️ BigQuery Schema](docs/bigquery-schema.md)** | Complete 34-register schema definition and analytical SQL query examples. |
+| **[🚀 Deployment & Services](docs/deployment.md)** | Google Cloud Run microservice deployment and headless systemd service configuration for Raspberry Pi. |
+| **[🛡️ Resilience & Outages](docs/troubleshooting-resilience.md)** | Outage tracking engine, autonomous BlueZ supervisor, and remote troubleshooting guide. |
 
 ---
 
-## 🗄️ BigQuery Schema (`solaria-solar.solaria.telemetry`)
+## 🌐 Live Cloud Dashboard
 
-The schema captures all **34 Modbus registers**, weather observations, and derived analytics:
-
-- `timestamp` (TIMESTAMP, Daily Partitioning)
-- `site`, `latitude`, `longitude` (STRING, FLOAT64)
-- `array_capacity_w`, `array_topology`, `array_utilization_pct`, `performance_ratio_pct`
-- `pv_power_w`, `pv_voltage_v`, `pv_current_a`
-- `battery_soc_pct`, `battery_voltage_v`, `battery_current_a`
-- `controller_temp_c`, `battery_temp_c`, `charging_state`, `load_status`, `fault_flags`
-- `daily_min_battery_voltage_v`, `daily_max_battery_voltage_v`, `daily_max_pv_w`, `daily_generated_wh`
-- `operating_days`, `total_battery_fullcharge_count`, `total_charging_ah`, `total_generated_kwh`
-- `weather_temp_c`, `weather_cloud_cover_pct`, `weather_direct_rad_w_m2`, `weather_diffuse_rad_w_m2`, `sun_classification`
+The production cloud service is hosted on Google Cloud Run:
+👉 **[https://solaria-dashboard-952659886764.us-central1.run.app](https://solaria-dashboard-952659886764.us-central1.run.app)**
 
 ---
 
-## 🚀 Live Cloud Run Dashboard
+## 📜 License
 
-- **URL:** [https://solaria-dashboard-952659886764.us-central1.run.app](https://solaria-dashboard-952659886764.us-central1.run.app)
-- **Features:**
-  - Real-time BigQuery-backed multi-timespan performance analytics (Day, Week, Month, Year)
-  - Atmospheric Irradiance ($W/m^2$) & Cloud Cover correlation
-  - Battery Voltage (V) & State of Charge (%)
-  - Live 400W 2S2P Array Capacity Utilization Gauge
-  - System Health & Modbus Alarm Monitor
+MIT License © Frank Currie

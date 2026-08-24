@@ -1,155 +1,354 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ☀️ SOLARIA: Interactive Setup & Deployment Wizard (Pure Go Edition)
+# ☀️ SOLARIA: AI-Agent & User Setup / Installation Wizard
+# ==============================================================================
+# Usage:
+#   Interactive:     ./setup.sh
+#   One-Liner:       curl -fsSL https://raw.githubusercontent.com/fkcurrie/solaria/main/setup.sh | bash
+#   Agent Mode:      ./setup.sh --agent-mode
+#   Non-Interactive: ./setup.sh --non-interactive
+#   Quick Start:     ./setup.sh --start-bridge
+#   Deploy Cloud:    ./setup.sh --deploy-cloud
 # ==============================================================================
 set -e
 
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-clear || true
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${YELLOW}   ☀️  SOLARIA: Renogy Solar & Atmospheric Intelligence Platform       ${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "This wizard configures your environment, site coordinates, solar array"
-echo -e "specifications, Google Cloud BigQuery pipeline, and Go edge bridge.\n"
-
-# ------------------------------------------------------------------------------
-# 1. Dependency Checks
-# ------------------------------------------------------------------------------
-echo -e "${CYAN}[1/5] Checking System Prerequisites...${NC}"
-
-has_go=false
-has_gcloud=false
-
-if command -v go &>/dev/null || [ -f "$HOME/.local/go/bin/go" ]; then
-    export PATH="$HOME/.local/go/bin:$PATH"
-    go_ver=$(go version 2>&1)
-    echo -e "  ${GREEN}✓${NC} Go: ${go_ver}"
-    has_go=true
+# ANSI Color Codes (disabled when stdout is not a tty or in json mode)
+if [ -t 1 ]; then
+    GREEN='\033[0;32m'
+    CYAN='\033[0;36m'
+    YELLOW='\033[1;33m'
+    RED='\033[0;31m'
+    BOLD='\033[1m'
+    NC='\033[0m'
 else
-    echo -e "  ${RED}✗${NC} Go 1.21+ not found."
+    GREEN=''
+    CYAN=''
+    YELLOW=''
+    RED=''
+    BOLD=''
+    NC=''
 fi
 
+# Parse Flags
+AGENT_MODE=false
+NON_INTERACTIVE=false
+CHECK_ONLY=false
+INSTALL_DEPS=false
+START_BRIDGE=false
+DEPLOY_CLOUD=false
+SHOW_HELP=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --agent-mode|--json)
+            AGENT_MODE=true
+            NON_INTERACTIVE=true
+            ;;
+        --non-interactive|-y|--yes)
+            NON_INTERACTIVE=true
+            ;;
+        --check-only)
+            CHECK_ONLY=true
+            ;;
+        --install-deps)
+            INSTALL_DEPS=true
+            ;;
+        --start-bridge|--bridge)
+            START_BRIDGE=true
+            NON_INTERACTIVE=true
+            ;;
+        --deploy-cloud|--deploy)
+            DEPLOY_CLOUD=true
+            NON_INTERACTIVE=true
+            ;;
+        --help|-h)
+            SHOW_HELP=true
+            ;;
+    esac
+done
+
+if [ "$SHOW_HELP" = true ]; then
+    cat << 'EOF'
+Solaria Installation & Setup Wizard
+
+USAGE:
+    ./setup.sh [OPTIONS]
+    curl -fsSL https://raw.githubusercontent.com/fkcurrie/solaria/main/setup.sh | bash
+
+OPTIONS:
+    --agent-mode, --json    Run in machine-readable mode tailored for AI agents (Gemini, Claude, Antigravity)
+    --non-interactive, -y   Execute configuration using environment variables and sensible defaults without prompts
+    --start-bridge          Immediately start the Go Edge Bridge and Web Dashboard on http://localhost:8080
+    --deploy-cloud          Deploy the Go cloud ingestion service and dashboard directly to Google Cloud Run
+    --install-deps          Automatically install Go and system dependencies if missing
+    --check-only            Run environment diagnostics and exit
+    --help, -h              Show this help message
+
+ENVIRONMENT VARIABLES (Optional overrides):
+    GCP_PROJECT             Google Cloud Project ID (default: solaria-solar)
+    BIGQUERY_DATASET        BigQuery Dataset (default: solaria)
+    BIGQUERY_TABLE          BigQuery Table (default: telemetry)
+    SITE_NAME               Installation Site Name (default: 1296 Wren Lake Drive, Dorset, ON)
+    SITE_LATITUDE           Site Latitude (default: 45.186)
+    SITE_LONGITUDE          Site Longitude (default: -78.863)
+    PANEL_RATED_WATTS       Array Peak Capacity in Watts (default: 400.0)
+    SOLARIA_API_TOKEN       Bearer token for cloud ingestion (default: solaria_cottage_secret_token_2026)
+    SOLARIA_CLOUD_ENDPOINT  Cloud Run Ingestion URL
+EOF
+    exit 0
+fi
+
+# Ensure workspace / repo directory exists
+if [ ! -f "go.mod" ]; then
+    if [ -d "solaria" ]; then
+        cd solaria
+    elif [ -d "solar-testing" ]; then
+        cd solar-testing
+    else
+        echo -e "${CYAN}Cloning Solaria repository into ./solaria...${NC}"
+        git clone https://github.com/fkcurrie/solaria.git solaria
+        cd solaria
+    fi
+fi
+
+# Detect Environment
+OS_TYPE="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH_TYPE="$(uname -m)"
+case "$ARCH_TYPE" in
+    x86_64)  GO_ARCH="amd64" ;;
+    aarch64|arm64) GO_ARCH="arm64" ;;
+    armv7l)  GO_ARCH="armv6l" ;;
+    *)       GO_ARCH="amd64" ;;
+esac
+
+# Check Go in standard paths and user-local paths
+export PATH="$HOME/.local/go/bin:$HOME/go/bin:/usr/local/go/bin:$PATH"
+HAS_GO=false
+GO_VERSION_STR="not found"
+if command -v go &>/dev/null; then
+    HAS_GO=true
+    GO_VERSION_STR=$(go version 2>&1)
+fi
+
+# Check gcloud
+HAS_GCLOUD=false
+GCLOUD_ACCOUNT="not logged in"
 if command -v gcloud &>/dev/null; then
-    gcloud_acc=$(gcloud config get-value account 2>/dev/null || echo "not logged in")
-    echo -e "  ${GREEN}✓${NC} Google Cloud SDK (Account: ${gcloud_acc})"
-    has_gcloud=true
-else
-    echo -e "  ${YELLOW}!${NC} gcloud SDK not found. Cloud Run deployment requires gcloud."
+    HAS_GCLOUD=true
+    GCLOUD_ACCOUNT=$(gcloud config get-value account 2>/dev/null || echo "not logged in")
 fi
 
-echo ""
+# Check Bluetooth Tools
+HAS_BLUETOOTH=false
+if command -v bluetoothctl &>/dev/null; then
+    HAS_BLUETOOTH=true
+fi
 
-# ------------------------------------------------------------------------------
-# 2. Interactive Site & Solar Configuration
-# ------------------------------------------------------------------------------
-echo -e "${CYAN}[2/5] Configuring Solar Site & Location...${NC}"
-
-# Read existing .env if present for smart defaults
+# Load existing .env if present
 if [ -f .env ]; then
     # shellcheck disable=SC1091
     source .env 2>/dev/null || true
 fi
 
-DEFAULT_SITE_NAME="${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}"
-read -rp "  📍 Site Name / Description [$DEFAULT_SITE_NAME]: " INPUT_SITE_NAME
-SITE_NAME="${INPUT_SITE_NAME:-$DEFAULT_SITE_NAME}"
+# Agent Mode JSON Output
+if [ "$AGENT_MODE" = true ]; then
+    cat << JSON_EOF
+{
+  "status": "ready",
+  "environment": {
+    "os": "${OS_TYPE}",
+    "arch": "${ARCH_TYPE}",
+    "go_installed": ${HAS_GO},
+    "go_version": "${GO_VERSION_STR}",
+    "gcloud_installed": ${HAS_GCLOUD},
+    "gcloud_account": "${GCLOUD_ACCOUNT}",
+    "bluetooth_available": ${HAS_BLUETOOTH}
+  },
+  "site_defaults": {
+    "site_name": "${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}",
+    "latitude": ${SITE_LATITUDE:-45.186},
+    "longitude": ${SITE_LONGITUDE:--78.863},
+    "rated_watts": ${PANEL_RATED_WATTS:-400.0}
+  },
+  "cloud_defaults": {
+    "gcp_project": "${GCP_PROJECT:-solaria-solar}",
+    "dataset": "${BIGQUERY_DATASET:-solaria}",
+    "table": "${BIGQUERY_TABLE:-telemetry}",
+    "cloud_endpoint": "${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+  },
+  "suggested_actions": [
+    {"command": "./setup.sh --start-bridge", "description": "Run local Go bridge & dashboard on http://localhost:8080"},
+    {"command": "./setup.sh --deploy-cloud", "description": "Deploy to Google Cloud Run"},
+    {"command": "go test ./...", "description": "Run unit and integration test suite"}
+  ]
+}
+JSON_EOF
+    exit 0
+fi
 
-DEFAULT_LAT="${SITE_LATITUDE:-45.186}"
-read -rp "  🌐 Site Latitude [$DEFAULT_LAT]: " INPUT_LAT
-SITE_LATITUDE="${INPUT_LAT:-$DEFAULT_LAT}"
+# Human-Readable Header
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "${YELLOW}${BOLD}   ☀️  SOLARIA: Renogy Solar & Atmospheric Intelligence Platform       ${NC}"
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "Configuring local edge bridge, Bluetooth supervisor, and BigQuery analytics.\n"
 
-DEFAULT_LON="${SITE_LONGITUDE:--78.863}"
-read -rp "  🌐 Site Longitude [$DEFAULT_LON]: " INPUT_LON
-SITE_LONGITUDE="${INPUT_LON:-$DEFAULT_LON}"
+# Step 1: Prerequisites
+echo -e "${CYAN}[1/4] Checking Prerequisites...${NC}"
+if [ "$HAS_GO" = true ]; then
+    echo -e "  ${GREEN}✓${NC} Go: ${GO_VERSION_STR}"
+else
+    echo -e "  ${YELLOW}!${NC} Go 1.21+ not found."
+    if [ "$INSTALL_DEPS" = true ] || [ "$NON_INTERACTIVE" = false ]; then
+        if [ "$NON_INTERACTIVE" = false ]; then
+            read -rp "  Would you like to install Go automatically? [Y/n]: " INSTALL_GO_PROMPT
+        else
+            INSTALL_GO_PROMPT="Y"
+        fi
+        if [[ "$INSTALL_GO_PROMPT" =~ ^[Yy]?$ ]]; then
+            echo -e "  ${CYAN}⬇️ Downloading official Go binary for ${OS_TYPE}-${GO_ARCH}...${NC}"
+            mkdir -p "$HOME/.local"
+            curl -fsSL "https://go.dev/dl/go1.23.6.${OS_TYPE}-${GO_ARCH}.tar.gz" | tar -C "$HOME/.local" -xz
+            export PATH="$HOME/.local/go/bin:$PATH"
+            echo -e "  ${GREEN}✓${NC} Go installed: $(go version)"
+            HAS_GO=true
+        fi
+    fi
+fi
 
-DEFAULT_WATTS="${PANEL_RATED_WATTS:-400.0}"
-read -rp "  ⚡ Array Peak Capacity in Watts (e.g., 400 for 4x100W) [$DEFAULT_WATTS]: " INPUT_WATTS
-PANEL_RATED_WATTS="${INPUT_WATTS:-$DEFAULT_WATTS}"
+if [ "$HAS_GCLOUD" = true ]; then
+    echo -e "  ${GREEN}✓${NC} Google Cloud SDK (Account: ${GCLOUD_ACCOUNT})"
+else
+    echo -e "  ${YELLOW}!${NC} gcloud SDK not found (optional, required only for Cloud Run deployment)"
+fi
 
-echo ""
+if [ "$HAS_BLUETOOTH" = true ]; then
+    echo -e "  ${GREEN}✓${NC} Linux BlueZ / Bluetooth Tools detected"
+fi
 
-# ------------------------------------------------------------------------------
-# 3. Cloud & Security Configuration
-# ------------------------------------------------------------------------------
-echo -e "${CYAN}[3/5] Configuring Google Cloud Platform & Security...${NC}"
+if [ "$CHECK_ONLY" = true ]; then
+    echo -e "\n${GREEN}Diagnostic check complete.${NC}"
+    exit 0
+fi
 
-DEFAULT_PROJECT="${GCP_PROJECT:-solaria-solar}"
-read -rp "  ☁️ GCP Project ID [$DEFAULT_PROJECT]: " INPUT_PROJECT
-GCP_PROJECT="${INPUT_PROJECT:-$DEFAULT_PROJECT}"
+# Step 2: Configuration
+echo -e "\n${CYAN}[2/4] Site & Cloud Configuration...${NC}"
 
-DEFAULT_DATASET="${BIGQUERY_DATASET:-solaria}"
-read -rp "  🗄️ BigQuery Dataset Name [$DEFAULT_DATASET]: " INPUT_DATASET
-BIGQUERY_DATASET="${INPUT_DATASET:-$DEFAULT_DATASET}"
+if [ "$NON_INTERACTIVE" = true ]; then
+    SITE_NAME="${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}"
+    SITE_LATITUDE="${SITE_LATITUDE:-45.186}"
+    SITE_LONGITUDE="${SITE_LONGITUDE:--78.863}"
+    PANEL_RATED_WATTS="${PANEL_RATED_WATTS:-400.0}"
+    GCP_PROJECT="${GCP_PROJECT:-solaria-solar}"
+    BIGQUERY_DATASET="${BIGQUERY_DATASET:-solaria}"
+    BIGQUERY_TABLE="${BIGQUERY_TABLE:-telemetry}"
+    SOLARIA_API_TOKEN="${SOLARIA_API_TOKEN:-solaria_cottage_secret_token_2026}"
+    SOLARIA_CLOUD_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+else
+    DEFAULT_SITE_NAME="${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}"
+    read -rp "  📍 Site Name [$DEFAULT_SITE_NAME]: " INPUT_SITE_NAME
+    SITE_NAME="${INPUT_SITE_NAME:-$DEFAULT_SITE_NAME}"
 
-DEFAULT_TABLE="${BIGQUERY_TABLE:-telemetry}"
-read -rp "  📊 BigQuery Table Name [$DEFAULT_TABLE]: " INPUT_TABLE
-BIGQUERY_TABLE="${INPUT_TABLE:-$DEFAULT_TABLE}"
+    DEFAULT_LAT="${SITE_LATITUDE:-45.186}"
+    read -rp "  🌐 Site Latitude [$DEFAULT_LAT]: " INPUT_LAT
+    SITE_LATITUDE="${INPUT_LAT:-$DEFAULT_LAT}"
 
-DEFAULT_TOKEN="${SOLARIA_API_TOKEN:-solaria_cottage_secret_token_2026}"
-read -rp "  🔑 Ingestion API Auth Token [$DEFAULT_TOKEN]: " INPUT_TOKEN
-SOLARIA_API_TOKEN="${INPUT_TOKEN:-$DEFAULT_TOKEN}"
+    DEFAULT_LON="${SITE_LONGITUDE:--78.863}"
+    read -rp "  🌐 Site Longitude [$DEFAULT_LON]: " INPUT_LON
+    SITE_LONGITUDE="${INPUT_LON:-$DEFAULT_LON}"
 
-DEFAULT_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
-read -rp "  🚀 Ingestion Cloud Endpoint [$DEFAULT_ENDPOINT]: " INPUT_ENDPOINT
-SOLARIA_CLOUD_ENDPOINT="${INPUT_ENDPOINT:-$DEFAULT_ENDPOINT}"
+    DEFAULT_WATTS="${PANEL_RATED_WATTS:-400.0}"
+    read -rp "  ⚡ Array Capacity in Watts (e.g., 400 for 4x100W) [$DEFAULT_WATTS]: " INPUT_WATTS
+    PANEL_RATED_WATTS="${INPUT_WATTS:-$DEFAULT_WATTS}"
 
-echo ""
+    DEFAULT_PROJECT="${GCP_PROJECT:-solaria-solar}"
+    read -rp "  ☁️ GCP Project ID [$DEFAULT_PROJECT]: " INPUT_PROJECT
+    GCP_PROJECT="${INPUT_PROJECT:-$DEFAULT_PROJECT}"
 
-# ------------------------------------------------------------------------------
-# 4. Write Configuration to .env
-# ------------------------------------------------------------------------------
-echo -e "${CYAN}[4/5] Saving Configuration to .env...${NC}"
+    DEFAULT_DATASET="${BIGQUERY_DATASET:-solaria}"
+    read -rp "  🗄️ BigQuery Dataset [$DEFAULT_DATASET]: " INPUT_DATASET
+    BIGQUERY_DATASET="${INPUT_DATASET:-$DEFAULT_DATASET}"
 
+    DEFAULT_TABLE="${BIGQUERY_TABLE:-telemetry}"
+    read -rp "  📊 BigQuery Table [$DEFAULT_TABLE]: " INPUT_TABLE
+    BIGQUERY_TABLE="${INPUT_TABLE:-$DEFAULT_TABLE}"
+
+    DEFAULT_TOKEN="${SOLARIA_API_TOKEN:-solaria_cottage_secret_token_2026}"
+    read -rp "  🔑 API Ingestion Token [$DEFAULT_TOKEN]: " INPUT_TOKEN
+    SOLARIA_API_TOKEN="${INPUT_TOKEN:-$DEFAULT_TOKEN}"
+
+    DEFAULT_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+    read -rp "  🚀 Cloud Endpoint [$DEFAULT_ENDPOINT]: " INPUT_ENDPOINT
+    SOLARIA_CLOUD_ENDPOINT="${INPUT_ENDPOINT:-$DEFAULT_ENDPOINT}"
+fi
+
+# Step 3: Write .env
+echo -e "\n${CYAN}[3/4] Saving Configuration (.env)...${NC}"
 cat << ENV_EOF > .env
 # ==============================================================================
 # Solaria Configuration File (Auto-generated by setup.sh)
 # ==============================================================================
-
-# Google Cloud Platform
 GCP_PROJECT=${GCP_PROJECT}
 BIGQUERY_DATASET=${BIGQUERY_DATASET}
 BIGQUERY_TABLE=${BIGQUERY_TABLE}
 PORT=8080
 
-# Site & Physical Solar Setup
 SITE_NAME="${SITE_NAME}"
 SITE_LATITUDE=${SITE_LATITUDE}
 SITE_LONGITUDE=${SITE_LONGITUDE}
 PANEL_RATED_WATTS=${PANEL_RATED_WATTS}
 
-# Ingestion Security & Cloud Ingest URL
 SOLARIA_API_TOKEN=${SOLARIA_API_TOKEN}
 SOLARIA_CLOUD_ENDPOINT=${SOLARIA_CLOUD_ENDPOINT}
 ENV_EOF
-
 echo -e "  ${GREEN}✓${NC} Configuration saved to ${CYAN}.env${NC}"
-echo ""
 
-# ------------------------------------------------------------------------------
-# 5. Build & Launch Options
-# ------------------------------------------------------------------------------
-echo -e "${CYAN}[5/5] Deployment & Launch Options:${NC}"
-echo -e "  1) Build & Start Go Gateway Bridge (${CYAN}go run ./cmd/bridge${NC})"
-echo -e "  2) Deploy Go Cloud Dashboard to Google Cloud Run"
+# Step 4: Execution / Action
+echo -e "\n${CYAN}[4/4] Execution...${NC}"
+
+if [ "$START_BRIDGE" = true ]; then
+    echo -e "${GREEN}🚀 Launching Solaria Go Bridge on http://localhost:8080...${NC}"
+    exec go run ./cmd/bridge
+fi
+
+if [ "$DEPLOY_CLOUD" = true ]; then
+    if [ "$HAS_GCLOUD" = true ]; then
+        echo -e "${GREEN}🚀 Deploying to Google Cloud Run in project ${GCP_PROJECT}...${NC}"
+        gcloud config set project "$GCP_PROJECT"
+        exec gcloud run deploy solaria-dashboard \
+            --source . \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --set-env-vars "GCP_PROJECT=${GCP_PROJECT},SOLARIA_API_TOKEN=${SOLARIA_API_TOKEN}"
+    else
+        echo -e "${RED}gcloud CLI is required for Cloud Run deployment.${NC}"
+        exit 1
+    fi
+fi
+
+if [ "$NON_INTERACTIVE" = true ]; then
+    echo -e "${GREEN}✓ Solaria setup completed successfully.${NC}"
+    echo -e "  • Start Bridge:    ${CYAN}go run ./cmd/bridge${NC} (or ${CYAN}./setup.sh --start-bridge${NC})"
+    echo -e "  • Deploy Cloud:    ${CYAN}./setup.sh --deploy-cloud${NC}"
+    echo -e "  • Open Dashboard:  ${CYAN}http://localhost:8080${NC}"
+    exit 0
+fi
+
+# Interactive Menu
+echo -e "  1) Start Local Go Bridge & Dashboard (${CYAN}http://localhost:8080${NC})"
+echo -e "  2) Deploy to Google Cloud Run"
 echo -e "  3) Build all binaries (${CYAN}make all${NC})"
-echo -e "  4) Exit setup"
-
+echo -e "  4) Exit"
 read -rp "  Select an option [1-4, default: 1]: " OPTION
 OPTION="${OPTION:-1}"
 
 case "$OPTION" in
     1)
-        echo -e "\n${GREEN}🚀 Starting Solaria Go Bridge...${NC}"
-        go run ./cmd/bridge
+        echo -e "\n${GREEN}🚀 Starting Solaria Go Bridge on http://localhost:8080...${NC}"
+        exec go run ./cmd/bridge
         ;;
     2)
-        if [ "$has_gcloud" = true ]; then
-            echo -e "\n${GREEN}🚀 Deploying to Cloud Run in project ${GCP_PROJECT}...${NC}"
+        if [ "$HAS_GCLOUD" = true ]; then
+            echo -e "\n${GREEN}🚀 Deploying to Cloud Run...${NC}"
             gcloud config set project "$GCP_PROJECT"
             gcloud run deploy solaria-dashboard \
                 --source . \
@@ -161,11 +360,11 @@ case "$OPTION" in
         fi
         ;;
     3)
-        echo -e "\n${GREEN}🔨 Building all Go binaries...${NC}"
+        echo -e "\n${GREEN}🔨 Building all binaries...${NC}"
         make all
-        echo -e "${GREEN}✓ Binaries built in bin/${NC}"
+        echo -e "${GREEN}✓ Binaries generated in bin/${NC}"
         ;;
     *)
-        echo -e "\n${GREEN}Setup complete! You can run './setup.sh' at any time.${NC}"
+        echo -e "\n${GREEN}Setup complete! Run './setup.sh' anytime.${NC}"
         ;;
 esac
