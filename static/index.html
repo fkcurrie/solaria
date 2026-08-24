@@ -258,6 +258,89 @@
       gap: 10px;
       margin-top: 12px;
     }
+
+    .outage-monitor-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .outage-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 14px 0;
+    }
+    .outage-mini-card {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+    .outage-mini-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .outage-mini-val {
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-family: var(--mono);
+      margin-top: 4px;
+    }
+    .outage-table-wrapper {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      overflow-x: auto;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    table.outage-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-family: var(--mono);
+    }
+    table.outage-table th {
+      background: #111827;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 8px 12px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+    table.outage-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+    table.outage-table tr:hover td {
+      background: rgba(255,255,255,0.02);
+    }
+    .badge-outage-active {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid #ef4444;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      animation: pulse 1.5s infinite;
+    }
+    .badge-outage-resolved {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid #10b981;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -456,6 +539,66 @@
     </div>
   </div>
 
+  <!-- Autonomous Resilience & Outages Supervisor Panel -->
+  <div class="outage-monitor-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
+          🛡️ Telemetry Stream Uptime & Outages Supervisor
+        </h2>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+          Autonomous watchdog monitoring, self-healing events & uptime audit log
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span id="streamHealthBadge" class="badge badge-online">🟢 Stream Active</span>
+      </div>
+    </div>
+
+    <!-- 4-Stat Metrics Grid -->
+    <div class="outage-stat-grid">
+      <div class="outage-mini-card">
+        <div class="outage-mini-label">System Availability</div>
+        <div class="outage-mini-val" id="resilienceAvailVal" style="color: #34d399;">100.0%</div>
+      </div>
+      <div class="outage-mini-card">
+        <div class="outage-mini-label">Total Outages</div>
+        <div class="outage-mini-val" id="resilienceOutagesVal" style="color: #94a3b8;">0</div>
+      </div>
+      <div class="outage-mini-card">
+        <div class="outage-mini-label">Total Downtime</div>
+        <div class="outage-mini-val" id="resilienceDowntimeVal" style="color: #94a3b8;">0s</div>
+      </div>
+      <div class="outage-mini-card">
+        <div class="outage-mini-label">Session Uptime</div>
+        <div class="outage-mini-val" id="resilienceUptimeVal" style="color: #38bdf8;">0s</div>
+      </div>
+    </div>
+
+    <!-- Outage Event Log Table -->
+    <div class="outage-table-wrapper">
+      <table class="outage-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Status</th>
+            <th>Interrupted At</th>
+            <th>Restored At</th>
+            <th>Duration</th>
+            <th>Root Cause / Self-Healing Action</th>
+          </tr>
+        </thead>
+        <tbody id="outageTableBody">
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">
+              ✨ No telemetry outages recorded. Stream connection is 100% stable.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Realtime Modbus & Transmission Terminal -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -497,6 +640,80 @@
 
     let writeCharObj = null;
     let notifyCharObj = null;
+
+    function formatSecs(sec) {
+      if (!sec || sec < 0) return '0s';
+      if (sec < 60) return `${sec}s`;
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+      const h = Math.floor(m / 60);
+      const remM = m % 60;
+      return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+    }
+
+    function updateOutageStats(stats) {
+      if (!stats) return;
+      const availEl = document.getElementById('resilienceAvailVal');
+      const outagesEl = document.getElementById('resilienceOutagesVal');
+      const downtimeEl = document.getElementById('resilienceDowntimeVal');
+      const uptimeEl = document.getElementById('resilienceUptimeVal');
+      const badgeEl = document.getElementById('streamHealthBadge');
+
+      if (availEl) {
+        availEl.textContent = `${stats.availability_pct.toFixed(1)}%`;
+        availEl.style.color = stats.availability_pct >= 99.0 ? '#34d399' : (stats.availability_pct >= 95.0 ? '#fbbf24' : '#f87171');
+      }
+      if (outagesEl) {
+        outagesEl.textContent = stats.outage_count;
+        outagesEl.style.color = stats.outage_count === 0 ? '#94a3b8' : '#fbbf24';
+      }
+      if (downtimeEl) {
+        downtimeEl.textContent = formatSecs(stats.total_downtime_sec);
+        downtimeEl.style.color = stats.total_downtime_sec === 0 ? '#94a3b8' : '#f87171';
+      }
+      if (uptimeEl) {
+        uptimeEl.textContent = formatSecs(stats.session_uptime_sec);
+      }
+
+      if (badgeEl) {
+        if (stats.in_outage) {
+          badgeEl.className = 'badge badge-offline';
+          badgeEl.textContent = `🔴 Outage Detected (${formatSecs(stats.current_outage_sec)})`;
+        } else {
+          badgeEl.className = 'badge badge-online';
+          badgeEl.textContent = '🟢 Stream Active';
+        }
+      }
+    }
+
+    function renderOutageHistory(history) {
+      const tbody = document.getElementById('outageTableBody');
+      if (!tbody) return;
+      if (!history || history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">✨ No telemetry outages recorded. Stream connection is 100% stable.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = history.map(h => {
+        const isActive = h.status === 'ACTIVE';
+        const statusBadge = isActive
+          ? `<span class="badge-outage-active">ACTIVE OUTAGE</span>`
+          : `<span class="badge-outage-resolved">RESOLVED</span>`;
+        const durStr = isActive ? 'In Progress...' : formatSecs(h.duration_sec);
+        const restoredStr = h.end_time || '--:--:--';
+        const actionStr = h.recovered_via || h.reason || 'Watchdog self-healing';
+        return `
+          <tr>
+            <td><strong>#${h.id}</strong></td>
+            <td>${statusBadge}</td>
+            <td style="color: #fbbf24;">${h.start_time}</td>
+            <td style="color: #34d399;">${restoredStr}</td>
+            <td>${durStr}</td>
+            <td style="color: var(--text-muted);">${actionStr}</td>
+          </tr>
+        `;
+      }).join('');
+    }
 
     function log(msg, type = 'info') {
       const box = document.getElementById('logBox');
@@ -554,7 +771,28 @@
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'watchdog_reconnect') {
+          
+          if (msg.type === 'outage_sync') {
+            updateOutageStats(msg.stats);
+            renderOutageHistory(msg.history);
+          } else if (msg.type === 'outage_event') {
+            updateOutageStats(msg.stats);
+            if (msg.event === 'outage_start') {
+              log(`🚨 [OUTAGE DETECTED #${msg.outage.id}] Telemetry stream interrupted at ${msg.outage.start_time} (${msg.outage.reason}). Watchdog auto-healing active...`, 'error');
+            } else if (msg.event === 'outage_end') {
+              log(`✅ [STREAM RESTORED] Telemetry resumed at ${msg.outage.end_time}! Outage #${msg.outage.id} resolved (Downtime: ${formatSecs(msg.outage.duration_sec)} | Availability: ${msg.stats.availability_pct.toFixed(1)}%)`, 'success');
+            }
+            if (msg.history) {
+              renderOutageHistory(msg.history);
+            } else {
+              // Re-query sync or prepend
+              sendToLinux({ type: 'get_outages' });
+            }
+          } else if (msg.type === 'outage_tick' || msg.type === 'ping') {
+            if (msg.stats) {
+              updateOutageStats(msg.stats);
+            }
+          } else if (msg.type === 'watchdog_reconnect') {
             log(`🔄 [Supervisor Watchdog] Telemetry quiet for ${msg.seconds_since_last_packet}s. Triggering automatic GATT re-sync...`, 'warn');
             reconnectGattSession();
           }

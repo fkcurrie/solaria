@@ -583,12 +583,190 @@ func processFrame(frame []byte) {
 			telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
 }
 
+type OutageEvent struct {
+	ID           int    `json:"id"`
+	Status       string `json:"status"` // "ACTIVE" or "RESOLVED"
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time,omitempty"`
+	DurationSec  int    `json:"duration_sec"`
+	Reason       string `json:"reason"`
+	RecoveredVia string `json:"recovered_via,omitempty"`
+}
+
+type OutageStats struct {
+	OutageCount      int     `json:"outage_count"`
+	TotalDowntimeSec int     `json:"total_downtime_sec"`
+	SessionUptimeSec int     `json:"session_uptime_sec"`
+	AvailabilityPct  float64 `json:"availability_pct"`
+	InOutage         bool    `json:"in_outage"`
+	CurrentOutageSec int     `json:"current_outage_sec"`
+}
+
+type OutageTracker struct {
+	mu            sync.Mutex
+	sessionStart  time.Time
+	hasSeenFrame  bool
+	inOutage      bool
+	outageCount   int
+	outageStart   time.Time
+	totalDowntime time.Duration
+	history       []OutageEvent
+}
+
 var (
 	clientsMu       sync.Mutex
 	activeClients   = make(map[*websocket.Conn]string)
 	lastFrameTime   = time.Now()
 	lastHealthCheck time.Time
+	tracker         = &OutageTracker{
+		sessionStart: time.Now(),
+		history:      make([]OutageEvent, 0),
+	}
 )
+
+func (t *OutageTracker) GetStats() (OutageStats, []OutageEvent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	now := time.Now()
+	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	if uptimeSec < 1 {
+		uptimeSec = 1
+	}
+
+	totalDown := t.totalDowntime
+	curOutageSec := 0
+	if t.inOutage {
+		curOutageSec = int(now.Sub(t.outageStart).Seconds())
+		totalDown += now.Sub(t.outageStart)
+	}
+
+	totalDownSec := int(totalDown.Seconds())
+	if totalDownSec > uptimeSec {
+		totalDownSec = uptimeSec
+	}
+
+	availPct := 100.0 * float64(uptimeSec-totalDownSec) / float64(uptimeSec)
+	if availPct < 0 {
+		availPct = 0
+	}
+
+	stats := OutageStats{
+		OutageCount:      t.outageCount,
+		TotalDowntimeSec: totalDownSec,
+		SessionUptimeSec: uptimeSec,
+		AvailabilityPct:  availPct,
+		InOutage:         t.inOutage,
+		CurrentOutageSec: curOutageSec,
+	}
+
+	histCopy := make([]OutageEvent, len(t.history))
+	copy(histCopy, t.history)
+
+	return stats, histCopy
+}
+
+func (t *OutageTracker) RecordOutageStart(reason string) (*OutageEvent, OutageStats) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.inOutage {
+		return nil, OutageStats{}
+	}
+
+	t.inOutage = true
+	t.outageCount++
+	t.outageStart = time.Now()
+
+	event := OutageEvent{
+		ID:          t.outageCount,
+		Status:      "ACTIVE",
+		StartTime:   t.outageStart.Format("15:04:05"),
+		DurationSec: 0,
+		Reason:      reason,
+	}
+
+	t.history = append([]OutageEvent{event}, t.history...)
+	if len(t.history) > 50 {
+		t.history = t.history[:50]
+	}
+
+	now := time.Now()
+	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	if uptimeSec < 1 {
+		uptimeSec = 1
+	}
+	totalDownSec := int(t.totalDowntime.Seconds())
+	availPct := 100.0 * float64(uptimeSec-totalDownSec) / float64(uptimeSec)
+	if availPct < 0 {
+		availPct = 0
+	}
+
+	stats := OutageStats{
+		OutageCount:      t.outageCount,
+		TotalDowntimeSec: totalDownSec,
+		SessionUptimeSec: uptimeSec,
+		AvailabilityPct:  availPct,
+		InOutage:         true,
+		CurrentOutageSec: 0,
+	}
+
+	return &event, stats
+}
+
+func (t *OutageTracker) RecordOutageEnd(recoveredVia string) (*OutageEvent, OutageStats) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.hasSeenFrame = true
+	if !t.inOutage {
+		return nil, OutageStats{}
+	}
+
+	now := time.Now()
+	duration := now.Sub(t.outageStart)
+	t.totalDowntime += duration
+	t.inOutage = false
+	durSec := int(duration.Seconds())
+
+	event := OutageEvent{
+		ID:           t.outageCount,
+		Status:       "RESOLVED",
+		StartTime:    t.outageStart.Format("15:04:05"),
+		EndTime:      now.Format("15:04:05"),
+		DurationSec:  durSec,
+		Reason:       "Telemetry stream interrupted",
+		RecoveredVia: recoveredVia,
+	}
+
+	if len(t.history) > 0 {
+		t.history[0].Status = "RESOLVED"
+		t.history[0].EndTime = now.Format("15:04:05")
+		t.history[0].DurationSec = durSec
+		t.history[0].RecoveredVia = recoveredVia
+	}
+
+	uptimeSec := int(now.Sub(t.sessionStart).Seconds())
+	if uptimeSec < 1 {
+		uptimeSec = 1
+	}
+	totalDownSec := int(t.totalDowntime.Seconds())
+	availPct := 100.0 * float64(uptimeSec-totalDownSec) / float64(uptimeSec)
+	if availPct < 0 {
+		availPct = 0
+	}
+
+	stats := OutageStats{
+		OutageCount:      t.outageCount,
+		TotalDowntimeSec: totalDownSec,
+		SessionUptimeSec: uptimeSec,
+		AvailabilityPct:  availPct,
+		InOutage:         false,
+		CurrentOutageSec: 0,
+	}
+
+	return &event, stats
+}
 
 func broadcastControlMsg(msg map[string]interface{}) {
 	clientsMu.Lock()
@@ -633,10 +811,10 @@ func checkAndHealBluetoothSubsystem() {
 }
 
 func startBluetoothWatchdog(ctx context.Context) {
-	ticker := time.NewTicker(15 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous 15s Bluetooth & Telemetry Watchdog active.\n")
+	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous Bluetooth, Outage Logger & Watchdog active.\n")
 
 	for {
 		select {
@@ -653,6 +831,31 @@ func startBluetoothWatchdog(ctx context.Context) {
 
 			// Check stream freshness
 			if elapsed > 30*time.Second {
+				// 1. Detect Outage Start
+				if !tracker.inOutage && time.Since(tracker.sessionStart) > 20*time.Second {
+					ev, stats := tracker.RecordOutageStart("Stream silent > 30s (BLE connection lost or stalled)")
+					if ev != nil {
+						fmt.Printf("\n[\033[1;31m🚨 OUTAGE DETECTED #%d\033[0m] Interrupted at %s (Quiet for %.0fs). Self-healing active...\n",
+							ev.ID, ev.StartTime, elapsed.Seconds())
+						_, hist := tracker.GetStats()
+						broadcastControlMsg(map[string]interface{}{
+							"type":    "outage_event",
+							"event":   "outage_start",
+							"outage":  ev,
+							"stats":   stats,
+							"history": hist,
+						})
+					}
+				} else if tracker.inOutage {
+					// Tick while outage continues
+					stats, hist := tracker.GetStats()
+					broadcastControlMsg(map[string]interface{}{
+						"type":    "outage_tick",
+						"stats":   stats,
+						"history": hist,
+					})
+				}
+
 				fmt.Printf("[\033[1;33mWATCHDOG\033[0m] Telemetry silent for %.0fs (Clients connected: %d). Verifying host BLE health...\n",
 					elapsed.Seconds(), clientCount)
 
@@ -662,17 +865,19 @@ func startBluetoothWatchdog(ctx context.Context) {
 				if clientCount > 0 {
 					// Instruct browser client to force-reconnect GATT session
 					broadcastControlMsg(map[string]interface{}{
-						"type":                       "watchdog_reconnect",
-						"reason":                     "stalled_telemetry",
+						"type":                      "watchdog_reconnect",
+						"reason":                    "stalled_telemetry",
 						"seconds_since_last_packet": int(elapsed.Seconds()),
 					})
 				} else {
 					fmt.Printf("[\033[1;31mWATCHDOG\033[0m] No browser WebSocket connected to ws://localhost:%d. Open http://localhost:%d in Chrome.\n", wsPort, httpPort)
 				}
 			} else {
-				// Send lightweight heartbeat ping to keep sockets active
+				// Send lightweight heartbeat ping with uptime stats
+				stats, _ := tracker.GetStats()
 				broadcastControlMsg(map[string]interface{}{
 					"type":      "ping",
+					"stats":     stats,
 					"timestamp": time.Now().UTC().Format(time.RFC3339),
 				})
 			}
@@ -698,6 +903,16 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	clientsMu.Unlock()
 
 	fmt.Printf("[\033[92mWS\033[0m] Browser connected: %s (Active clients: %d)\n", clientAddr, len(activeClients))
+
+	// Send initial outage & uptime state synchronization
+	initStats, initHistory := tracker.GetStats()
+	if syncData, err := json.Marshal(map[string]interface{}{
+		"type":    "outage_sync",
+		"stats":   initStats,
+		"history": initHistory,
+	}); err == nil {
+		_ = conn.WriteMessage(websocket.TextMessage, syncData)
+	}
 
 	var localRx []byte
 
@@ -750,12 +965,38 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 						frameMu.Lock()
 						lastFrameTime = time.Now()
 						frameMu.Unlock()
+
+						// Record outage restoration if previously in outage
+						ev, stats := tracker.RecordOutageEnd("Auto-healed / GATT Re-synced")
+						if ev != nil {
+							fmt.Printf("\n[\033[1;32m✅ STREAM RESTORED\033[0m] Telemetry resumed at %s! Outage #%d resolved (Duration: %ds | Session Uptime: %.1f%%)\n\n",
+								ev.EndTime, ev.ID, ev.DurationSec, stats.AvailabilityPct)
+							_, hist := tracker.GetStats()
+							broadcastControlMsg(map[string]interface{}{
+								"type":    "outage_event",
+								"event":   "outage_end",
+								"outage":  ev,
+								"stats":   stats,
+								"history": hist,
+							})
+						}
+
 						processFrame(frame)
 					}
 				}
 			}
 			if len(localRx) > 512 {
 				localRx = localRx[:0]
+			}
+
+		case "get_outages":
+			s, h := tracker.GetStats()
+			if d, err := json.Marshal(map[string]interface{}{
+				"type":    "outage_sync",
+				"stats":   s,
+				"history": h,
+			}); err == nil {
+				_ = conn.WriteMessage(websocket.TextMessage, d)
 			}
 		}
 	}
