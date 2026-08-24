@@ -502,6 +502,25 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(info)
 }
 
+func classifyWeather(cloudPct float64, tempC float64, isDay bool, avgIrr float64, sunClass string) (string, string) {
+	if !isDay || (avgIrr < 5.0 && (sunClass == "NIGHT" || sunClass == "")) {
+		return "🌙", "Night / Dark"
+	}
+	if strings.Contains(sunClass, "RAIN") || strings.Contains(sunClass, "STORM") {
+		return "🌧️", fmt.Sprintf("Rain (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+	}
+	if cloudPct <= 20 {
+		return "☀️", fmt.Sprintf("Sunny / Clear (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+	}
+	if cloudPct <= 60 {
+		return "⛅", fmt.Sprintf("Partly Cloudy (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+	}
+	if cloudPct <= 85 {
+		return "🌥️", fmt.Sprintf("Mostly Cloudy (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+	}
+	return "☁️", fmt.Sprintf("Overcast (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+}
+
 func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -516,11 +535,19 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	genWh := make([]interface{}, 24)
 	irradiance := make([]interface{}, 24)
 	battSOC := make([]interface{}, 24)
+	weatherIcons := make([]interface{}, 24)
+	weatherConds := make([]interface{}, 24)
+	cloudPct := make([]interface{}, 24)
+	tempC := make([]interface{}, 24)
 	for i := 0; i < 24; i++ {
 		hours[i] = fmt.Sprintf("%02d:00", i)
 		genWh[i] = nil
 		irradiance[i] = nil
 		battSOC[i] = nil
+		weatherIcons[i] = nil
+		weatherConds[i] = nil
+		cloudPct[i] = nil
+		tempC[i] = nil
 	}
 
 	recordsCount := 0
@@ -538,6 +565,10 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 				MAX(pv_power_w) as max_pv_w,
 				AVG(weather_direct_rad_w_m2 + weather_diffuse_rad_w_m2) as avg_irr,
 				AVG(battery_soc_pct) as avg_soc,
+				AVG(weather_cloud_cover_pct) as avg_cloud,
+				AVG(weather_temp_c) as avg_temp,
+				LOGICAL_OR(weather_is_day) as is_day,
+				ARRAY_AGG(sun_classification ORDER BY timestamp DESC LIMIT 1)[OFFSET(0)] as sun_class,
 				SUM(pv_power_w * (5.0 / 3600.0)) as est_wh,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
@@ -550,13 +581,17 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			for {
 				var row struct {
-					Hour    int64   `bigquery:"hour"`
-					AvgPvW  float64 `bigquery:"avg_pv_w"`
-					MaxPvW  int64   `bigquery:"max_pv_w"`
-					AvgIrr  float64 `bigquery:"avg_irr"`
-					AvgSOC  float64 `bigquery:"avg_soc"`
-					EstWh   float64 `bigquery:"est_wh"`
-					Samples int64   `bigquery:"samples"`
+					Hour     int64   `bigquery:"hour"`
+					AvgPvW   float64 `bigquery:"avg_pv_w"`
+					MaxPvW   int64   `bigquery:"max_pv_w"`
+					AvgIrr   float64 `bigquery:"avg_irr"`
+					AvgSOC   float64 `bigquery:"avg_soc"`
+					AvgCloud float64 `bigquery:"avg_cloud"`
+					AvgTemp  float64 `bigquery:"avg_temp"`
+					IsDay    bool    `bigquery:"is_day"`
+					SunClass string  `bigquery:"sun_class"`
+					EstWh    float64 `bigquery:"est_wh"`
+					Samples  int64   `bigquery:"samples"`
 				}
 				err := it.Next(&row)
 				if err != nil {
@@ -567,6 +602,13 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 					genWh[h] = mathRound(row.EstWh, 1)
 					irradiance[h] = mathRound(row.AvgIrr, 1)
 					battSOC[h] = int(row.AvgSOC + 0.5)
+					cloudPct[h] = int(row.AvgCloud + 0.5)
+					tempC[h] = mathRound(row.AvgTemp, 1)
+
+					icon, cond := classifyWeather(row.AvgCloud, row.AvgTemp, row.IsDay, row.AvgIrr, row.SunClass)
+					weatherIcons[h] = icon
+					weatherConds[h] = cond
+
 					recordsCount += int(row.Samples)
 					if int(row.MaxPvW) > peakWatts {
 						peakWatts = int(row.MaxPvW)
@@ -588,6 +630,13 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 					genWh[h] = float64(item.Telemetry.DailyGeneratedWh)
 					irradiance[h] = item.Weather.DirectRadiationWM2 + item.Weather.DiffuseRadiationWM2
 					battSOC[h] = item.Telemetry.BatterySOCPct
+					cloudPct[h] = item.Weather.CloudCoverPct
+					tempC[h] = item.Weather.TemperatureC
+
+					icon, cond := classifyWeather(float64(item.Weather.CloudCoverPct), item.Weather.TemperatureC, item.Weather.IsDay, item.Weather.DirectRadiationWM2+item.Weather.DiffuseRadiationWM2, item.SunClassification)
+					weatherIcons[h] = icon
+					weatherConds[h] = cond
+
 					recordsCount++
 					if item.Telemetry.PVPowerW > peakWatts {
 						peakWatts = item.Telemetry.PVPowerW
@@ -598,16 +647,20 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"date":            nowLocal.Format("Monday, Jan 02, 2006"),
-		"hours":           hours,
-		"generation_wh":   genWh,
-		"irradiance_w_m2": irradiance,
-		"battery_soc_pct": battSOC,
-		"total_yield_wh":  mathRound(totalWh, 1),
-		"peak_watts":      peakWatts,
-		"data_available":  recordsCount > 0,
-		"sample_count":    recordsCount,
-		"status_message":  fmt.Sprintf("Streaming live data: %d samples recorded today.", recordsCount),
+		"date":               nowLocal.Format("Monday, Jan 02, 2006"),
+		"hours":              hours,
+		"generation_wh":      genWh,
+		"irradiance_w_m2":    irradiance,
+		"battery_soc_pct":    battSOC,
+		"weather_icons":      weatherIcons,
+		"weather_conditions": weatherConds,
+		"cloud_cover_pct":    cloudPct,
+		"temperature_c":      tempC,
+		"total_yield_wh":     mathRound(totalWh, 1),
+		"peak_watts":         peakWatts,
+		"data_available":     recordsCount > 0,
+		"sample_count":       recordsCount,
+		"status_message":     fmt.Sprintf("Streaming live data: %d samples recorded today.", recordsCount),
 	}
 	json.NewEncoder(w).Encode(resp)
 }

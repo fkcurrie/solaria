@@ -222,6 +222,48 @@
       grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
       gap: 20px;
     }
+    .weather-timeline {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      scrollbar-width: thin;
+    }
+    .weather-hour-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 54px;
+      padding: 6px 4px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .weather-hour-chip.has-data {
+      border-color: rgba(56, 189, 248, 0.35);
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .weather-hour-chip .wh-icon {
+      font-size: 1.25rem;
+      margin: 2px 0;
+    }
+    .weather-hour-chip .wh-cloud {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+    .weather-hour-chip .wh-yield {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #f59e0b;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -321,9 +363,12 @@
 
     <div class="charts-grid">
       <div class="card">
-        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
-          ☀️ 400W Array Generation (W) vs Atmospheric Irradiance (W/m²)
-        </h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+          <h3 style="font-size: 0.95rem; margin: 0;">
+            ☀️ 400W Array Generation (W) vs Atmospheric Irradiance (W/m²)
+          </h3>
+          <span id="liveWxPill" class="badge badge-array" style="font-size: 0.75rem;">🌤️ Weather Tracking</span>
+        </div>
         <div class="chart-container">
           <canvas id="solarChart"></canvas>
         </div>
@@ -343,6 +388,8 @@
   <!-- TAB 2: DAY VIEW (HOURLY BREAKDOWN) -->
   <div id="tab-day" class="tab-content">
     <div id="dayStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+    <!-- 24-Hour Weather Progression Timeline Ribbon -->
+    <div id="dayWeatherStrip" class="weather-timeline" style="display: none;"></div>
     <div class="charts-grid">
       <div class="card">
         <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
@@ -514,6 +561,8 @@
     let solarChart = null;
     let batteryChart = null;
     let currentLimit = 40;
+    let liveHistoryCache = [];
+    let dayDataCache = null;
 
     // Additional Horizon Chart Handles
     let daySolarChart = null;
@@ -524,6 +573,99 @@
     let monthPrChart = null;
     let yearYieldChart = null;
     let yearCumulativeChart = null;
+
+    function getWeatherMeta(item) {
+      if (!item) return { icon: '☀️', text: 'Clear / Sunny', cloud: 0, temp: '--' };
+      const wx = item.weather || {};
+      const sun = item.sun_classification || '';
+      const isDay = wx.is_day !== undefined ? wx.is_day : true;
+      const cloud = wx.cloud_cover_pct !== undefined && wx.cloud_cover_pct !== null ? wx.cloud_cover_pct : 0;
+      const rad = (wx.direct_radiation_w_m2 || 0) + (wx.diffuse_radiation_w_m2 || 0);
+      const temp = wx.temperature_c !== undefined && wx.temperature_c !== null ? wx.temperature_c : '--';
+
+      if (!isDay || (rad < 5 && (sun === 'NIGHT' || sun === ''))) {
+        return { icon: '🌙', text: 'Night', cloud, temp };
+      }
+      if (sun.includes('RAIN') || sun.includes('STORM')) {
+        return { icon: '🌧️', text: 'Rain', cloud, temp };
+      }
+      if (cloud <= 20) {
+        return { icon: '☀️', text: 'Sunny / Clear', cloud, temp };
+      }
+      if (cloud <= 60) {
+        return { icon: '⛅', text: 'Partly Cloudy', cloud, temp };
+      }
+      if (cloud <= 85) {
+        return { icon: '🌥️', text: 'Mostly Cloudy', cloud, temp };
+      }
+      return { icon: '☁️', text: 'Overcast', cloud, temp };
+    }
+
+    const dayWeatherPlugin = {
+      id: 'dayWeatherPlugin',
+      afterDatasetsDraw(chart) {
+        const icons = chart.config.options?.plugins?.weatherIcons;
+        if (!icons || !icons.length) return;
+        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+
+        ctx.save();
+        ctx.font = '15px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        icons.forEach((icon, idx) => {
+          if (!icon) return;
+          const xPos = x.getPixelForTick(idx);
+          if (isNaN(xPos)) return;
+
+          const meta = chart.getDatasetMeta(0);
+          let yPos = top + 22;
+          if (meta && meta.data && meta.data[idx]) {
+            const elem = meta.data[idx];
+            if (elem && !isNaN(elem.y) && elem.y < bottom - 10) {
+              yPos = Math.max(top + 18, elem.y - 6);
+            }
+          }
+          ctx.fillText(icon, xPos, yPos);
+        });
+        ctx.restore();
+      }
+    };
+
+    const liveWeatherMarkerPlugin = {
+      id: 'liveWeatherMarkerPlugin',
+      afterDatasetsDraw(chart) {
+        const list = chart.config.options?.plugins?.liveWeatherItems;
+        if (!list || !list.length) return;
+        const { ctx, chartArea: { top, left, right }, scales: { x } } = chart;
+
+        ctx.save();
+        ctx.font = '13px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        const step = Math.max(1, Math.floor(list.length / 8));
+        for (let i = 0; i < list.length; i += step) {
+          const item = list[i];
+          if (!item) continue;
+          const xPos = x.getPixelForTick(i);
+          if (isNaN(xPos) || xPos < left || xPos > right) continue;
+          const meta = getWeatherMeta(item);
+          ctx.fillText(meta.icon, xPos, top + 4);
+        }
+        if (list.length > 1 && (list.length - 1) % step !== 0) {
+          const lastIdx = list.length - 1;
+          const xPos = x.getPixelForTick(lastIdx);
+          if (!isNaN(xPos) && xPos >= left && xPos <= right) {
+            const meta = getWeatherMeta(list[lastIdx]);
+            ctx.fillText(meta.icon, xPos, top + 4);
+          }
+        }
+        ctx.restore();
+      }
+    };
+
+    Chart.register(dayWeatherPlugin, liveWeatherMarkerPlugin);
 
     function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -587,7 +729,28 @@
             y: { position: 'left', min: 0, max: 420, ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watts (Max 400W)', color: '#f59e0b' } },
             y1: { position: 'right', min: 0, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
           },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0].dataIndex;
+                  const item = liveHistoryCache[idx];
+                  if (item) {
+                    const meta = getWeatherMeta(item);
+                    return `${items[0].label} ${meta.icon} ${meta.text} (${meta.cloud}% Clouds, ${meta.temp}°C)`;
+                  }
+                  return items[0].label;
+                }
+              }
+            }
+          }
         }
       });
 
@@ -629,7 +792,28 @@
             y: { position: 'left', min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } },
             y1: { position: 'right', min: 0, max: 100, ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#a855f7' } }
           },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0].dataIndex;
+                  const item = liveHistoryCache[idx];
+                  if (item) {
+                    const meta = getWeatherMeta(item);
+                    return `${items[0].label} ${meta.icon} (${meta.cloud}% Clouds)`;
+                  }
+                  return items[0].label;
+                }
+              }
+            }
+          }
         }
       });
     }
@@ -637,11 +821,36 @@
     async function initDayCharts() {
       const resp = await fetch('/api/v1/stats/day');
       const data = await resp.json();
+      dayDataCache = data;
 
       const banner = document.getElementById('dayStatusBanner');
       if (banner && data.status_message) {
         banner.style.display = 'flex';
         banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">DAY TELEMETRY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Date: ${data.date}</div>`;
+      }
+
+      // Populate 24-hour weather timeline strip
+      const strip = document.getElementById('dayWeatherStrip');
+      if (strip && data.hours) {
+        strip.style.display = 'flex';
+        let html = '';
+        data.hours.forEach((h, i) => {
+          const hasData = (data.generation_wh && data.generation_wh[i] !== null) || (data.irradiance_w_m2 && data.irradiance_w_m2[i] !== null);
+          const icon = (data.weather_icons && data.weather_icons[i]) || '🌙';
+          const cloud = (data.cloud_cover_pct && data.cloud_cover_pct[i] !== null) ? `${data.cloud_cover_pct[i]}%` : '--';
+          const yieldWh = (data.generation_wh && data.generation_wh[i] !== null) ? `${data.generation_wh[i]} Wh` : '--';
+          const cond = (data.weather_conditions && data.weather_conditions[i]) || 'No Data';
+
+          html += `
+            <div class="weather-hour-chip ${hasData ? 'has-data' : ''}" title="${h}: ${cond}">
+              <span style="font-weight:600; color:#94a3b8; font-size:0.7rem;">${h}</span>
+              <span class="wh-icon">${hasData ? icon : '·'}</span>
+              <span class="wh-cloud">${hasData ? cloud : '--'}</span>
+              <span class="wh-yield">${yieldWh}</span>
+            </div>
+          `;
+        });
+        strip.innerHTML = html;
       }
 
       const ctxSolar = document.getElementById('daySolarChart').getContext('2d');
@@ -679,7 +888,36 @@
             y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watt-Hours (Wh)', color: '#f59e0b' } },
             y1: { position: 'right', ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
           },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            weatherIcons: data.weather_icons || [],
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0].dataIndex;
+                  const h = data.hours[idx];
+                  const icon = (data.weather_icons && data.weather_icons[idx]) || '';
+                  const cond = (data.weather_conditions && data.weather_conditions[idx]) || '';
+                  return `${h} ${icon} ${cond}`;
+                },
+                afterTitle: (items) => {
+                  const idx = items[0].dataIndex;
+                  const cloud = data.cloud_cover_pct?.[idx];
+                  const temp = data.temperature_c?.[idx];
+                  if (cloud !== undefined && cloud !== null && temp !== undefined && temp !== null) {
+                    return `☁️ Cloud Cover: ${cloud}% | 🌡️ Ambient: ${temp}°C`;
+                  }
+                  return '';
+                }
+              }
+            }
+          }
         }
       });
 
@@ -706,7 +944,27 @@
             x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
             y: { min: 0, max: 100, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'SOC (%)', color: '#10b981' } }
           },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            weatherIcons: data.weather_icons || [],
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              padding: 10,
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0].dataIndex;
+                  const h = data.hours[idx];
+                  const icon = (data.weather_icons && data.weather_icons[idx]) || '';
+                  const cond = (data.weather_conditions && data.weather_conditions[idx]) || '';
+                  return `${h} ${icon} ${cond}`;
+                }
+              }
+            }
+          }
         }
       });
     }
@@ -980,6 +1238,12 @@
         document.getElementById('tempSummary').textContent = `Ambient: ${weather.temperature_c ?? '--'}°C | Ctrl: ${telem.controller_temp_c ?? '--'}°C`;
         document.getElementById('lifetimeStats').textContent = `Lifetime: ${telem.total_generated_kwh || 0} kWh | Full: ${telem.total_battery_fullcharge_count || 0} cycles`;
 
+        const livePill = document.getElementById('liveWxPill');
+        if (livePill) {
+          const m = getWeatherMeta({ weather, sun_classification: sunClass });
+          livePill.textContent = `${m.icon} ${m.text} (${m.cloud}% Clouds, ${m.temp}°C)`;
+        }
+
         const badge = document.getElementById('sunConditionBadge');
         const map = {
           'FULL_SUN': { text: '☀️ FULL SUN', cls: 'badge-full-sun' },
@@ -1012,6 +1276,7 @@
         const list = await resp.json();
         if (!list || list.length === 0) return;
 
+        liveHistoryCache = list;
         const labels = list.map(item => new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         const pvWatts = list.map(item => item.telemetry?.pv_power_w || 0);
         const irradiance = list.map(item => item.weather?.direct_radiation_w_m2 || 0);
@@ -1022,6 +1287,7 @@
           solarChart.data.labels = labels;
           solarChart.data.datasets[0].data = pvWatts;
           solarChart.data.datasets[1].data = irradiance;
+          solarChart.options.plugins.liveWeatherItems = list;
           solarChart.update('none');
         }
 
