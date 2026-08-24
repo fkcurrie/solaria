@@ -1,14 +1,12 @@
 # Multi-Stage Ultra-Compact Go Container for Cloud Run (~12MB)
-FROM golang:1.21-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /build
 
 RUN apk add --no-cache git ca-certificates
 
-COPY go.mod ./
+COPY go.mod go.sum ./
 COPY . .
-
-RUN go mod tidy
 
 # Compile static Go binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /solaria-server ./cmd/cloud-server
