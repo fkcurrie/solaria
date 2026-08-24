@@ -1,4 +1,8 @@
-# Solaria
+# Solaria: Solar Energy Intelligence & Cloud Analytics
+
+<p align="center">
+  <img src="assets/solaria-logo.png" alt="Solaria Solar Energy Intelligence & Analytics" width="220" />
+</p>
 
 Solaria streams telemetry from Renogy solar charge controllers (Rover, Wanderer, Adventurer) via Bluetooth Low Energy (BT-1 / BT-2) to local disk logs and optional Google BigQuery analytics, correlating solar harvest against local atmospheric weather data in real time.
 
