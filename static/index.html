@@ -344,9 +344,12 @@
         Auto-Reconnect Loop
       </label>
       <select id="pollIntervalSelect" onchange="updatePollRate()">
-        <option value="1000">Poll 1s</option>
-        <option value="2000" selected>Poll 2s</option>
+        <option value="2000">Poll 2s (Fast)</option>
         <option value="5000">Poll 5s</option>
+        <option value="10000" selected>Poll 10s (Recommended)</option>
+        <option value="15000">Poll 15s</option>
+        <option value="30000">Poll 30s</option>
+        <option value="60000">Poll 60s</option>
       </select>
     </div>
   </div>
@@ -469,7 +472,7 @@
     let bleDevice = null;
     let gattServer = null;
     let pollTimer = null;
-    let pollIntervalMs = 2000;
+    let pollIntervalMs = 10000;
     let autoReconnectEnabled = true;
     let wakeLock = null;
     let packetCounter = 0;

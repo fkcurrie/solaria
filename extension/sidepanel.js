@@ -115,9 +115,9 @@ async function connectToDevice(dev) {
 
     sendToLinux({ type: 'gatt_connected', name: name, id: dev.id });
 
-    // Start auto polling
+    // Start auto polling (10 seconds)
     if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(pollTelemetry, 2000);
+    pollInterval = setInterval(pollTelemetry, 10000);
     pollTelemetry();
 
   } catch (e) {
