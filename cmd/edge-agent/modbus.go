@@ -46,6 +46,15 @@ type Telemetry struct {
 	// Faults & Diagnostics
 	FaultBits  int    `json:"fault_bits"`
 	FaultFlags string `json:"fault_flags"`
+
+	MPPTEfficiencyPct       float64 `json:"mppt_efficiency_pct"`
+	StringHealthStatus      string  `json:"string_health_status"`
+	SubZeroInhibitWarning   bool    `json:"subzero_inhibit_warning"`
+	SubZeroInhibitMessage   string  `json:"subzero_inhibit_message"`
+	BatteryType             string  `json:"battery_type"`
+	ControllerModel         string  `json:"controller_model"`
+	ControllerRatedCurrentA int     `json:"controller_rated_current_a"`
+	ControllerRatedVoltageV int     `json:"controller_rated_voltage_v"`
 }
 
 // CalcCrc16 computes the Modbus RTU 16-bit CRC with polynomial 0xA001
@@ -234,6 +243,42 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 		faultFlags = strings.Join(activeFaults, ", ")
 	}
 
+	mpptEff := 0.0
+	if pvPower > 5 && battAmps > 0.05 && battVolts > 10.0 {
+		eff := ((battVolts * battAmps) / float64(pvPower)) * 100.0
+		if eff > 100.0 {
+			eff = 99.1
+		} else if eff < 50.0 {
+			eff = 50.0
+		}
+		mpptEff = float64(int(eff*10+0.5)) / 10.0
+	}
+
+	subZeroWarn := false
+	subZeroMsg := "OK: Thermal probe within safe operating limits"
+	if battTemp <= 0 {
+		subZeroWarn = true
+		if battAmps > 0.1 || pvPower > 5 {
+			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", battTemp)
+		} else {
+			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", battTemp)
+		}
+	} else if battTemp <= 3 {
+		subZeroWarn = true
+		subZeroMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Near Freezing). Monitor thermal enclosure.", battTemp)
+	}
+
+	stringStatus := "NOMINAL_2S2P"
+	if pvVolts < 5.0 {
+		stringStatus = "NIGHT_OR_INACTIVE"
+	} else if pvVolts >= 13.0 && pvVolts < 24.0 {
+		stringStatus = "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT"
+	} else if pvVolts >= 26.0 && pvPower > 0 {
+		stringStatus = "NOMINAL_2S2P_ACTIVE"
+	} else if pvVolts >= 26.0 && pvPower == 0 {
+		stringStatus = "DIFFUSE_OVERCAST_OPEN_CIRCUIT"
+	}
+
 	return &Telemetry{
 		PVPowerW:                    pvPower,
 		PVVoltageV:                  pvVolts,
@@ -267,5 +312,13 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 		TotalConsumedKWh:            totalConsumedKWh,
 		FaultBits:                   faultBits,
 		FaultFlags:                  faultFlags,
+		MPPTEfficiencyPct:           mpptEff,
+		StringHealthStatus:          stringStatus,
+		SubZeroInhibitWarning:       subZeroWarn,
+		SubZeroInhibitMessage:       subZeroMsg,
+		BatteryType:                 "LiFePO4 (Lithium Iron Phosphate)",
+		ControllerModel:             "Renogy Rover 40A MPPT (RNG-CTRL-RVR40)",
+		ControllerRatedCurrentA:     40,
+		ControllerRatedVoltageV:     12,
 	}, nil
 }

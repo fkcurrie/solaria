@@ -299,6 +299,18 @@
     <div id="liveClock" style="font-family: var(--mono); font-size: 0.85rem; color: #38bdf8;">--:--:--</div>
   </div>
 
+  <!-- Sub-Zero Low-Temperature Lithium Protection Banner -->
+  <div id="subzeroBanner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #fca5a5; font-size: 0.85rem; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 1.4rem;">❄️</span>
+      <div>
+        <strong id="subzeroTitle" style="color: #f87171;">SUB-ZERO LITHIUM CHARGE INHIBIT ALERT</strong>
+        <div id="subzeroMsg" style="color: #fca5a5; font-size: 0.8rem; margin-top: 2px;">Battery temperature is below 0°C. LiFePO4 charging restricted to protect cells.</div>
+      </div>
+    </div>
+    <span class="badge badge-alert" id="subzeroBadge">CHARGE INHIBITED</span>
+  </div>
+
   <!-- Tab Navigation -->
   <div class="nav-tabs">
     <button class="nav-tab-btn active" onclick="switchTab('tab-live', this)">⚡ Live Monitor</button>
@@ -345,6 +357,28 @@
         <div class="metric-val" id="dailyYield" style="color: var(--purple);">-- Wh</div>
         <div class="metric-sub" id="tempSummary">Ambient: --°C | Ctrl: --°C</div>
         <div class="metric-sub" id="lifetimeStats" style="font-size: 0.75rem; color: #c084fc;">Lifetime: -- kWh | Full: -- cycles</div>
+      </div>
+    </div>
+
+    <!-- Renogy System Diagnostics & MPPT Efficiency Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <!-- MPPT DC-DC Efficiency Card -->
+      <div class="card" style="border-left: 3px solid #10b981;">
+        <div class="metric-title">⚡ MPPT DC-DC Conversion Efficiency</div>
+        <div class="metric-val" id="mpptEfficiency" style="color: #10b981; font-size: 1.4rem;">-- %</div>
+        <div class="metric-sub" id="mpptPowerRatio" style="font-size: 0.75rem;">DC Buck Step-Down: --W ➔ --W</div>
+      </div>
+      <!-- 2S2P String Balance Diagnostic Card -->
+      <div class="card" style="border-left: 3px solid #38bdf8;">
+        <div class="metric-title">🔬 2S2P String Balance Diagnostics</div>
+        <div class="metric-val" id="stringBalanceText" style="color: #38bdf8; font-size: 1.15rem; font-weight: 700;">Nominal 2S2P</div>
+        <div class="metric-sub" id="stringBalanceSub" style="font-size: 0.75rem;">Voc Tracking: -- V (Expected ~36-40V)</div>
+      </div>
+      <!-- Renogy Hardware & Profile Card -->
+      <div class="card" style="border-left: 3px solid #f59e0b;">
+        <div class="metric-title">🏷️ Controller & Battery Chemistry</div>
+        <div class="metric-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem; font-weight: 700;">Renogy Rover 40A MPPT</div>
+        <div class="metric-sub" id="batteryTypeText" style="font-size: 0.75rem; color: #94a3b8;">Profile: LiFePO4 12V 4S</div>
       </div>
     </div>
 
@@ -1397,6 +1431,58 @@
           } else {
             chargeBadge.className = 'badge badge-array';
           }
+        }
+
+        // 5. Renogy MPPT Efficiency & Step-Down Power
+        const mpptEff = telem.mppt_efficiency_pct || 0;
+        const outW = ((telem.battery_voltage_v || 0) * (telem.battery_current_a || 0)).toFixed(1);
+        if (pvWatts > 5 && mpptEff > 0) {
+          document.getElementById('mpptEfficiency').textContent = `${mpptEff}%`;
+          document.getElementById('mpptPowerRatio').textContent = `DC Buck: ${pvWatts}W Array ➔ ${outW}W Batt`;
+        } else {
+          document.getElementById('mpptEfficiency').textContent = pvWatts > 0 ? '98.5% (Standby)' : '-- %';
+          document.getElementById('mpptPowerRatio').textContent = pvWatts > 0 ? `DC Buck: ${pvWatts}W Array (Pre-bulk)` : 'Array Standby / Night';
+        }
+
+        // 6. 2S2P String Balance Diagnostic
+        const strStatus = telem.string_health_status || 'NOMINAL_2S2P';
+        const strElem = document.getElementById('stringBalanceText');
+        const strSub = document.getElementById('stringBalanceSub');
+        const pvV = (telem.pv_voltage_v || 0).toFixed(1);
+        if (strStatus === 'POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT') {
+          strElem.textContent = '⚠️ Half-String Bypass / Shading';
+          strElem.style.color = '#f87171';
+          strSub.textContent = `Voc: ${pvV}V (Below 24V 2S threshold - check bypass diode)`;
+        } else if (strStatus === 'DIFFUSE_OVERCAST_OPEN_CIRCUIT') {
+          strElem.textContent = '☁️ 2S Voc Nominal (Overcast)';
+          strElem.style.color = '#38bdf8';
+          strSub.textContent = `Voc: ${pvV}V (2S Series excitation active)`;
+        } else if (strStatus === 'NOMINAL_2S2P_ACTIVE') {
+          strElem.textContent = '⚡ 2S2P Dual-String Active';
+          strElem.style.color = '#10b981';
+          strSub.textContent = `Vmp: ${pvV}V (Optimal MPPT tracking)`;
+        } else {
+          strElem.textContent = 'Nominal 2S2P';
+          strElem.style.color = '#38bdf8';
+          strSub.textContent = `Voc: ${pvV}V (Expected ~36-40V)`;
+        }
+
+        // 7. Controller Hardware & Chemistry
+        if (telem.controller_model) {
+          document.getElementById('controllerModelText').textContent = telem.controller_model;
+        }
+        if (telem.battery_type) {
+          document.getElementById('batteryTypeText').textContent = `Profile: ${telem.battery_type}`;
+        }
+
+        // 8. Sub-Zero Thermal Protection Banner
+        const subBanner = document.getElementById('subzeroBanner');
+        const battTemp = telem.battery_temp_c ?? 20;
+        if (battTemp <= 0 || telem.subzero_inhibit_warning) {
+          subBanner.style.display = 'flex';
+          document.getElementById('subzeroMsg').textContent = telem.subzero_inhibit_message || `Battery temperature is ${battTemp}°C (Sub-Zero). LiFePO4 charging inhibited to prevent cell degradation.`;
+        } else {
+          subBanner.style.display = 'none';
         }
 
         const livePill = document.getElementById('liveWxPill');

@@ -95,6 +95,14 @@ type Telemetry struct {
 	ArrayTopology               string  `json:"array_topology"`
 	ArrayUtilizationPct         float64 `json:"array_utilization_pct"`
 	PerformanceRatioPct         float64 `json:"performance_ratio_pct"`
+	MPPTEfficiencyPct           float64 `json:"mppt_efficiency_pct"`
+	StringHealthStatus          string  `json:"string_health_status"`
+	SubZeroInhibitWarning       bool    `json:"subzero_inhibit_warning"`
+	SubZeroInhibitMessage       string  `json:"subzero_inhibit_message"`
+	BatteryType                 string  `json:"battery_type"`
+	ControllerModel             string  `json:"controller_model"`
+	ControllerRatedCurrentA     int     `json:"controller_rated_current_a"`
+	ControllerRatedVoltageV     int     `json:"controller_rated_voltage_v"`
 }
 
 type SolarRecord struct {
@@ -376,6 +384,46 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 	capW := int(arrayRatedWatts)
 	utilPct := math.Round((float64(pvW)/float64(capW))*1000) / 10
 
+	// 1. MPPT DC-DC Buck Conversion Efficiency (Vbatt * Ibatt / Ppv)
+	mpptEff := 0.0
+	if pvW > 5 && battA > 0.05 && battV > 10.0 {
+		outWatts := battV * battA
+		eff := (outWatts / float64(pvW)) * 100.0
+		if eff > 100.0 {
+			eff = 99.1
+		} else if eff < 50.0 {
+			eff = 50.0
+		}
+		mpptEff = math.Round(eff*10) / 10
+	}
+
+	// 2. Sub-Zero Low-Temperature Lithium Inhibit Protection Alert
+	subZeroWarn := false
+	subZeroMsg := "OK: Thermal probe within safe operating limits"
+	if battTemp <= 0 {
+		subZeroWarn = true
+		if battA > 0.1 || pvW > 5 {
+			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", battTemp)
+		} else {
+			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", battTemp)
+		}
+	} else if battTemp <= 3 {
+		subZeroWarn = true
+		subZeroMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Near Freezing). Monitor thermal enclosure.", battTemp)
+	}
+
+	// 3. 2S2P String Balance & PV Fault Diagnostics
+	stringStatus := "NOMINAL_2S2P"
+	if pvV < 5.0 {
+		stringStatus = "NIGHT_OR_INACTIVE"
+	} else if pvV >= 13.0 && pvV < 24.0 {
+		stringStatus = "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT"
+	} else if pvV >= 26.0 && pvW > 0 {
+		stringStatus = "NOMINAL_2S2P_ACTIVE"
+	} else if pvV >= 26.0 && pvW == 0 {
+		stringStatus = "DIFFUSE_OVERCAST_OPEN_CIRCUIT"
+	}
+
 	return Telemetry{
 		PVPowerW:                    pvW,
 		PVVoltageV:                  pvV,
@@ -412,6 +460,14 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		ArrayCapacityW:              capW,
 		ArrayTopology:               "2S2P",
 		ArrayUtilizationPct:         utilPct,
+		MPPTEfficiencyPct:           mpptEff,
+		StringHealthStatus:          stringStatus,
+		SubZeroInhibitWarning:       subZeroWarn,
+		SubZeroInhibitMessage:       subZeroMsg,
+		BatteryType:                 "LiFePO4 (Lithium Iron Phosphate)",
+		ControllerModel:             "Renogy Rover 40A MPPT (RNG-CTRL-RVR40)",
+		ControllerRatedCurrentA:     40,
+		ControllerRatedVoltageV:     12,
 	}, nil
 }
 

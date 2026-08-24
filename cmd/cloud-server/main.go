@@ -63,6 +63,15 @@ type Telemetry struct {
 
 	FaultBits  int    `json:"fault_bits"`
 	FaultFlags string `json:"fault_flags"`
+
+	MPPTEfficiencyPct       float64 `json:"mppt_efficiency_pct"`
+	StringHealthStatus      string  `json:"string_health_status"`
+	SubZeroInhibitWarning   bool    `json:"subzero_inhibit_warning"`
+	SubZeroInhibitMessage   string  `json:"subzero_inhibit_message"`
+	BatteryType             string  `json:"battery_type"`
+	ControllerModel         string  `json:"controller_model"`
+	ControllerRatedCurrentA int     `json:"controller_rated_current_a"`
+	ControllerRatedVoltageV int     `json:"controller_rated_voltage_v"`
 }
 
 type WeatherMetrics struct {

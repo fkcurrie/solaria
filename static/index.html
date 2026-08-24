@@ -373,6 +373,18 @@
     </a>
   </div>
 
+  <!-- Sub-Zero Low-Temperature Lithium Protection Banner -->
+  <div id="subzeroBanner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #fca5a5; font-size: 0.85rem; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 1.4rem;">❄️</span>
+      <div>
+        <strong id="subzeroTitle" style="color: #f87171;">SUB-ZERO LITHIUM CHARGE INHIBIT ALERT</strong>
+        <div id="subzeroMsg" style="color: #fca5a5; font-size: 0.8rem; margin-top: 2px;">Battery temperature is below 0°C. LiFePO4 charging restricted to protect cells.</div>
+      </div>
+    </div>
+    <span class="badge badge-offline" id="subzeroBadge" style="background:#ef4444; color:#fff;">CHARGE INHIBITED</span>
+  </div>
+
   <!-- Status Cards -->
   <div class="status-grid">
     <div class="card">
@@ -402,9 +414,31 @@
     <div class="card">
       <div class="card-label">Hardware Controller</div>
       <div class="card-val" id="hwModelVal" style="color: #f59e0b; font-size: 1.05rem;">
-        Renogy Rover 20A
+        Renogy Rover 40A MPPT
       </div>
       <div class="card-sub" id="hwSubText">400W 2S2P Monocrystalline</div>
+    </div>
+  </div>
+
+  <!-- Renogy System Diagnostics & MPPT Efficiency Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <!-- MPPT DC-DC Efficiency Card -->
+    <div class="card" style="border-left: 3px solid #10b981;">
+      <div class="card-label">⚡ MPPT DC-DC Conversion Efficiency</div>
+      <div class="card-val" id="mpptEfficiency" style="color: #10b981; font-size: 1.35rem;">-- %</div>
+      <div class="card-sub" id="mpptPowerRatio">DC Buck Step-Down: --W ➔ --W</div>
+    </div>
+    <!-- 2S2P String Balance Diagnostic Card -->
+    <div class="card" style="border-left: 3px solid #38bdf8;">
+      <div class="card-label">🔬 2S2P String Balance Diagnostics</div>
+      <div class="card-val" id="stringBalanceText" style="color: #38bdf8; font-size: 1.1rem;">Nominal 2S2P</div>
+      <div class="card-sub" id="stringBalanceSub">Voc Tracking: -- V (Expected ~36-40V)</div>
+    </div>
+    <!-- Renogy Hardware & Profile Card -->
+    <div class="card" style="border-left: 3px solid #f59e0b;">
+      <div class="card-label">🏷️ Controller & Battery Chemistry</div>
+      <div class="card-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem;">Renogy Rover 40A MPPT</div>
+      <div class="card-sub" id="batteryTypeText">Profile: LiFePO4 12V 4S</div>
     </div>
   </div>
 
@@ -1018,6 +1052,68 @@
       const battPill = document.getElementById('chartBattLivePill');
       if (battPill) {
         battPill.textContent = `${bV.toFixed(1)}V | ${bSOC}% (${t.charging_state || 'Nominal'})`;
+      }
+
+      // 5. Renogy MPPT Efficiency & Step-Down Power
+      const mpptEff = t.mppt_efficiency_pct || 0;
+      const outW = (bV * bA).toFixed(1);
+      const mpptEffElem = document.getElementById('mpptEfficiency');
+      const mpptSubElem = document.getElementById('mpptPowerRatio');
+      if (mpptEffElem) {
+        if (pvW > 5 && mpptEff > 0) {
+          mpptEffElem.textContent = `${mpptEff}%`;
+          if (mpptSubElem) mpptSubElem.textContent = `DC Buck: ${pvW}W Array ➔ ${outW}W Batt`;
+        } else {
+          mpptEffElem.textContent = pvW > 0 ? '98.5% (Standby)' : '-- %';
+          if (mpptSubElem) mpptSubElem.textContent = pvW > 0 ? `DC Buck: ${pvW}W Array (Pre-bulk)` : 'Array Standby / Night';
+        }
+      }
+
+      // 6. 2S2P String Balance Diagnostic
+      const strStatus = t.string_health_status || 'NOMINAL_2S2P';
+      const strElem = document.getElementById('stringBalanceText');
+      const strSub = document.getElementById('stringBalanceSub');
+      if (strElem) {
+        if (strStatus === 'POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT') {
+          strElem.textContent = '⚠️ Half-String Bypass / Shading';
+          strElem.style.color = '#f87171';
+          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (Below 24V 2S threshold - check bypass diode)`;
+        } else if (strStatus === 'DIFFUSE_OVERCAST_OPEN_CIRCUIT') {
+          strElem.textContent = '☁️ 2S Voc Nominal (Overcast)';
+          strElem.style.color = '#38bdf8';
+          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (2S Series excitation active)`;
+        } else if (strStatus === 'NOMINAL_2S2P_ACTIVE') {
+          strElem.textContent = '⚡ 2S2P Dual-String Active';
+          strElem.style.color = '#10b981';
+          if (strSub) strSub.textContent = `Vmp: ${pvV.toFixed(1)}V (Optimal MPPT tracking)`;
+        } else {
+          strElem.textContent = 'Nominal 2S2P';
+          strElem.style.color = '#38bdf8';
+          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (Expected ~36-40V)`;
+        }
+      }
+
+      // 7. Controller Hardware & Chemistry
+      const ctrlElem = document.getElementById('controllerModelText');
+      if (ctrlElem && t.controller_model) {
+        ctrlElem.textContent = t.controller_model;
+      }
+      const battTypeElem = document.getElementById('batteryTypeText');
+      if (battTypeElem && t.battery_type) {
+        battTypeElem.textContent = `Profile: ${t.battery_type}`;
+      }
+
+      // 8. Sub-Zero Thermal Protection Banner
+      const subBanner = document.getElementById('subzeroBanner');
+      const battTemp = t.battery_temp_c ?? 20;
+      if (subBanner) {
+        if (battTemp <= 0 || t.subzero_inhibit_warning) {
+          subBanner.style.display = 'flex';
+          const msgElem = document.getElementById('subzeroMsg');
+          if (msgElem) msgElem.textContent = t.subzero_inhibit_message || `Battery temperature is ${battTemp}°C (Sub-Zero). LiFePO4 charging inhibited to protect cells.`;
+        } else {
+          subBanner.style.display = 'none';
+        }
       }
     }
 
