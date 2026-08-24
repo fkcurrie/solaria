@@ -778,6 +778,42 @@
       </div>
     </div>
 
+    <!-- 🔬 Array Topology & MC4 Wiring Verifier Card -->
+    <div class="card" style="border-left: 4px solid #38bdf8; margin-bottom: 24px; background: rgba(56, 189, 248, 0.03);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <h3 style="font-size: 1rem; color: #38bdf8; margin: 0; display: flex; align-items: center; gap: 8px;">
+            🔬 2S2P Array String & MC4 Wiring Topology Verifier
+          </h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
+            Electrical string validation, winter cold-temperature Voc margin check, and MC4 branch verifier.
+          </p>
+        </div>
+        <div id="topoStatusBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
+          OPTIMAL 2S2P TOPOLOGY
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px;">
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Array Operating Voltage</div>
+          <div id="topoVoltsVal" style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">37.4 V <span style="font-size: 0.75rem; color: #94a3b8;">(Target: 36-42V)</span></div>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Array Operating Current</div>
+          <div id="topoAmpsVal" style="font-size: 1.25rem; font-weight: 700; color: #f59e0b;">9.8 A <span style="font-size: 0.75rem; color: #94a3b8;">(Target: 9-11.2A)</span></div>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">-25°C Sub-Zero Max Voc</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">48.2 V <span style="font-size: 0.75rem; color: #94a3b8;">(Limit: 100V)</span></div>
+        </div>
+      </div>
+
+      <div id="topoAdvisoryBox" style="font-size: 0.82rem; color: #93c5fd; padding: 8px 12px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
+        ✅ <strong>Topology Confirmed:</strong> 2 Series x 2 Parallel configuration verified. Safe 51.8V headroom below Rover 20A 100V maximum limit in freezing Algonquin winters.
+      </div>
+    </div>
+
     <!-- Live Oscilloscope Chart Section -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
       <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">

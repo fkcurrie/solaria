@@ -371,5 +371,37 @@ func TestHandleCommissioningWizard(t *testing.T) {
 	}
 }
 
+func TestHandleArrayTopology(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/array-topology", nil)
+	w := httptest.NewRecorder()
+	handleArrayTopology(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/array-topology, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode array topology response: %v", err)
+	}
+
+	if res["status"] != "OPTIMAL" {
+		t.Errorf("Expected OPTIMAL status for nominal 37.4V, got %v", res["status"])
+	}
+
+	// Test 4S overvoltage classification
+	over := classifyTopology(78.0, 5.1)
+	if over.Status != "WARNING_OVERVOLTAGE" {
+		t.Errorf("Expected WARNING_OVERVOLTAGE for 78V, got %v", over.Status)
+	}
+
+	// Test 4P high current classification
+	parallel := classifyTopology(19.0, 19.5)
+	if parallel.Status != "SUBOPTIMAL_HIGH_CURRENT" {
+		t.Errorf("Expected SUBOPTIMAL_HIGH_CURRENT for 19V, got %v", parallel.Status)
+	}
+}
+
+
 
 
