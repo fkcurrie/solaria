@@ -1110,6 +1110,93 @@ func handleSampleDay(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(sampleDayJSON)
 }
 
+type HardwareConfig struct {
+	ControllerKey       string `json:"controller_key"`
+	ControllerName      string `json:"controller_name"`
+	ControllerRatedAmps int    `json:"controller_rated_amps"`
+	BatteryKey          string `json:"battery_key"`
+	BatteryName         string `json:"battery_name"`
+	BatteryCapacityAh   int    `json:"battery_capacity_ah"`
+	ArrayCapacityWatts  int    `json:"array_capacity_watts"`
+	ArrayTopology       string `json:"array_topology"`
+}
+
+var (
+	hardwareConfigMu     sync.RWMutex
+	activeHardwareConfig = HardwareConfig{
+		ControllerKey:       "RVR20",
+		ControllerName:      "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
+		ControllerRatedAmps: 20,
+		BatteryKey:          "RENOGY_170_LFP",
+		BatteryName:         "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)",
+		BatteryCapacityAh:   170,
+		ArrayCapacityWatts:  400,
+		ArrayTopology:       "2S2P (4x100W)",
+	}
+)
+
+func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var newCfg HardwareConfig
+		if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
+			http.Error(w, "Invalid configuration payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if newCfg.ControllerName == "" {
+			newCfg.ControllerName = "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)"
+		}
+		if newCfg.BatteryName == "" {
+			newCfg.BatteryName = "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)"
+		}
+		if newCfg.BatteryCapacityAh <= 0 {
+			newCfg.BatteryCapacityAh = 170
+		}
+		if newCfg.ArrayCapacityWatts <= 0 {
+			newCfg.ArrayCapacityWatts = 400
+		}
+
+		hardwareConfigMu.Lock()
+		activeHardwareConfig = newCfg
+		hardwareConfigMu.Unlock()
+
+		// Update latest record in ring buffer
+		if ringBuf != nil {
+			rec := ringBuf.GetLatest()
+			rec.Telemetry.ControllerModel = newCfg.ControllerName
+			rec.Telemetry.BatteryType = newCfg.BatteryName
+			rec.Telemetry.ArrayCapacityW = newCfg.ArrayCapacityWatts
+			rec.Telemetry.ArrayTopology = newCfg.ArrayTopology
+			if newCfg.ControllerRatedAmps > 0 {
+				rec.Telemetry.ControllerRatedCurrentA = newCfg.ControllerRatedAmps
+			}
+			ringBuf.Push([]SolarRecord{rec})
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "success",
+			"message": "Hardware configuration saved and applied",
+			"config":  newCfg,
+		})
+		return
+	}
+
+	// GET
+	hardwareConfigMu.RLock()
+	cfg := activeHardwareConfig
+	hardwareConfigMu.RUnlock()
+	json.NewEncoder(w).Encode(cfg)
+}
+
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
@@ -1122,6 +1209,7 @@ func main() {
 	http.HandleFunc("/api/v1/stats/month", handleMonthStats)
 	http.HandleFunc("/api/v1/stats/year", handleYearStats)
 	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
+	http.HandleFunc("/api/v1/hardware-config", handleHardwareConfig)
 	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
 	http.HandleFunc("/api/v1/health", handleHealth)
 	http.HandleFunc("/healthz", handleHealthz)

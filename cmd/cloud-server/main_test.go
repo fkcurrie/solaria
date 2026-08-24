@@ -189,3 +189,39 @@ func TestHandleDayStats_CacheHeaders(t *testing.T) {
 	}
 }
 
+func TestHandleHardwareConfig(t *testing.T) {
+	// 1. GET initial hardware config
+	reqGet := httptest.NewRequest(http.MethodGet, "/api/v1/hardware-config", nil)
+	wGet := httptest.NewRecorder()
+	handleHardwareConfig(wGet, reqGet)
+	if wGet.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/hardware-config, got %d", wGet.Code)
+	}
+
+	var cfg HardwareConfig
+	if err := json.NewDecoder(wGet.Body).Decode(&cfg); err != nil {
+		t.Fatalf("Failed to decode hardware config: %v", err)
+	}
+	if cfg.ControllerKey != "RVR20" {
+		t.Errorf("Expected initial ControllerKey RVR20, got %s", cfg.ControllerKey)
+	}
+
+	// 2. POST update hardware config
+	newPayload := `{"controller_key":"RVR20","controller_name":"Renogy Rover 20A MPPT (RNG-CTRL-RVR20)","controller_rated_amps":20,"battery_key":"RENOGY_170_LFP","battery_name":"Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)","battery_capacity_ah":170,"array_capacity_watts":400,"array_topology":"2S2P (4x100W)"}`
+	reqPost := httptest.NewRequest(http.MethodPost, "/api/v1/hardware-config", strings.NewReader(newPayload))
+	wPost := httptest.NewRecorder()
+	handleHardwareConfig(wPost, reqPost)
+	if wPost.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on POST /api/v1/hardware-config, got %d", wPost.Code)
+	}
+
+	// 3. Verify updated latest ringBuffer record
+	latest := ringBuf.GetLatest()
+	if latest.Telemetry.ControllerModel != "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)" {
+		t.Errorf("Expected updated controller model in ring buffer, got %s", latest.Telemetry.ControllerModel)
+	}
+	if latest.Telemetry.BatteryType != "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)" {
+		t.Errorf("Expected updated battery profile in ring buffer, got %s", latest.Telemetry.BatteryType)
+	}
+}
+

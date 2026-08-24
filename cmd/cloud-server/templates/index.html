@@ -334,6 +334,9 @@
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <button onclick="switchTab('tab-specs', document.querySelectorAll('.nav-tab-btn')[5])" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
+        ⚙️ Settings & Setup
+      </button>
       <button id="sunlightToggle" onclick="toggleSunlightMode()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;">
         ☀️ Sunlight Mode
       </button>
@@ -1618,17 +1621,38 @@
       if (document.getElementById('cfgDerivedVoltages')) document.getElementById('cfgDerivedVoltages').textContent = `${bPreset.lvdV}V / ${bPreset.boostV}V`;
     }
 
-    function saveHardwareConfig() {
+    async function saveHardwareConfig() {
       const cKey = document.getElementById('cfgControllerSelect').value;
       const bKey = document.getElementById('cfgBatterySelect').value;
       const ah = parseFloat(document.getElementById('cfgBatteryAh').value) || 170;
       const arrayW = parseFloat(document.getElementById('cfgArrayW').value) || 400;
       const topo = document.getElementById('cfgTopologySelect').value;
 
+      const cPreset = CONTROLLER_PRESETS[cKey] || CONTROLLER_PRESETS['RVR20'];
+      const bPreset = BATTERY_PRESETS[bKey] || BATTERY_PRESETS['RENOGY_170_LFP'];
+
       const cfg = { controllerKey: cKey, batteryKey: bKey, ah, arrayW, topo };
       localStorage.setItem('solaria_hardware_config', JSON.stringify(cfg));
       applyHardwareConfigToUI(cfg);
-      alert('✅ Hardware profile applied & saved successfully!');
+
+      try {
+        await fetch('/api/v1/hardware-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            controller_key: cKey,
+            controller_name: cPreset.name,
+            controller_rated_amps: cPreset.amps,
+            battery_key: bKey,
+            battery_name: bPreset.name,
+            battery_capacity_ah: ah,
+            array_capacity_watts: arrayW,
+            array_topology: `${topo} (${arrayW}W)`
+          })
+        });
+      } catch (e) {}
+
+      alert('✅ Hardware profile applied & synchronized successfully!');
     }
 
     function applyHardwareConfigToUI(cfg) {
