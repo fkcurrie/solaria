@@ -243,6 +243,13 @@ func TestDecodeTelemetry_ColdDeratingAndStringImbalance(t *testing.T) {
 		t.Errorf("Expected SubZeroInhibitWarning to be true at -2C")
 	}
 
+	// Frame with Unconnected RTS probe (battTemp=0, ctrlTemp=25C) -> should not trigger sub-zero inhibit
+	frameNoProbe := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, 0)
+	telemNoProbe, _ := decodeTelemetry(frameNoProbe)
+	if telemNoProbe.SubZeroInhibitWarning {
+		t.Errorf("Expected SubZeroInhibitWarning to be false when battTemp is 0 with 25C controller temp (unconnected RTS probe)")
+	}
+
 	// Frame with String Imbalance: PV Volts = 18.0V (single string/bypass) while power is 120W
 	frameImbalance := buildMockRTUFrame(120, 18.0, 13.5, 8.5, 80, 25, 20)
 	telemImbalance, _ := decodeTelemetry(frameImbalance)
@@ -250,5 +257,6 @@ func TestDecodeTelemetry_ColdDeratingAndStringImbalance(t *testing.T) {
 		t.Errorf("Expected POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT, got %s", telemImbalance.StringHealthStatus)
 	}
 }
+
 
 

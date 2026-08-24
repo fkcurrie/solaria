@@ -1265,14 +1265,31 @@
         battTypeElem.textContent = `Profile: ${t.battery_type}`;
       }
 
-      // 8. Sub-Zero Thermal Protection Banner
+      // 8. Sub-Zero Thermal Protection Banner & Cold Derate Warning
       const subBanner = document.getElementById('subzeroBanner');
-      const battTemp = t.battery_temp_c ?? 20;
+      const battTemp = t.battery_temp_c;
+      const isSubZero = t.subzero_inhibit_warning || (battTemp !== undefined && battTemp < 0);
+      const isColdDerate = t.cold_derate_warning || (battTemp !== undefined && battTemp >= 0 && battTemp <= 5 && (t.controller_temp_c === undefined || t.controller_temp_c <= 10));
+
       if (subBanner) {
-        if (battTemp <= 0 || t.subzero_inhibit_warning) {
+        if (isSubZero) {
           subBanner.style.display = 'flex';
+          subBanner.style.borderColor = '#ef4444';
+          subBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+          subBanner.style.color = '#fca5a5';
+          const titleElem = document.getElementById('subzeroTitle');
+          if (titleElem) titleElem.textContent = '❄️ SUB-ZERO LITHIUM CHARGE INHIBIT ALERT';
           const msgElem = document.getElementById('subzeroMsg');
-          if (msgElem) msgElem.textContent = t.subzero_inhibit_message || `Battery temperature is ${battTemp}°C (Sub-Zero). LiFePO4 charging inhibited to protect cells.`;
+          if (msgElem) msgElem.textContent = t.subzero_inhibit_message || `Battery temperature is ${battTemp ?? 0}°C (Sub-Zero). LiFePO4 charging inhibited to protect cells.`;
+        } else if (isColdDerate) {
+          subBanner.style.display = 'flex';
+          subBanner.style.borderColor = '#f59e0b';
+          subBanner.style.background = 'rgba(245, 158, 11, 0.15)';
+          subBanner.style.color = '#fcd34d';
+          const titleElem = document.getElementById('subzeroTitle');
+          if (titleElem) titleElem.textContent = '⚠️ COLD CHARGE DERATE ADVISORY';
+          const msgElem = document.getElementById('subzeroMsg');
+          if (msgElem) msgElem.textContent = t.cold_derate_message || `Battery temperature is ${battTemp ?? 0}°C (Low Temp Zone). Charge current should be derated to protect cells.`;
         } else {
           subBanner.style.display = 'none';
         }

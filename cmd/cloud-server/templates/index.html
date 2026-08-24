@@ -1736,7 +1736,12 @@
         document.getElementById('perfRatioText').textContent = `Harvest PR: ${prStr} vs Irradiance`;
 
         document.getElementById('dailyYield').textContent = `${telem.daily_generated_wh || 0} Wh`;
-        document.getElementById('tempSummary').textContent = `Ambient: ${weather.temperature_c ?? '--'}°C | Ctrl: ${telem.controller_temp_c ?? '--'}°C`;
+        
+        const battTempDisplay = (telem.battery_temp_c !== undefined && telem.battery_temp_c !== 0) 
+          ? `${telem.battery_temp_c}°C` 
+          : (telem.controller_temp_c ? `${telem.controller_temp_c - 3}°C (Est)` : '--°C');
+        document.getElementById('tempSummary').textContent = `Ambient: ${weather.temperature_c ?? '--'}°C | Ctrl: ${telem.controller_temp_c ?? '--'}°C | Batt: ${battTempDisplay}`;
+        
         document.getElementById('lifetimeStats').textContent = `Lifetime: ${telem.total_generated_kwh || 0} kWh | Full: ${telem.total_battery_fullcharge_count || 0} cycles`;
 
         // 1. Array Badge
@@ -1850,14 +1855,30 @@
           document.getElementById('batteryTypeText').textContent = `Profile: ${telem.battery_type}`;
         }
 
-        // 8. Sub-Zero Thermal Protection Banner
+        // 8. Sub-Zero Thermal Protection Banner & Cold Derate Warning
         const subBanner = document.getElementById('subzeroBanner');
-        const battTemp = telem.battery_temp_c ?? 20;
-        if (battTemp <= 0 || telem.subzero_inhibit_warning) {
-          subBanner.style.display = 'flex';
-          document.getElementById('subzeroMsg').textContent = telem.subzero_inhibit_message || `Battery temperature is ${battTemp}°C (Sub-Zero). LiFePO4 charging inhibited to prevent cell degradation.`;
-        } else {
-          subBanner.style.display = 'none';
+        const battTemp = telem.battery_temp_c;
+        const isSubZero = telem.subzero_inhibit_warning || (battTemp !== undefined && battTemp < 0);
+        const isColdDerate = telem.cold_derate_warning || (battTemp !== undefined && battTemp >= 0 && battTemp <= 5 && (telem.controller_temp_c === undefined || telem.controller_temp_c <= 10));
+
+        if (subBanner) {
+          if (isSubZero) {
+            subBanner.style.display = 'flex';
+            subBanner.style.borderColor = '#ef4444';
+            subBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+            subBanner.style.color = '#fca5a5';
+            document.getElementById('subzeroTitle').textContent = '❄️ SUB-ZERO LITHIUM CHARGE INHIBIT ALERT';
+            document.getElementById('subzeroMsg').textContent = telem.subzero_inhibit_message || `Battery temperature is ${battTemp ?? 0}°C (Sub-Zero). LiFePO4 charging inhibited to prevent cell degradation.`;
+          } else if (isColdDerate) {
+            subBanner.style.display = 'flex';
+            subBanner.style.borderColor = '#f59e0b';
+            subBanner.style.background = 'rgba(245, 158, 11, 0.15)';
+            subBanner.style.color = '#fcd34d';
+            document.getElementById('subzeroTitle').textContent = '⚠️ COLD CHARGE DERATE ADVISORY';
+            document.getElementById('subzeroMsg').textContent = telem.cold_derate_message || `Battery temperature is ${battTemp ?? 0}°C (Low Temp Zone). Charge current should be derated to protect cells.`;
+          } else {
+            subBanner.style.display = 'none';
+          }
         }
 
         const livePill = document.getElementById('liveWxPill');
