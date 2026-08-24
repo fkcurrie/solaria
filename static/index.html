@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solaria BLE Bridge & Daemon Gateway</title>
+  <title>Solaria BLE Bridge Gateway</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230b0f19'/%3E%3Ccircle cx='50' cy='50' r='36' fill='%23f59e0b'/%3E%3Cpolygon points='63,2 35,50 49,50 37,98 65,50 51,50' fill='%230b0f19' stroke='%230b0f19' stroke-width='4'/%3E%3Cpolygon points='63,2 35,50 49,50 37,98 65,50 51,50' fill='%2338bdf8'/%3E%3C/svg%3E">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#f59e0b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Solaria Bridge">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0b0f19;
@@ -25,27 +24,6 @@
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
-    body.sunlight-mode {
-      --bg: #ffffff;
-      --card-bg: #f8fafc;
-      --card-border: #94a3b8;
-      --text: #020617;
-      --text-muted: #334155;
-      --primary: #0284c7;
-      --solar: #b45309;
-      --success: #047857;
-      --danger: #b91c1c;
-    }
-    body.sunlight-mode .card,
-    body.sunlight-mode .cloud-link-banner,
-    body.sunlight-mode .outage-monitor-card,
-    body.sunlight-mode .outage-mini-card,
-    body.sunlight-mode .outage-table-wrapper {
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-      border-color: #cbd5e1;
-      background: #f8fafc;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -54,9 +32,8 @@
       color: var(--text);
       line-height: 1.5;
       padding: 24px;
-      max-width: 1100px;
+      max-width: 860px;
       margin: 0 auto;
-      transition: background 0.2s ease, color 0.2s ease;
     }
 
     header {
@@ -71,7 +48,7 @@
     }
 
     h1 {
-      font-size: 1.4rem;
+      font-size: 1.35rem;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -107,54 +84,17 @@
       100% { transform: scale(0.95); opacity: 0.7; }
     }
 
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .card {
+    .controls-panel {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 18px;
-    }
-
-    .card-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .card-val {
-      font-size: 1.15rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-sub {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 4px;
-      font-family: var(--mono);
-    }
-
-    .controls-panel {
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 14px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin-bottom: 24px;
+      gap: 16px;
     }
 
     .btn-group {
@@ -167,31 +107,100 @@
       background: #2563eb;
       color: white;
       border: none;
-      padding: 10px 18px;
-      border-radius: 6px;
+      padding: 12px 22px;
+      border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       transition: all 0.15s ease;
     }
-    button:hover { filter: brightness(1.1); }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
     button.btn-solar { background: #f59e0b; color: #0b0f19; font-weight: 700; }
     button.btn-danger { background: #ef4444; }
     button.btn-outline { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
     button.btn-outline:hover { background: #1e293b; }
 
-    select {
-      background: #090d16;
-      border: 1px solid var(--card-border);
+    .cloud-btn {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
       color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
+      text-decoration: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .cloud-btn:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 0.88rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-value {
+      font-weight: 600;
       font-family: var(--mono);
-      font-size: 0.85rem;
+    }
+
+    .log-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
     }
 
     .log-box {
@@ -199,7 +208,7 @@
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 14px;
-      height: 480px;
+      height: 320px;
       overflow-y: auto;
       font-family: var(--mono);
       font-size: 0.82rem;
@@ -215,1202 +224,171 @@
     .log-solar { color: #f59e0b; font-weight: 600; }
     .log-data { color: #38bdf8; }
 
-    .cloud-link-banner {
-      background: linear-gradient(90deg, rgba(37, 99, 235, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 8px;
-      padding: 14px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .battery-config-card {
-      background: var(--card-bg);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 10px;
-      padding: 18px 20px;
-      margin-bottom: 24px;
-    }
-    .profile-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin: 16px 0;
-    }
-    .profile-card {
-      background: #090d16;
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 12px 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .profile-card:hover {
-      border-color: #38bdf8;
-      background: #0f172a;
-    }
-    .profile-card.active {
-      border-color: #10b981;
-      background: rgba(16, 185, 129, 0.08);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
-    }
-    .profile-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .profile-desc {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      font-family: var(--mono);
-      line-height: 1.4;
-    }
-    .config-banner-alert {
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      border-radius: 6px;
-      padding: 10px 14px;
+    footer {
+      margin-top: 24px;
+      text-align: center;
       font-size: 0.8rem;
-      color: #fbbf24;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .outage-monitor-card {
-      background: var(--card-bg);
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      border-radius: 10px;
-      padding: 18px 20px;
-      margin-bottom: 24px;
-    }
-    .outage-stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-      margin: 14px 0;
-    }
-    .outage-mini-card {
-      background: #090d16;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 10px 14px;
-    }
-    .outage-mini-label {
-      font-size: 0.72rem;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .outage-mini-val {
-      font-size: 1.15rem;
-      font-weight: 700;
-      font-family: var(--mono);
-      margin-top: 4px;
-    }
-    .outage-table-wrapper {
-      background: #090d16;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      overflow-x: auto;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    table.outage-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      font-family: var(--mono);
-    }
-    table.outage-table th {
-      background: #111827;
-      color: var(--text-muted);
-      text-align: left;
-      padding: 8px 12px;
-      font-weight: 600;
-      border-bottom: 1px solid var(--card-border);
-      white-space: nowrap;
-    }
-    table.outage-table td {
-      padding: 8px 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      color: #e2e8f0;
-      white-space: nowrap;
-    }
-    table.outage-table tr:hover td {
-      background: rgba(255,255,255,0.02);
-    }
-    .badge-outage-active {
-      background: rgba(239, 68, 68, 0.2);
-      color: #f87171;
-      border: 1px solid #ef4444;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      animation: pulse 1.5s infinite;
-    }
-    .badge-outage-resolved {
-      background: rgba(16, 185, 129, 0.2);
-      color: #34d399;
-      border: 1px solid #10b981;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.72rem;
-      font-weight: 600;
     }
   </style>
 </head>
 <body>
 
   <header>
-    <div style="display: flex; align-items: center; gap: 14px;">
-      <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.35));">
-        <defs>
-          <linearGradient id="bridgeSun" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#fbbf24" />
-            <stop offset="100%" stop-color="#f59e0b" />
-          </linearGradient>
-          <linearGradient id="bridgeSunDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#f59e0b" />
-            <stop offset="100%" stop-color="#d97706" />
-          </linearGradient>
-          <linearGradient id="bridgeBolt" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#38bdf8" />
-            <stop offset="100%" stop-color="#0284c7" />
-          </linearGradient>
-        </defs>
-        <path d="M 50,14 A 36,36 0 0,0 50,86 Z" fill="url(#bridgeSun)" />
-        <path d="M 50,14 A 36,36 0 0,1 50,86 Z" fill="url(#bridgeSunDark)" />
-        <polygon points="63,2 35,50 49,50 37,98 65,50 51,50" fill="#0b0f19" stroke="#0b0f19" stroke-width="6" stroke-linejoin="round" />
-        <polygon points="63,2 35,50 49,50 37,98 65,50 51,50" fill="url(#bridgeBolt)" stroke="#ffffff" stroke-width="0.5" stroke-linejoin="round" />
-      </svg>
-      <div>
-        <h1 style="font-size: 1.35rem; font-weight: 800; display: flex; align-items: center; gap: 8px; letter-spacing: -0.02em; margin: 0;">
-          <span style="background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SOLARIA</span>
-          <span style="font-size: 0.75rem; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 2px 6px; letter-spacing: 0.05em;">EDGE BRIDGE</span>
-        </h1>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px; margin-bottom: 0;">
-          Local Bluetooth Modbus RTU Proxy ↔ Google Cloud Run &amp; BigQuery
-        </p>
-      </div>
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-      <button onclick="openEdgeCommissioningModal()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #10b981; color: #10b981; font-weight: 600;">
-        🔌 Commissioning Wizard
-      </button>
-      <button onclick="openEdgeWinterizeModal()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
-        ❄️ Winterize Cottage
-      </button>
-      <button onclick="toggleHwConfig()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
-        ⚙️ Hardware Settings
-      </button>
-      <button id="sunlightToggle" onclick="toggleSunlightMode()" class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-color: #f59e0b; color: #f59e0b;">
-        ☀️ Sunlight Mode
-      </button>
-      <span id="wsBadge" class="badge badge-offline">Linux Bridge Offline</span>
-      <span id="bleBadge" class="badge badge-offline">BLE Disconnected</span>
-      <span id="wakeLockBadge" class="badge badge-online" style="display: none;">Keep-Alive Active</span>
+    <h1>
+      <span>☀️</span>
+      <span>Solaria BLE Bridge Gateway</span>
+    </h1>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <span id="gatewayStatusBadge" class="badge badge-online">
+        <span class="pulse-dot"></span> GATEWAY READY
+      </span>
+      <a href="https://solaria-dashboard-952659886764.us-central1.run.app/" target="_blank" rel="noopener noreferrer" class="cloud-btn">
+        <span>☁️ Open Cloud Dashboard ↗</span>
+      </a>
     </div>
   </header>
 
-  <!-- First-Time Commissioning & Safe Wiring Sequence Modal -->
-  <div id="edgeCommissioningModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-    <div class="card" style="max-width: 680px; width: 100%; max-height: 90vh; overflow-y: auto; background: #0b1120; border: 1px solid #10b981; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
-        <h2 style="font-size: 1.15rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
-          🔌 Safe Wiring Sequence & Commissioning Wizard
-        </h2>
-        <button onclick="closeEdgeCommissioningModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
-      </div>
-
-      <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px;">
-        <strong style="color: #f87171; font-size: 0.88rem;">⚠️ Golden Rule of Solar Commissioning:</strong>
-        <p style="font-size: 0.8rem; color: #fca5a5; margin: 3px 0 0 0;">
-          ALWAYS connect the 12V Battery Bank to the MPPT Controller BEFORE connecting solar panels. Connecting PV first without a battery reference voltage can permanently destroy internal buck converters.
-        </p>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #10b981; font-size: 0.9rem;">Step 1: Connect 170Ah LiFePO4 Battery Bank</strong>
-            <span class="badge badge-online">MANDATORY 1ST</span>
-          </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
-            Connect battery (+) to Controller Battery (+) and (-) to Battery (-). Ensure 30A inline ANL fuse is installed. Controller LCD will power on.
-          </p>
-        </div>
-
-        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #38bdf8; font-size: 0.9rem;">Step 2: Connect Renogy RTS Temperature Sensor</strong>
-            <span class="badge badge-array">STEP 2</span>
-          </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
-            Plug 3.5mm RTS probe into the temperature port and tape copper sensor lug directly to the LiFePO4 casing. Arms sub-zero freeze protection (0°C cutoff).
-          </p>
-        </div>
-
-        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #f59e0b; font-size: 0.9rem;">Step 3: Connect Renogy BT-1 Bluetooth Module</strong>
-            <span class="badge badge-retry">STEP 3</span>
-          </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
-            Plug RJ12 cable from BT-1 module into RS232 port of Rover MPPT. Green LED will flash to broadcast Bluetooth Modbus RTU telemetry.
-          </p>
-        </div>
-
-        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #38bdf8; font-size: 0.9rem;">Step 4: Wire 4x100W 2S2P Array & Close PV Breaker</strong>
-            <span class="badge badge-array">STEP 4</span>
-          </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
-            Verify MC4 branch Y-connectors (2 series pairs paralleled). Close 20A DC breaker. MPPT solar indicator illuminates and reads ~36-40V Voc.
-          </p>
-        </div>
-
-        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="color: #10b981; font-size: 0.9rem;">Step 5: Verify Live Sync & Autonomous Guardian</strong>
-            <span class="badge badge-online">STEP 5</span>
-          </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0 0;">
-            Check that Solaria dashboard displays real-time watts, battery SOC%, and green health badges.
-          </p>
-        </div>
-      </div>
-
-      <div style="display: flex; justify-content: flex-end;">
-        <button onclick="closeEdgeCommissioningModal()" class="btn-solar" style="font-weight: 700; padding: 8px 18px; border: none;">
-          ✓ Commissioning Understood
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Winterization & Freeze-Proof Departure Modal -->
-  <div id="edgeWinterizeModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-    <div class="card" style="max-width: 650px; width: 100%; max-height: 90vh; overflow-y: auto; background: #0b1120; border: 1px solid #38bdf8; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
-        <h2 style="font-size: 1.15rem; color: #38bdf8; margin: 0; display: flex; align-items: center; gap: 8px;">
-          ❄️ Cottage Winterization & Freeze-Proof Departure Assistant
-        </h2>
-        <button onclick="closeEdgeWinterizeModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer;">✕</button>
-      </div>
-
-      <!-- Battery Storage Health Indicator -->
-      <div style="background: rgba(15, 23, 42, 0.8); padding: 14px; border-radius: 8px; border: 1px solid var(--card-border); margin-bottom: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">170Ah LiFePO4 Winter Storage Health</span>
-          <span id="edgeWinStorageBadge" class="badge badge-online">OPTIMAL STORAGE</span>
-        </div>
-        <div style="display: flex; gap: 20px; align-items: baseline; margin-top: 8px;">
-          <div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Current SOC:</span>
-            <span id="edgeWinCurrentSoc" style="font-size: 1.3rem; font-weight: 700; color: #10b981; margin-left: 6px;">82%</span>
-          </div>
-          <div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Voltage:</span>
-            <span id="edgeWinCurrentVolt" style="font-size: 1.3rem; font-weight: 700; color: #38bdf8; margin-left: 6px;">13.3 V</span>
-          </div>
-          <div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Ideal Target:</span>
-            <span style="font-size: 1rem; font-weight: 600; color: #f59e0b; margin-left: 6px;">50% - 60% SOC</span>
-          </div>
-        </div>
-        <div id="edgeWinRecText" style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px; line-height: 1.4;">
-          LiFePO4 cells suffer minimal degradation when stored at ~50%-60% SOC during deep Muskoka winter freezes (-25°C).
-        </div>
-      </div>
-
-      <!-- 5-Step Interactive Checklist -->
-      <h3 style="font-size: 0.95rem; color: #f8fafc; margin-bottom: 10px;">📋 Step-by-Step Departure Checklist:</h3>
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-          <input type="checkbox" id="edgeWinChk1" style="accent-color: #38bdf8; margin-top: 3px;">
-          <div>
-            <strong style="color: #f8fafc; font-size: 0.88rem;">1. Verify Sub-Zero Inhibit Armed</strong>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Rover 20A MPPT low-temp lithium charge inhibit is verified active to prevent destructive sub-zero charging.</p>
-          </div>
-        </label>
-        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-          <input type="checkbox" id="edgeWinChk2" style="accent-color: #38bdf8; margin-top: 3px;">
-          <div>
-            <strong style="color: #f8fafc; font-size: 0.88rem;">2. Power Down AC Inverter & DC Loads</strong>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Turn off AC Inverter switch, 12V water pump breaker, Starlink, and fridge to eliminate parasitic battery drain.</p>
-          </div>
-        </label>
-        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-          <input type="checkbox" id="edgeWinChk3" style="accent-color: #38bdf8; margin-top: 3px;">
-          <div>
-            <strong style="color: #f8fafc; font-size: 0.88rem;">3. Inspect Panel Pitch for Snow Shedding</strong>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Confirm 4x100W 2S2P panels are angled steep (~55°-60°) so Algonquin lake-effect snow easily slides off.</p>
-          </div>
-        </label>
-        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-          <input type="checkbox" id="edgeWinChk4" style="accent-color: #38bdf8; margin-top: 3px;">
-          <div>
-            <strong style="color: #f8fafc; font-size: 0.88rem;">4. Inspect RTS Temp Probe & Insulated Box</strong>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Ensure RTS temperature sensor is taped directly to the battery casing and the insulated battery enclosure is latched.</p>
-          </div>
-        </label>
-        <label style="display: flex; gap: 12px; align-items: flex-start; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer;">
-          <input type="checkbox" id="edgeWinChk5" style="accent-color: #38bdf8; margin-top: 3px;">
-          <div>
-            <strong style="color: #f8fafc; font-size: 0.88rem;">5. Lock Breakers & Record Departure Certificate</strong>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 0 0;">Confirm DC breaker positions and generate your departure record for cottage logs.</p>
-          </div>
-        </label>
-      </div>
-
-      <!-- Action Buttons -->
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <button onclick="downloadEdgeWinterCertificate()" class="btn-outline" style="border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 8px 16px;">
-          📄 Download Departure Certificate (.txt)
-        </button>
-        <button onclick="closeEdgeWinterizeModal()" class="btn-solar" style="font-weight: 700; padding: 8px 16px; border: none;">
-          ✓ Done
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Banner linking to Cloud Run -->
-  <div class="cloud-link-banner">
-    <div>
-      <div style="font-weight: 700; color: #38bdf8;">📊 Live Solaria Multi-Tab Cloud Dashboard</div>
-      <div style="font-size: 0.8rem; color: #94a3b8;">View Day, Week, Month, and Year analytics powered by BigQuery.</div>
-    </div>
-    <a href="https://solaria-dashboard-952659886764.us-central1.run.app" target="_blank" style="text-decoration: none;">
-      <button class="btn-solar" style="font-size: 0.85rem; padding: 8px 16px;">
-        🚀 Open Cloud Dashboard
-      </button>
-    </a>
-  </div>
-
-  <!-- Sub-Zero Low-Temperature Lithium Protection Banner -->
-  <div id="subzeroBanner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #fca5a5; font-size: 0.85rem; align-items: center; justify-content: space-between; gap: 12px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <span style="font-size: 1.4rem;">❄️</span>
-      <div>
-        <strong id="subzeroTitle" style="color: #f87171;">SUB-ZERO LITHIUM CHARGE INHIBIT ALERT</strong>
-        <div id="subzeroMsg" style="color: #fca5a5; font-size: 0.8rem; margin-top: 2px;">Battery temperature is below 0°C. LiFePO4 charging restricted to protect cells.</div>
-      </div>
-    </div>
-    <span class="badge badge-offline" id="subzeroBadge" style="background:#ef4444; color:#fff;">CHARGE INHIBITED</span>
-  </div>
-
-  <!-- Status Cards -->
-  <div class="status-grid">
-    <div class="card">
-      <div class="card-label">Bluetooth Controller Link</div>
-      <div class="card-val" id="bleStatusVal" style="color: #f87171;">
-        <span>Disconnected</span>
-      </div>
-      <div class="card-sub" id="bleSubText">Auto-Reconnect: Armed</div>
-    </div>
-
-    <div class="card">
-      <div class="card-label">Linux Gateway Process</div>
-      <div class="card-val" id="wsStatusVal" style="color: #f87171;">
-        <span>ws://localhost:8765</span>
-      </div>
-      <div class="card-sub" id="wsSubText">Connecting...</div>
-    </div>
-
-    <div class="card">
-      <div class="card-label">Cloud Pipeline & BigQuery</div>
-      <div class="card-val" id="cloudStatusVal" style="color: #38bdf8;">
-        <span id="packetCount">0</span> pkts sent
-      </div>
-      <div class="card-sub" id="cloudSubText">solaria.telemetry</div>
-    </div>
-
-    <div class="card">
-      <div class="card-label">Hardware Controller</div>
-      <div class="card-val" id="hwModelVal" style="color: #f59e0b; font-size: 1.05rem;">
-        Renogy Rover 20A MPPT
-      </div>
-      <div class="card-sub" id="hwSubText">400W 2S2P Monocrystalline (138.8% Over-Paneled)</div>
-    </div>
-  </div>
-
-  <!-- Renogy System Diagnostics & MPPT Efficiency Grid -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
-    <!-- MPPT DC-DC Efficiency Card -->
-    <div class="card" style="border-left: 3px solid #10b981;">
-      <div class="card-label">⚡ MPPT DC-DC Conversion Efficiency</div>
-      <div class="card-val" id="mpptEfficiency" style="color: #10b981; font-size: 1.35rem;">-- %</div>
-      <div class="card-sub" id="mpptPowerRatio">DC Buck Step-Down: --W ➔ --W</div>
-    </div>
-    <!-- 2S2P String Balance Diagnostic Card -->
-    <div class="card" style="border-left: 3px solid #38bdf8;">
-      <div class="card-label">🔬 2S2P String Balance Diagnostics</div>
-      <div class="card-val" id="stringBalanceText" style="color: #38bdf8; font-size: 1.1rem;">Nominal 2S2P</div>
-      <div class="card-sub" id="stringBalanceSub">Voc Tracking: -- V (Expected ~36-40V)</div>
-    </div>
-    <!-- Renogy Hardware & Profile Card -->
-    <div class="card" style="border-left: 3px solid #f59e0b; cursor: pointer;" onclick="toggleHwConfig()">
-      <div class="card-label">🏷️ Controller & Battery Chemistry</div>
-      <div class="card-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem;">Renogy Rover 20A MPPT</div>
-      <div class="card-sub" id="batteryTypeText">Profile: Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</div>
-    </div>
-  </div>
-
-  <!-- Controls Panel -->
+  <!-- Primary Connection Control Panel -->
   <div class="controls-panel">
+    <div>
+      <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 4px;">Hardware Pairing & Stream Control</div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Connect your browser directly to the Renogy BT-1 / BT-2 module over Web Bluetooth to bridge telemetry.
+      </div>
+    </div>
     <div class="btn-group">
-      <button class="btn-solar" id="connectBtn" onclick="connectRenogyByService()">
-        ⚡ Connect Renogy Controller (BLE)
+      <button id="connectBtn" class="btn-solar" onclick="connectRenogyByService()">
+        <span>⚡ Connect Renogy BT-1 (0xFFD0)</span>
       </button>
-      <button class="btn-outline" onclick="connectAnyBle()">
-        🔍 Pick Any Device
+      <button id="disconnectBtn" class="btn-danger" onclick="disconnectGatt()" disabled>
+        <span>Disconnect</span>
       </button>
-      <button class="btn-danger" id="disconnectBtn" onclick="disconnectDevice()" disabled>
-        ⏹️ Disconnect
-      </button>
-      <button class="btn-outline" onclick="toggleBtGuide()" style="border-color: #38bdf8; color: #38bdf8;">
-        🛠️ BT-1 Setup Assistant
-      </button>
-      <button class="btn-outline" id="simBtn" onclick="toggleLocalSimulation()" style="border-color: #f59e0b; color: #f59e0b; font-weight: 600;">
-        ⚡ Offline Simulation
-      </button>
-      <button class="btn-outline" onclick="toggleHwConfig()" style="border-color: #f59e0b; color: #f59e0b; font-weight: 600;">
-        ⚙️ Hardware Settings
-      </button>
-      <button class="btn-outline" onclick="exportEdgeTelemetryCSV()" style="border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
-        📥 Export CSV
-      </button>
-    </div>
-
-    <div style="display: flex; gap: 12px; align-items: center;">
-      <label style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-        <input type="checkbox" id="autoReconnectCheck" checked onchange="toggleAutoReconnect(this.checked)">
-        Auto-Reconnect Loop
-      </label>
-      <select id="pollIntervalSelect" onchange="updatePollRate()">
-        <option value="2000">Poll 2s (Fast)</option>
-        <option value="5000">Poll 5s</option>
-        <option value="10000" selected>Poll 10s (Recommended)</option>
-        <option value="15000">Poll 15s</option>
-        <option value="30000">Poll 30s</option>
-        <option value="60000">Poll 60s</option>
-      </select>
     </div>
   </div>
 
-  <!-- Hardware Configuration & Renogy Profile Card -->
-  <div id="hwConfigCard" class="card" style="display: none; margin-bottom: 24px; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.3);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-      <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
-        ⚙️ Edge Hardware Profile & Renogy Model Configuration
-      </h3>
-      <button onclick="toggleHwConfig()" style="background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer;">✕</button>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
-      <div>
-        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
-          ⚡ CONTROLLER MODEL:
-        </label>
-        <select id="edgeControllerSelect" onchange="onEdgeConfigChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;">
-          <option value="RVR20" selected>Renogy Rover 20A MPPT (RNG-CTRL-RVR20)</option>
-          <option value="RVR30">Renogy Rover 30A MPPT (RNG-CTRL-RVR30)</option>
-          <option value="RVR40">Renogy Rover 40A MPPT (RNG-CTRL-RVR40)</option>
-          <option value="RVR60">Renogy Rover 60A MPPT (RNG-CTRL-RVR60)</option>
-          <option value="RCC20RVE">Renogy Rover Elite 20A MPPT</option>
-          <option value="RCC40RVE">Renogy Rover Elite 40A MPPT</option>
-          <option value="WND10">Renogy Wanderer 10A PWM</option>
-          <option value="WND30">Renogy Wanderer 30A PWM</option>
-          <option value="ADV30">Renogy Adventurer 30A Flush Mount</option>
-        </select>
-      </div>
-      <div>
-        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
-          🔋 BATTERY BANK PROFILE:
-        </label>
-        <select id="edgeBatterySelect" onchange="onEdgeConfigChange()" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;">
-          <option value="RENOGY_170_LFP" selected>Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</option>
-          <option value="RENOGY_100_LFP">Renogy 12V 100Ah LiFePO4 (RBT100LFP12-BT)</option>
-          <option value="RENOGY_200_LFP">Renogy 12V 200Ah LiFePO4 Core</option>
-          <option value="CUSTOM_LFP">Custom 12V LiFePO4</option>
-          <option value="AGM">Deep-Cycle Sealed AGM (12V)</option>
-          <option value="GEL">Gel Cell Deep Cycle (12V)</option>
-          <option value="FLOODED">Flooded Lead-Acid (12V)</option>
-        </select>
-      </div>
-      <div>
-        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">
-          📦 CAPACITY (Ah) & ARRAY (W):
-        </label>
-        <div style="display: flex; gap: 6px;">
-          <input type="number" id="edgeBatteryAh" value="170" min="10" max="2000" oninput="onEdgeConfigChange()" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;" placeholder="Ah">
-          <input type="number" id="edgeArrayW" value="400" min="50" max="5000" oninput="onEdgeConfigChange()" style="width: 50%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem;" placeholder="Watts">
+  <!-- Dual Status Overview Grid -->
+  <div class="status-grid">
+    
+    <!-- Card 1: Bluetooth LE Connectivity -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title" style="color: #f59e0b;">
+          <span>📱</span> Bluetooth LE Connectivity
         </div>
+        <span id="bleBadge" class="badge badge-offline">DISCONNECTED</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="info-label">Target Device:</span>
+        <span class="info-value" id="devNameVal">Renogy BT-1 / BT-2</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">GATT Channels:</span>
+        <span class="info-value">0xFFD1 (TX) / 0xFFF1 (RX)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">GATT Session State:</span>
+        <span class="info-value" id="bleStatusVal" style="color: #f87171;">Disconnected</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Frames Received:</span>
+        <span class="info-value" id="framesCountVal">0</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Last BLE Packet:</span>
+        <span class="info-value" id="lastPacketVal" style="color: var(--text-muted);">Never</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Auto-Reconnect:</span>
+        <span class="info-value">
+          <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="autoReconnectCheck" checked style="accent-color: #f59e0b;">
+            <span>Enabled</span>
+          </label>
+        </span>
       </div>
     </div>
-    <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-      <span id="edgeDerivedStats" style="font-size: 0.8rem; color: #38bdf8; font-family: var(--mono);">
-        Reserve: 2,176 Wh | Max Ctrl: 288W (20A) | Over-Panel: 138.8%
-      </span>
-      <button class="btn-outline" onclick="saveEdgeHardwareConfig()" style="border-color: #f59e0b; color: #f59e0b; font-size: 0.75rem; padding: 4px 12px; font-weight: 700;">
-        💾 Save Profile
-      </button>
+
+    <!-- Card 2: Internet & Cloud Bridge Uplink -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title" style="color: #38bdf8;">
+          <span>🌐</span> Cloud Uplink & Bridge
+        </div>
+        <span id="bridgeBadge" class="badge badge-online">BRIDGE ACTIVE</span>
+      </div>
+
+      <div class="info-row">
+        <span class="info-label">Local Gateway:</span>
+        <span class="info-value" style="color: #34d399;">http://localhost:8080</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">WebSocket Stream:</span>
+        <span class="info-value" id="wsStatusVal" style="color: #34d399;">Connected (ws://127.0.0.1:8765)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Cloud Destination:</span>
+        <span class="info-value" style="color: #38bdf8; font-size: 0.8rem;">Cloud Run (us-central1)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">BigQuery Table:</span>
+        <span class="info-value" style="color: var(--text-muted);">solaria-solar.solaria.telemetry</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Ingest Status:</span>
+        <span class="info-value" id="uplinkStatusVal" style="color: #34d399;">READY (HTTP/2 Auto-Forward)</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Spool Offline Buffer:</span>
+        <span class="info-value" id="spoolCountVal">0 records</span>
+      </div>
     </div>
+
   </div>
 
-  <!-- BT-1 Guided Troubleshooting & Pairing Assistant Card -->
-  <div id="btGuideCard" class="card" style="display: none; margin-bottom: 24px; background: rgba(56, 189, 248, 0.05); border-color: rgba(56, 189, 248, 0.3);">
+  <!-- Live Gateway Terminal & Activity Log -->
+  <div class="log-panel">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h3 style="font-size: 1rem; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
-        📱 Renogy BT-1 Bluetooth Pairing & Field Diagnostic Guide
-      </h3>
-      <button onclick="toggleBtGuide()" style="background: none; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer;">✕</button>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; font-size: 0.85rem;">
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <strong style="color: #f59e0b;">Step 1: Check BT-1 Power LED</strong>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
-          The green POWER LED on the BT-1 module must be solidly lit. If unlit, verify the RJ12 cable is firmly clicked into the controller's RS232 port.
-        </p>
+      <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📟</span> Live Gateway Activity Stream
       </div>
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <strong style="color: #38bdf8;">Step 2: Disconnect Renogy DC Home App</strong>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
-          Renogy BT-1 only accepts <strong>one simultaneous Bluetooth connection</strong>. Close the official Renogy phone app completely (force-stop) before pairing here.
-        </p>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <strong style="color: #10b981;">Step 3: Linux Daemon Watchdog</strong>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
-          The backend runs an autonomous supervisor that executes <code>bluetoothctl power on</code> and restarts <code>bluetooth.service</code> automatically if connection freezes.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- 🌅 Daily Sunset Digest & Morning Forecast Card -->
-  <div class="card" style="border-left: 4px solid #f59e0b; margin-bottom: 24px; background: rgba(245, 158, 11, 0.04);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
-          🌅 Daily Sunset Digest & Morning Solar Forecast
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          End-of-day harvest summary, battery evening baseline, and tomorrow's solar noon window.
-        </p>
-      </div>
-      <div id="edgeSunsetDigestBadge" class="badge badge-array" style="font-size: 0.8rem; padding: 4px 10px;">
-        HARVEST COMPLETE
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Today's Solar Yield</div>
-        <div id="edgeDigestYieldKWh" style="font-size: 1.25rem; font-weight: 700; color: #f59e0b;">1.84 kWh</div>
-        <div id="edgeDigestPeakW" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Peak: 382 W (12:45 PM)</div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Absorption / Float Duration</div>
-        <div id="edgeDigestAbsorption" style="font-size: 1.25rem; font-weight: 700; color: #10b981;">2h 15m</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Full Saturation Achieved</div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Evening Battery Level</div>
-        <div id="edgeDigestEveningSoc" style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">100% (13.4V)</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">2,176 Wh Usable Energy</div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Tomorrow's Peak Solar Window</div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #eab308;">11:30 AM - 2:30 PM</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Est: 1.9 - 2.2 kWh (Clear Sky)</div>
-      </div>
-    </div>
-
-    <div id="edgeDigestGuidanceBanner" style="font-size: 0.85rem; color: #fef08a; padding: 8px 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; border-left: 3px solid #f59e0b;">
-      🌟 Perfect solar harvest today! Battery 100% full. You have ~2,176 Wh reserve to run Starlink, cabin lights, and fridge overnight with zero concerns.
-    </div>
-  </div>
-
-  <!-- ⏱️ Cottage Appliance Power Budget & Runtime Estimator Card -->
-  <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background: rgba(16, 185, 129, 0.04);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
-          ⏱️ Cottage Power Budget & Appliance Runtime Estimator
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          Toggle cabin appliances to project battery hours remaining on your 170Ah LiFePO4 bank.
-        </p>
-      </div>
-      <div id="edgeBudgetStatusBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
-        AMPLE RESERVE
-      </div>
-    </div>
-
-    <!-- Appliance Selection Grid -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px;">
-      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
-        <input type="checkbox" id="edgeAppStarlink" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
-        <span>🛰️ Starlink (45W)</span>
-      </label>
-      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
-        <input type="checkbox" id="edgeAppFridge" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
-        <span>🧊 12V Fridge (30W)</span>
-      </label>
-      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
-        <input type="checkbox" id="edgeAppLights" checked onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
-        <span>💡 Cabin LEDs (15W)</span>
-      </label>
-      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
-        <input type="checkbox" id="edgeAppPump" onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
-        <span>🚿 Water Pump (60W)</span>
-      </label>
-      <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
-        <input type="checkbox" id="edgeAppLaptop" onchange="updateEdgePowerBudget()" style="accent-color: #10b981;">
-        <span>💻 Laptop/USB (65W)</span>
-      </label>
-      <div style="display: flex; align-items: center; gap: 6px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); font-size: 0.85rem;">
-        <span>➕ Custom:</span>
-        <input type="number" id="edgeAppCustomWatts" value="0" min="0" max="1500" step="10" oninput="updateEdgePowerBudget()" style="width: 60px; background: #0f172a; color: #f8fafc; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; text-align: right;">
-        <span>W</span>
-      </div>
-    </div>
-
-    <!-- Live Budget Projection Output -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 12px 16px; background: rgba(15, 23, 42, 0.8); border-radius: 8px; border: 1px solid var(--card-border);">
-      <div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Selected Total Load</div>
-        <div id="edgeBudgetTotalWatts" style="font-size: 1.3rem; font-weight: 700; color: #f59e0b;">90 W</div>
-      </div>
-      <div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Battery Usable Energy</div>
-        <div id="edgeBudgetUsableWh" style="font-size: 1.3rem; font-weight: 700; color: #38bdf8;">1,784 Wh (82% SOC)</div>
-      </div>
-      <div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Projected Continuous Runtime</div>
-        <div id="edgeBudgetRuntimeHours" style="font-size: 1.3rem; font-weight: 700; color: #10b981;">19.8 Hours</div>
-      </div>
-    </div>
-
-    <!-- Plain English Cottage Advisory Banner -->
-    <div id="edgeBudgetAdvisoryText" style="margin-top: 10px; font-size: 0.85rem; color: #93c5fd; padding: 6px 10px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
-      💡 Ample battery reserve (19.8 hrs). Safe for overnight operation of Starlink, 12V fridge, and lighting.
-    </div>
-  </div>
-
-  <!-- 🌲 Solar Analytics: Tree Shading & Branch Trimming Advisory Card -->
-  <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background: rgba(16, 185, 129, 0.03);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
-          🌲 Tree Shading & Branch Trimming Advisory Engine
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          Diurnal irradiance curve notch detection, bypass diode tracking, and branch pruning ROI.
-        </p>
-      </div>
-      <div id="edgeShadingExposureBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
-        86.8% CLEAR SKY EXPOSURE
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px;">
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #f59e0b; font-size: 0.85rem;">🌅 Morning Notch (08:45 - 10:15 AM)</strong>
-          <span class="badge badge-retry" style="font-size: 0.7rem;">MODERATE</span>
-        </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-          East White Pine Canopy (105°-120° Azimuth) &bull; <strong>~180 Wh lost/day</strong>
-        </div>
-        <div style="font-size: 0.78rem; color: #38bdf8; margin-top: 6px;">
-          ✂️ <strong>Action:</strong> Trim lower overhang branches on eastern white pine ~15m from array.
-        </div>
-      </div>
-
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <strong style="color: #94a3b8; font-size: 0.85rem;">🌇 Afternoon Notch (04:15 - 05:30 PM)</strong>
-          <span class="badge badge-online" style="font-size: 0.7rem;">MINOR</span>
-        </div>
-        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-          West Hemlock Ridge (245°-260° Azimuth) &bull; <strong>~120 Wh lost/day</strong>
-        </div>
-        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 6px;">
-          ℹ️ <strong>Action:</strong> No trimming required (battery is full by 4 PM on clear days).
-        </div>
-      </div>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(30, 41, 59, 0.4); padding: 8px 12px; border-radius: 6px; font-size: 0.8rem;">
-      <span style="color: #cbd5e1;">🔬 Bypass Diodes: <strong style="color: #10b981;">Nominal (No permanent diode drop detected)</strong></span>
-      <span style="color: #38bdf8;">📈 Season Harvest Recovery: <strong>+36 kWh / season</strong></span>
-    </div>
-  </div>
-
-  <!-- 🔬 Array Topology & MC4 Wiring Verifier Card -->
-  <div class="card" style="border-left: 4px solid #38bdf8; margin-bottom: 24px; background: rgba(56, 189, 248, 0.03);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #38bdf8; margin: 0; display: flex; align-items: center; gap: 8px;">
-          🔬 2S2P Array String & MC4 Wiring Topology Verifier
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          Electrical string validation, winter cold-temperature Voc margin check, and MC4 branch verifier.
-        </p>
-      </div>
-      <div id="edgeTopoStatusBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
-        OPTIMAL 2S2P TOPOLOGY
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px;">
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Array Operating Voltage</div>
-        <div id="edgeTopoVoltsVal" style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">37.4 V <span style="font-size: 0.75rem; color: #94a3b8;">(Target: 36-42V)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Array Operating Current</div>
-        <div id="edgeTopoAmpsVal" style="font-size: 1.25rem; font-weight: 700; color: #f59e0b;">9.8 A <span style="font-size: 0.75rem; color: #94a3b8;">(Target: 9-11.2A)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">-25°C Sub-Zero Max Voc</div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">48.2 V <span style="font-size: 0.75rem; color: #94a3b8;">(Limit: 100V)</span></div>
-      </div>
-    </div>
-
-    <div id="edgeTopoAdvisoryBox" style="font-size: 0.82rem; color: #93c5fd; padding: 8px 12px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
-      ✅ <strong>Topology Confirmed:</strong> 2 Series x 2 Parallel configuration verified. Safe 51.8V headroom below Rover 20A 100V maximum limit in freezing Algonquin winters.
-    </div>
-  </div>
-
-  <!-- 📶 Bluetooth Signal Strength & Antenna Placement Card -->
-  <div class="card" style="border-left: 4px solid #f59e0b; margin-bottom: 24px; background: rgba(245, 158, 11, 0.03);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #f59e0b; margin: 0; display: flex; align-items: center; gap: 8px;">
-          📶 BT-1 Bluetooth Signal Strength (RSSI) & Antenna Placement Tool
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          BLE link margin, packet reliability metrics, and metal battery box Faraday shielding bypass.
-        </p>
-      </div>
-      <div id="edgeBtSignalQualityBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
-        STRONG (-58 dBm)
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px;">
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">BLE Signal Strength</div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">-58 dBm <span style="font-size: 0.75rem; color: #94a3b8;">(Good: > -75 dBm)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Modbus CRC Packet Loss</div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #38bdf8;">0.02% <span style="font-size: 0.75rem; color: #94a3b8;">(Ultra Reliable)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Faraday Enclosure Check</div>
-        <div style="font-size: 1.25rem; font-weight: 700; color: #10b981;">PASSED <span style="font-size: 0.75rem; color: #94a3b8;">(Unshielded)</span></div>
-      </div>
-    </div>
-
-    <div style="font-size: 0.82rem; color: #fde68a; padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border-radius: 6px; line-height: 1.4;">
-      📡 <strong>Antenna Placement Tip:</strong> If installing in a metal battery box, mount the BT-1 module <em>outside</em> using an RJ12 extension cable. Metal walls act as a Faraday cage attenuating 2.4 GHz BLE signals by >30 dB.
-    </div>
-  </div>
-
-  <!-- ☁️ Automated Google Cloud & BigQuery Provisioning Card -->
-  <div class="card" style="border-left: 4px solid #3b82f6; margin-bottom: 24px; background: rgba(59, 130, 246, 0.03);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h3 style="font-size: 1rem; color: #3b82f6; margin: 0; display: flex; align-items: center; gap: 8px;">
-          ☁️ Automated Google Cloud & BigQuery Provisioning Assistant
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-          1-click setup for BigQuery partitioned datasets, IAM service account permissions, and Cloud Run ingestion.
-        </p>
-      </div>
-      <div class="badge badge-online" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 0.8rem; padding: 4px 10px;">
-        PROVISIONING ASSISTANT READY
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px;">
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">BigQuery Telemetry Table</div>
-        <div style="font-size: 1.1rem; font-weight: 700; color: #38bdf8;">solaria.telemetry <span style="font-size: 0.75rem; color: #94a3b8;">(Day Partitioned)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Cloud Shell Setup Script</div>
-        <div style="font-size: 1.1rem; font-weight: 700; color: #10b981;">./setup-gcp.sh <span style="font-size: 0.75rem; color: #94a3b8;">(Auto IAM + BQ)</span></div>
-      </div>
-      <div style="background: rgba(15, 23, 42, 0.7); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--card-border);">
-        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Zero-Config Discovery</div>
-        <div style="font-size: 1.1rem; font-weight: 700; color: #f59e0b;">solaria.local:8080 <span style="font-size: 0.75rem; color: #94a3b8;">(mDNS Active)</span></div>
-      </div>
-    </div>
-
-    <div style="font-size: 0.82rem; color: #93c5fd; padding: 8px 12px; background: rgba(59, 130, 246, 0.08); border-radius: 6px; line-height: 1.4; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-      <span>🚀 <strong>1-Click Cloud Shell:</strong> Run <code>./setup-gcp.sh</code> in Google Cloud Shell or your terminal to automatically configure project APIs, BigQuery datasets, and edge ingestion tokens.</span>
-      <a href="https://shell.cloud.google.com/?show=terminal" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline; font-weight: 600; font-size: 0.8rem;">Open Cloud Shell ↗</a>
-    </div>
-  </div>
-
-  <!-- Live Real-Time Oscilloscope & Telemetry Charts -->
-  <div style="margin-bottom: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-      <div>
-        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
-          Live Telemetry Oscilloscope & Atmospheric Dynamics
-        </h2>
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-          High-frequency real-time stream (PV Voltage, Power, Amps vs Atmospheric Irradiance & Battery Bank)
-        </div>
-      </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <span id="chartLiveIndicator" class="badge badge-online" style="font-size: 0.72rem;">Live Stream</span>
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px;">
-      <!-- Solar Array & Irradiance Chart -->
-      <div class="card" style="padding: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
-          <span style="font-size: 0.88rem; font-weight: 600; color: #fbbf24;">400W Array: Voltage (V) & Power (W) vs Irradiance (W/m²)</span>
-          <span id="chartPvLivePill" style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-muted);">--V | --W</span>
-        </div>
-        <div style="position: relative; height: 210px; width: 100%;">
-          <canvas id="liveSolarChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Battery Bank & Current Chart -->
-      <div class="card" style="padding: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
-          <span style="font-size: 0.88rem; font-weight: 600; color: #34d399;">Battery Bank: Voltage (V), Charge (A) & SOC (%)</span>
-          <span id="chartBattLivePill" style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-muted);">--V | --%</span>
-        </div>
-        <div style="position: relative; height: 210px; width: 100%;">
-          <canvas id="liveBatteryChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Battery Chemistry & Profile Configurator -->
-  <div class="battery-config-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-      <div>
-        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
-          🔋 Battery Chemistry & Profile Configurator
-        </h2>
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
-          Remotely reconfigure Rover charge profile over Bluetooth (Modbus Function Code 0x06 / Register 0xE004)
-        </div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Active Setting:</span>
-        <span id="currentBattTypeBadge" class="badge badge-retry" style="font-size: 0.85rem;">Checking Rover...</span>
-        <button class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem;" onclick="readBatteryProfile()">
-          🔄 Read Setting
-        </button>
-      </div>
-    </div>
-
-    <!-- Presets Selector Grid -->
-    <div class="profile-grid">
-      <div class="profile-card active" id="pCard-4" onclick="selectProfile(4, 'LI (Lithium / LiFePO4)')">
-        <div class="profile-title">
-          <span>🚀 LiFePO4 (Lithium)</span>
-          <span style="color: #10b981; font-size: 0.8rem;">Preset 0x04</span>
-        </div>
-        <div class="profile-desc">
-          Boost: 14.4V<br>
-          Float: Rest / Cutoff<br>
-          Equalize: <strong>Disabled</strong><br>
-          Temp Comp: <strong>0 mV/°C</strong>
-        </div>
-      </div>
-
-      <div class="profile-card" id="pCard-1" onclick="selectProfile(1, 'SLD (Sealed / AGM)')">
-        <div class="profile-title">
-          <span>🛡️ AGM / Sealed</span>
-          <span style="color: #fbbf24; font-size: 0.8rem;">Preset 0x01</span>
-        </div>
-        <div class="profile-desc">
-          Boost: 14.4V<br>
-          Float: 13.8V<br>
-          Equalize: 14.6V (2h)<br>
-          Temp Comp: -30 mV/°C
-        </div>
-      </div>
-
-      <div class="profile-card" id="pCard-2" onclick="selectProfile(2, 'GEL (Gel Cell)')">
-        <div class="profile-title">
-          <span>💧 Gel Battery</span>
-          <span style="color: #38bdf8; font-size: 0.8rem;">Preset 0x02</span>
-        </div>
-        <div class="profile-desc">
-          Boost: 14.2V<br>
-          Float: 13.8V<br>
-          Equalize: <strong>Disabled</strong><br>
-          Temp Comp: -30 mV/°C
-        </div>
-      </div>
-
-      <div class="profile-card" id="pCard-3" onclick="selectProfile(3, 'FLD (Flooded)')">
-        <div class="profile-title">
-          <span>⚡ Flooded Lead</span>
-          <span style="color: #a855f7; font-size: 0.8rem;">Preset 0x03</span>
-        </div>
-        <div class="profile-desc">
-          Boost: 14.6V<br>
-          Float: 13.8V<br>
-          Equalize: 14.8V (2h)<br>
-          Temp Comp: -30 mV/°C
-        </div>
-      </div>
-
-      <div class="profile-card" id="pCard-0" onclick="selectProfile(0, 'USER (Custom)')">
-        <div class="profile-title">
-          <span>⚙️ User Custom</span>
-          <span style="color: #94a3b8; font-size: 0.8rem;">Preset 0x00</span>
-        </div>
-        <div class="profile-desc">
-          Manual Voltage Map<br>
-          Individual Registers<br>
-          0xE005 - 0xE015<br>
-          Custom Thresholds
-        </div>
-      </div>
-    </div>
-
-    <!-- Apply Button & Cold Warning -->
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <button class="btn-solar" style="font-size: 0.88rem; padding: 10px 20px;" onclick="applySelectedProfile()">
-          ⚡ Flash Selected Profile to Rover Controller
-        </button>
-        <span id="writeStatusMsg" style="font-size: 0.82rem; font-family: var(--mono); color: #34d399;"></span>
-      </div>
-      <div class="config-banner-alert" style="margin-top: 0; padding: 6px 12px;">
-        <span>❄️ <strong>Cold Weather Notice:</strong> If using LiFePO4, never charge cells below 0°C (32°F).</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Autonomous Resilience & Outages Supervisor Panel -->
-  <div class="outage-monitor-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-      <div>
-        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
-          Telemetry Stream Uptime & Outages Supervisor
-        </h2>
-        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
-          Autonomous watchdog monitoring, self-healing events & uptime audit log
-        </div>
-      </div>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <button class="btn-outline" style="font-size: 0.72rem; padding: 4px 10px; color: var(--text-muted);" onclick="clearOutagesLog()">Clear History</button>
-        <span id="streamHealthBadge" class="badge badge-online">Stream Active</span>
-      </div>
-    </div>
-
-    <!-- 4-Stat Metrics Grid -->
-    <div class="outage-stat-grid">
-      <div class="outage-mini-card">
-        <div class="outage-mini-label">System Availability</div>
-        <div class="outage-mini-val" id="resilienceAvailVal" style="color: #34d399;">100.0%</div>
-      </div>
-      <div class="outage-mini-card">
-        <div class="outage-mini-label">Total Outages</div>
-        <div class="outage-mini-val" id="resilienceOutagesVal" style="color: #94a3b8;">0</div>
-      </div>
-      <div class="outage-mini-card">
-        <div class="outage-mini-label">Total Downtime</div>
-        <div class="outage-mini-val" id="resilienceDowntimeVal" style="color: #94a3b8;">0s</div>
-      </div>
-      <div class="outage-mini-card">
-        <div class="outage-mini-label">Session Uptime</div>
-        <div class="outage-mini-val" id="resilienceUptimeVal" style="color: #38bdf8;">0s</div>
-      </div>
-    </div>
-
-    <!-- Outage Event Log Table -->
-    <div class="outage-table-wrapper">
-      <table class="outage-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Status</th>
-            <th>Interrupted At</th>
-            <th>Restored At</th>
-            <th>Duration</th>
-            <th>Root Cause / Self-Healing Action</th>
-          </tr>
-        </thead>
-        <tbody id="outageTableBody">
-          <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">
-              ✨ No telemetry outages recorded. Stream connection is 100% stable.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Realtime Modbus & Transmission Terminal -->
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <div style="font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
-        <span class="pulse-dot"></span> Live Modbus RTU & Cloud Bridge Stream
-      </div>
-      <button class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem;" onclick="clearLogs()">Clear Log</button>
+      <button class="btn-outline" onclick="clearLogs()" style="padding: 4px 10px; font-size: 0.78rem;">
+        Clear Console
+      </button>
     </div>
     <div id="logBox" class="log-box"></div>
   </div>
 
+  <footer>
+    Solaria Renogy BLE Gateway Bridge • 1296 Wren Lake Drive, Dorset, ON • 
+    <a href="https://solaria-dashboard-952659886764.us-central1.run.app/" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none;">
+      Cloud Solar Analytics Hub ↗
+    </a>
+  </footer>
+
   <script>
-    let ws = null;
+    // --- Solaria BLE Gateway Script ---
+    const RENOGY_SERVICE_WRITE = 0xFFD0;
+    const RENOGY_CHAR_WRITE    = 0xFFD1;
+    const RENOGY_SERVICE_READ  = 0xFFF0;
+    const RENOGY_CHAR_NOTIFY   = 0xFFF1;
+    const ALL_SERVICES = [RENOGY_SERVICE_WRITE, RENOGY_SERVICE_READ];
+
     let bleDevice = null;
     let gattServer = null;
-    let pollTimer = null;
-    let pollIntervalMs = 10000;
-    let autoReconnectEnabled = true;
-    let wakeLock = null;
-    let packetCounter = 0;
-    let isConnectingGatt = false;
-
-    let rxBuffer = new Uint8Array(0);
-    let rxTimeout = null;
-
-    const RENOGY_SERVICE_WRITE = '0000ffd0-0000-1000-8000-00805f9b34fb';
-    const RENOGY_CHAR_WRITE = '0000ffd1-0000-1000-8000-00805f9b34fb';
-    const RENOGY_SERVICE_READ = '0000fff0-0000-1000-8000-00805f9b34fb';
-    const RENOGY_CHAR_NOTIFY = '0000fff1-0000-1000-8000-00805f9b34fb';
-
-    const ALL_SERVICES = [
-      RENOGY_SERVICE_WRITE,
-      RENOGY_SERVICE_READ,
-      '0000ffe0-0000-1000-8000-00805f9b34fb',
-      '0000ff00-0000-1000-8000-00805f9b34fb',
-      'battery_service',
-      'device_information'
-    ];
-
     let writeCharObj = null;
     let notifyCharObj = null;
-
-    function formatSecs(sec) {
-      if (!sec || sec < 0) return '0s';
-      if (sec < 60) return `${sec}s`;
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
-      const h = Math.floor(m / 60);
-      const remM = m % 60;
-      return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
-    }
-
-    function updateOutageStats(stats) {
-      if (!stats) return;
-      const availEl = document.getElementById('resilienceAvailVal');
-      const outagesEl = document.getElementById('resilienceOutagesVal');
-      const downtimeEl = document.getElementById('resilienceDowntimeVal');
-      const uptimeEl = document.getElementById('resilienceUptimeVal');
-      const badgeEl = document.getElementById('streamHealthBadge');
-
-      if (availEl) {
-        availEl.textContent = `${stats.availability_pct.toFixed(1)}%`;
-        availEl.style.color = stats.availability_pct >= 99.0 ? '#34d399' : (stats.availability_pct >= 95.0 ? '#fbbf24' : '#f87171');
-      }
-      if (outagesEl) {
-        outagesEl.textContent = stats.outage_count;
-        outagesEl.style.color = stats.outage_count === 0 ? '#94a3b8' : '#fbbf24';
-      }
-      if (downtimeEl) {
-        downtimeEl.textContent = formatSecs(stats.total_downtime_sec);
-        downtimeEl.style.color = stats.total_downtime_sec === 0 ? '#94a3b8' : '#f87171';
-      }
-      if (uptimeEl) {
-        uptimeEl.textContent = formatSecs(stats.session_uptime_sec);
-      }
-
-      if (badgeEl) {
-        if (stats.in_outage) {
-          badgeEl.className = 'badge badge-offline';
-          badgeEl.textContent = `Outage Detected (${formatSecs(stats.current_outage_sec)})`;
-        } else {
-          badgeEl.className = 'badge badge-online';
-          badgeEl.textContent = 'Stream Active';
-        }
-      }
-    }
-
-    function clearOutagesLog() {
-      if (confirm('Reset outage audit log and availability counters?')) {
-        sendToLinux({ type: 'clear_outages' });
-      }
-    }
-
-    function formatLocalTime(isoStr, fallbackStr) {
-      if (isoStr) {
-        const d = new Date(isoStr);
-        if (!isNaN(d.getTime())) {
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        }
-      }
-      return fallbackStr || '--:--:--';
-    }
-
-    function renderOutageHistory(history) {
-      const tbody = document.getElementById('outageTableBody');
-      if (!tbody) return;
-      if (!history || history.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">No telemetry outages recorded. Stream connection is 100% stable.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = history.map(h => {
-        const isActive = h.status === 'ACTIVE';
-        const statusBadge = isActive
-          ? `<span class="badge-outage-active">ACTIVE OUTAGE</span>`
-          : `<span class="badge-outage-resolved">RESOLVED</span>`;
-        const startStr = formatLocalTime(h.start_iso, h.start_time);
-        const restoredStr = isActive ? '--:--:--' : formatLocalTime(h.end_iso, h.end_time);
-        const durStr = isActive ? 'In Progress...' : formatSecs(h.duration_sec);
-        const actionStr = h.recovered_via || h.reason || 'Watchdog self-healing';
-        return `
-          <tr>
-            <td><strong>#${h.id}</strong></td>
-            <td>${statusBadge}</td>
-            <td style="color: #fbbf24;">${startStr}</td>
-            <td style="color: #34d399;">${restoredStr}</td>
-            <td>${durStr}</td>
-            <td style="color: var(--text-muted);">${actionStr}</td>
-          </tr>
-        `;
-      }).join('');
-    }
+    let rxBuffer = new Uint8Array(0);
+    let ws = null;
+    let pollIntervalMs = 10000;
+    let isConnectingGatt = false;
+    let wakeLock = null;
+    let totalFramesReceived = 0;
 
     function log(msg, type = 'info') {
       const box = document.getElementById('logBox');
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const time = new Date().toLocaleTimeString();
       const div = document.createElement('div');
       div.className = `log-entry log-${type}`;
       div.textContent = `[${time}] ${msg}`;
@@ -1418,7 +396,19 @@
       box.scrollTop = box.scrollHeight;
     }
 
-    function clearLogs() { document.getElementById('logBox').innerHTML = ''; }
+    function clearLogs() {
+      document.getElementById('logBox').innerHTML = '';
+      log('Console cleared.', 'info');
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          log('Screen WakeLock active (prevents background tab suspension).', 'success');
+        }
+      } catch (e) {}
+    }
 
     function calcCrc16(buffer) {
       let crc = 0xFFFF;
@@ -1436,368 +426,31 @@
       return [crc & 0xFF, (crc >> 8) & 0xFF];
     }
 
-    async function requestWakeLock() {
-      try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
-          document.getElementById('wakeLockBadge').style.display = 'inline-flex';
-          log('Screen Keep-Alive (WakeLock) active.', 'info');
-        }
-      } catch (err) {}
-    }
-
-    // --- LIVE OSCILLOSCOPE CHARTS ---
-    let solarChart = null;
-    let batteryChart = null;
-    const MAX_CHART_POINTS = 40;
-
-    function initLiveCharts() {
-      if (typeof Chart === 'undefined') return;
-
-      const solarCtx = document.getElementById('liveSolarChart');
-      if (solarCtx && !solarChart) {
-        solarChart = new Chart(solarCtx, {
-          type: 'line',
-          data: {
-            labels: [],
-            datasets: [
-              {
-                label: 'PV Voltage (V)',
-                data: [],
-                borderColor: '#38bdf8',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                borderWidth: 2,
-                pointRadius: 2,
-                tension: 0.2,
-                yAxisID: 'yVolts'
-              },
-              {
-                label: 'PV Power (W)',
-                data: [],
-                borderColor: '#f59e0b',
-                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                borderWidth: 2,
-                pointRadius: 2,
-                fill: true,
-                tension: 0.2,
-                yAxisID: 'yWatts'
-              },
-              {
-                label: 'Irradiance (W/m²)',
-                data: [],
-                borderColor: '#a855f7',
-                borderDash: [4, 4],
-                borderWidth: 1.5,
-                pointRadius: 0,
-                tension: 0.2,
-                yAxisID: 'yWatts'
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-              x: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0 }
-              },
-              yVolts: {
-                type: 'linear',
-                position: 'left',
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#38bdf8', font: { size: 10 } },
-                suggestedMin: 0,
-                suggestedMax: 45
-              },
-              yWatts: {
-                type: 'linear',
-                position: 'right',
-                grid: { display: false },
-                ticks: { color: '#f59e0b', font: { size: 10 } },
-                suggestedMin: 0,
-                suggestedMax: 50
-              }
-            },
-            plugins: {
-              legend: { labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 } }
-            }
-          }
-        });
-      }
-
-      const battCtx = document.getElementById('liveBatteryChart');
-      if (battCtx && !batteryChart) {
-        batteryChart = new Chart(battCtx, {
-          type: 'line',
-          data: {
-            labels: [],
-            datasets: [
-              {
-                label: 'Battery (V)',
-                data: [],
-                borderColor: '#34d399',
-                backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                borderWidth: 2,
-                pointRadius: 2,
-                tension: 0.2,
-                yAxisID: 'yVolts'
-              },
-              {
-                label: 'SOC (%)',
-                data: [],
-                borderColor: '#38bdf8',
-                borderDash: [3, 3],
-                borderWidth: 1.5,
-                pointRadius: 0,
-                tension: 0.2,
-                yAxisID: 'yPct'
-              },
-              {
-                label: 'Charge (A)',
-                data: [],
-                borderColor: '#fbbf24',
-                borderWidth: 1.5,
-                pointRadius: 2,
-                tension: 0.2,
-                yAxisID: 'yAmps'
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-              x: {
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0 }
-              },
-              yVolts: {
-                type: 'linear',
-                position: 'left',
-                grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                ticks: { color: '#34d399', font: { size: 10 } },
-                suggestedMin: 11.5,
-                suggestedMax: 14.8
-              },
-              yPct: {
-                type: 'linear',
-                position: 'right',
-                grid: { display: false },
-                ticks: { color: '#38bdf8', font: { size: 10 } },
-                suggestedMin: 0,
-                suggestedMax: 100
-              },
-              yAmps: { display: false, suggestedMin: 0, suggestedMax: 20 }
-            },
-            plugins: {
-              legend: { labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 } }
-            }
-          }
-        });
-      }
-    }
-
-    function pushTelemetryToCharts(record) {
-      if (!solarChart || !batteryChart) {
-        initLiveCharts();
-      }
-      if (!solarChart || !batteryChart || !record) return;
-
-      window.edgeTelemetryBuffer = window.edgeTelemetryBuffer || [];
-      window.edgeTelemetryBuffer.push(record);
-      if (window.edgeTelemetryBuffer.length > 2000) {
-        window.edgeTelemetryBuffer.shift();
-      }
-
-      const t = record.telemetry || {};
-      const w = record.weather || {};
-      const timeLabel = formatLocalTime(record.timestamp, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
-
-      const pvV = t.pv_voltage_v !== undefined ? t.pv_voltage_v : 0;
-      const pvW = t.pv_power_w !== undefined ? t.pv_power_w : 0;
-      const pvA = t.pv_current_a !== undefined ? t.pv_current_a : 0;
-      const rad = w.direct_radiation_w_m2 !== undefined ? w.direct_radiation_w_m2 : (w.global_tilted_irradiance_w_m2 || 0);
-
-      const bV = t.battery_voltage_v !== undefined ? t.battery_voltage_v : 0;
-      const bSOC = t.battery_soc_pct !== undefined ? t.battery_soc_pct : 0;
-      const bA = t.battery_current_a !== undefined ? t.battery_current_a : 0;
-
-      // Update Live Solar Chart
-      solarChart.data.labels.push(timeLabel);
-      solarChart.data.datasets[0].data.push(pvV);
-      solarChart.data.datasets[1].data.push(pvW);
-      solarChart.data.datasets[2].data.push(rad);
-
-      if (solarChart.data.labels.length > MAX_CHART_POINTS) {
-        solarChart.data.labels.shift();
-        solarChart.data.datasets.forEach(ds => ds.data.shift());
-      }
-      solarChart.update('none');
-
-      // Update Live Battery Chart
-      batteryChart.data.labels.push(timeLabel);
-      batteryChart.data.datasets[0].data.push(bV);
-      batteryChart.data.datasets[1].data.push(bSOC);
-      batteryChart.data.datasets[2].data.push(bA);
-
-      if (batteryChart.data.labels.length > MAX_CHART_POINTS) {
-        batteryChart.data.labels.shift();
-        batteryChart.data.datasets.forEach(ds => ds.data.shift());
-      }
-      batteryChart.update('none');
-
-      // Update live pills
-      const pvPill = document.getElementById('chartPvLivePill');
-      if (pvPill) {
-        pvPill.textContent = `${pvV.toFixed(1)}V | ${pvW}W (${pvA.toFixed(2)}A)`;
-      }
-      const battPill = document.getElementById('chartBattLivePill');
-      if (battPill) {
-        battPill.textContent = `${bV.toFixed(1)}V | ${bSOC}% (${t.charging_state || 'Nominal'})`;
-      }
-
-      // 5. Renogy MPPT Efficiency & Step-Down Power
-      const mpptEff = t.mppt_efficiency_pct || 0;
-      const outW = (bV * bA).toFixed(1);
-      const mpptEffElem = document.getElementById('mpptEfficiency');
-      const mpptSubElem = document.getElementById('mpptPowerRatio');
-      if (mpptEffElem) {
-        if (pvW > 5 && mpptEff > 0) {
-          mpptEffElem.textContent = `${mpptEff}%`;
-          if (mpptSubElem) mpptSubElem.textContent = `DC Buck: ${pvW}W Array ➔ ${outW}W Batt`;
-        } else {
-          mpptEffElem.textContent = pvW > 0 ? '98.5% (Standby)' : '-- %';
-          if (mpptSubElem) mpptSubElem.textContent = pvW > 0 ? `DC Buck: ${pvW}W Array (Pre-bulk)` : 'Array Standby / Night';
-        }
-      }
-
-      // 6. 2S2P String Balance Diagnostic
-      const strStatus = t.string_health_status || 'NOMINAL_2S2P';
-      const strElem = document.getElementById('stringBalanceText');
-      const strSub = document.getElementById('stringBalanceSub');
-      if (strElem) {
-        if (strStatus === 'POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT') {
-          strElem.textContent = '⚠️ Half-String Bypass / Shading';
-          strElem.style.color = '#f87171';
-          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (Below 24V 2S threshold - check bypass diode)`;
-        } else if (strStatus === 'DIFFUSE_OVERCAST_OPEN_CIRCUIT') {
-          strElem.textContent = '☁️ 2S Voc Nominal (Overcast)';
-          strElem.style.color = '#38bdf8';
-          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (2S Series excitation active)`;
-        } else if (strStatus === 'NOMINAL_2S2P_ACTIVE') {
-          strElem.textContent = '⚡ 2S2P Dual-String Active';
-          strElem.style.color = '#10b981';
-          if (strSub) strSub.textContent = `Vmp: ${pvV.toFixed(1)}V (Optimal MPPT tracking)`;
-        } else {
-          strElem.textContent = 'Nominal 2S2P';
-          strElem.style.color = '#38bdf8';
-          if (strSub) strSub.textContent = `Voc: ${pvV.toFixed(1)}V (Expected ~36-40V)`;
-        }
-      }
-
-      // 7. Controller Hardware & Chemistry
-      const ctrlElem = document.getElementById('controllerModelText');
-      if (ctrlElem && t.controller_model) {
-        ctrlElem.textContent = t.controller_model;
-      }
-      const battTypeElem = document.getElementById('batteryTypeText');
-      if (battTypeElem && t.battery_type) {
-        battTypeElem.textContent = `Profile: ${t.battery_type}`;
-      }
-
-      // 8. Sub-Zero Thermal Protection Banner & Cold Derate Warning
-      const subBanner = document.getElementById('subzeroBanner');
-      const battTemp = t.battery_temp_c;
-      const isSubZero = t.subzero_inhibit_warning || (battTemp !== undefined && battTemp < 0);
-      const isColdDerate = t.cold_derate_warning || (battTemp !== undefined && battTemp >= 0 && battTemp <= 5 && (t.controller_temp_c === undefined || t.controller_temp_c <= 10));
-
-      if (subBanner) {
-        if (isSubZero) {
-          subBanner.style.display = 'flex';
-          subBanner.style.borderColor = '#ef4444';
-          subBanner.style.background = 'rgba(239, 68, 68, 0.15)';
-          subBanner.style.color = '#fca5a5';
-          const titleElem = document.getElementById('subzeroTitle');
-          if (titleElem) titleElem.textContent = '❄️ SUB-ZERO LITHIUM CHARGE INHIBIT ALERT';
-          const msgElem = document.getElementById('subzeroMsg');
-          if (msgElem) msgElem.textContent = t.subzero_inhibit_message || `Battery temperature is ${battTemp ?? 0}°C (Sub-Zero). LiFePO4 charging inhibited to protect cells.`;
-        } else if (isColdDerate) {
-          subBanner.style.display = 'flex';
-          subBanner.style.borderColor = '#f59e0b';
-          subBanner.style.background = 'rgba(245, 158, 11, 0.15)';
-          subBanner.style.color = '#fcd34d';
-          const titleElem = document.getElementById('subzeroTitle');
-          if (titleElem) titleElem.textContent = '⚠️ COLD CHARGE DERATE ADVISORY';
-          const msgElem = document.getElementById('subzeroMsg');
-          if (msgElem) msgElem.textContent = t.cold_derate_message || `Battery temperature is ${battTemp ?? 0}°C (Low Temp Zone). Charge current should be derated to protect cells.`;
-        } else {
-          subBanner.style.display = 'none';
-        }
-      }
-    }
-
-    // --- WEBSOCKET TO LINUX BRIDGE ---
     function connectWebSocket() {
-      const wsUrl = 'ws://localhost:8765';
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${proto}//${window.location.hostname}:8765`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        const badge = document.getElementById('wsBadge');
-        badge.className = 'badge badge-online';
-        badge.textContent = 'Linux Gateway Online';
-        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#34d399;">Connected (Active)</span>';
-        document.getElementById('wsSubText').textContent = 'Relaying to Cloud Run';
-        log('Connected to Linux WebSocket gateway (ws://localhost:8765)!', 'success');
-        sendToLinux({ type: 'get_outages' });
+        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#34d399;">Connected (ws://127.0.0.1:8765)</span>';
+        log('WebSocket bridge connection to Go daemon established on :8765', 'success');
         tryAutoConnectSavedDevice();
       };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          
-          if (msg.type === 'telemetry_frame') {
-            if (msg.record) {
-              pushTelemetryToCharts(msg.record);
-            }
-          } else if (msg.type === 'outage_sync') {
-            updateOutageStats(msg.stats);
-            renderOutageHistory(msg.history);
-          } else if (msg.type === 'outage_event') {
-            updateOutageStats(msg.stats);
-            if (msg.event === 'outage_start') {
-              const st = formatLocalTime(msg.outage.start_iso, msg.outage.start_time);
-              log(`[OUTAGE DETECTED #${msg.outage.id}] Telemetry stream interrupted at ${st} (${msg.outage.reason}). Watchdog auto-healing active...`, 'error');
-            } else if (msg.event === 'outage_end') {
-              const et = formatLocalTime(msg.outage.end_iso, msg.outage.end_time);
-              log(`[STREAM RESTORED] Telemetry resumed at ${et}! Outage #${msg.outage.id} resolved (Downtime: ${formatSecs(msg.outage.duration_sec)} | Availability: ${msg.stats.availability_pct.toFixed(1)}%)`, 'success');
-            }
-            if (msg.history) {
-              renderOutageHistory(msg.history);
-            } else {
-              // Re-query sync or prepend
-              sendToLinux({ type: 'get_outages' });
-            }
-          } else if (msg.type === 'outage_tick' || msg.type === 'ping') {
-            if (msg.stats) {
-              updateOutageStats(msg.stats);
-            }
-          } else if (msg.type === 'watchdog_reconnect') {
-            log(`[Supervisor Watchdog] Telemetry quiet for ${msg.seconds_since_last_packet}s. Triggering automatic GATT re-sync...`, 'warn');
-            reconnectGattSession();
+          if (msg.type === 'telemetry') {
+            totalFramesReceived++;
+            document.getElementById('framesCountVal').textContent = totalFramesReceived;
+            document.getElementById('lastPacketVal').textContent = new Date().toLocaleTimeString();
+            log(`⚡ Ingested Frame #${totalFramesReceived}: PV ${msg.telemetry.pv_power_w}W | Batt ${msg.telemetry.battery_soc_pct}% (${msg.telemetry.battery_voltage_v}V) ➔ Forwarded to Cloud Run`, 'solar');
           }
         } catch (e) {}
       };
 
       ws.onclose = () => {
-        const badge = document.getElementById('wsBadge');
-        badge.className = 'badge badge-offline';
-        badge.textContent = 'Linux Gateway Offline';
-        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#f87171;">Offline</span>';
-        document.getElementById('wsSubText').textContent = 'Reconnecting in 3s...';
+        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#fbbf24;">Reconnecting...</span>';
         setTimeout(connectWebSocket, 3000);
       };
 
@@ -1810,15 +463,10 @@
       }
     }
 
-    let hasLoggedNoGetDevices = false;
-
     async function tryAutoConnectSavedDevice() {
       if (isConnectingGatt || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) return;
       if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
-        if (!hasLoggedNoGetDevices) {
-          hasLoggedNoGetDevices = true;
-          log('👉 Ready: Click "⚡ Connect Renogy Controller (BLE)" to start the persistent streaming session.', 'info');
-        }
+        log('👉 Ready: Click "⚡ Connect Renogy BT-1" to pair and begin streaming.', 'info');
         return;
       }
       try {
@@ -1828,15 +476,11 @@
           const devName = renogy.name || 'Renogy Controller';
           log(`⚡ Authorized controller found (${devName}). Auto-connecting...`, 'info');
           await startRenogySession(renogy);
-        } else if (!hasLoggedNoGetDevices) {
-          hasLoggedNoGetDevices = true;
-          log('👉 Click "⚡ Connect Renogy Controller (BLE)" to pair and start streaming.', 'info');
+        } else {
+          log('👉 Click "⚡ Connect Renogy BT-1" to pair and begin streaming.', 'info');
         }
       } catch (e) {
-        if (!hasLoggedNoGetDevices) {
-          hasLoggedNoGetDevices = true;
-          log(`Auto-connect note: ${e.message}`, 'warn');
-        }
+        log(`Auto-connect note: ${e.message}`, 'warn');
       }
     }
 
@@ -1853,24 +497,11 @@
       }
     }
 
-    async function connectAnyBle() {
-      try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ALL_SERVICES
-        });
-        await startRenogySession(bleDevice);
-      } catch (err) {
-        log(`Scan cancelled: ${err.message}`, 'warn');
-      }
-    }
-
-    // --- BLE GATT SETUP WITH INFINITE AUTO RETRY ---
     async function startRenogySession(device) {
       if (isConnectingGatt) return;
       isConnectingGatt = true;
       bleDevice = device;
-      autoReconnectEnabled = document.getElementById('autoReconnectCheck').checked;
+      const autoReconnectEnabled = document.getElementById('autoReconnectCheck').checked;
       const devName = device.name || 'Renogy BT Module';
       log(`Acquiring GATT session with ${devName}...`, 'info');
       sendToLinux({ type: 'device_selected', name: devName, id: device.id });
@@ -1886,8 +517,7 @@
         try {
           if (attempt > 1) {
             document.getElementById('bleStatusVal').innerHTML = `<span style="color:#fbbf24;">Retrying (${attempt})...</span>`;
-            document.getElementById('bleSubText').textContent = 'Waiting for BT-1 socket';
-            log(`Retrying GATT connection (attempt ${attempt} — continuous mode active)...`, 'warn');
+            log(`Retrying GATT connection (attempt ${attempt})...`, 'warn');
           }
           gattServer = await device.gatt.connect();
           if (gattServer && gattServer.connected) {
@@ -1905,14 +535,16 @@
       if (!connected) return;
 
       document.getElementById('disconnectBtn').disabled = false;
+      document.getElementById('connectBtn').disabled = true;
+
       const bleBadge = document.getElementById('bleBadge');
       bleBadge.className = 'badge badge-online';
-      bleBadge.textContent = devName;
+      bleBadge.textContent = 'CONNECTED';
 
-      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#34d399;">Connected</span>`;
-      document.getElementById('bleSubText').textContent = `${devName} (Channels 0xFFD1/0xFFF1)`;
+      document.getElementById('devNameVal').textContent = devName;
+      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#34d399;">Connected to ${devName}</span>`;
 
-      log(`🎉 GATT Connected successfully to ${devName}! Initializing channels...`, 'success');
+      log(`🎉 GATT Connected successfully to ${devName}! Initializing telemetry channels...`, 'success');
       requestWakeLock();
 
       try {
@@ -1937,10 +569,9 @@
       sendToLinux({ type: 'gatt_connected', name: devName, id: device.id });
 
       setTimeout(queryDeviceInfo, 500);
-      setTimeout(readBatteryProfile, 1000);
       setTimeout(() => {
         startPollingLoop();
-      }, 1800);
+      }, 1500);
     }
 
     async function sendModbusFrame(rawCommand) {
@@ -1956,77 +587,12 @@
       } catch (e) {}
     }
 
-    let selectedProfileVal = 4;
-    let selectedProfileName = 'LI (Lithium / LiFePO4)';
-    const PROFILE_NAMES = {
-      0: 'USER (Custom)',
-      1: 'SLD (Sealed / AGM)',
-      2: 'GEL (Gel)',
-      3: 'FLD (Flooded)',
-      4: 'LI (Lithium / LiFePO4)'
-    };
-
-    function selectProfile(val, name) {
-      selectedProfileVal = val;
-      selectedProfileName = name;
-      [0, 1, 2, 3, 4].forEach(p => {
-        const el = document.getElementById(`pCard-${p}`);
-        if (el) el.classList.remove('active');
-      });
-      const activeEl = document.getElementById(`pCard-${val}`);
-      if (activeEl) activeEl.classList.add('active');
-      log(`Selected Battery Profile candidate: ${name} (Reg 0xE004 = 0x0${val})`, 'info');
-    }
-
-    async function applySelectedProfile() {
-      if (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected || !writeCharObj) {
-        log('⚠️ Cannot write profile: Bluetooth is not connected to Renogy controller.', 'warn');
-        alert('Please connect to the Renogy controller via Bluetooth first.');
-        return;
-      }
-      const confirmMsg = `⚡ Are you sure you want to write battery profile:\n\n👉 "${selectedProfileName}"\n\nto the Renogy Rover controller over Modbus RTU?`;
-      if (!confirm(confirmMsg)) return;
-
-      const raw = new Uint8Array([0x01, 0x06, 0xE0, 0x04, 0x00, selectedProfileVal]);
-      await sendModbusFrame(raw);
-      log(`⚡ Transmitted Modbus 0x06 Write Frame: Reg 0xE004 ➔ 0x0${selectedProfileVal} (${selectedProfileName})`, 'solar');
-      document.getElementById('writeStatusMsg').textContent = 'Flashing EEPROM...';
-      setTimeout(readBatteryProfile, 1000);
-    }
-
-    async function readBatteryProfile() {
-      if (!writeCharObj) return;
-      const raw = new Uint8Array([0x01, 0x03, 0xE0, 0x04, 0x00, 0x01]);
-      await sendModbusFrame(raw);
-      log('🔍 Querying active Battery Profile register (0xE004)...', 'info');
-    }
-
-    function updateProfileBadge(val) {
-      const badge = document.getElementById('currentBattTypeBadge');
-      const name = PROFILE_NAMES[val] || `Profile #${val}`;
-      if (badge) {
-        badge.textContent = name;
-        if (val === 4) {
-          badge.className = 'badge badge-online';
-          badge.style.color = '#34d399';
-        } else {
-          badge.className = 'badge badge-retry';
-          badge.style.color = '#fbbf24';
-        }
-      }
-      const statusMsg = document.getElementById('writeStatusMsg');
-      if (statusMsg) {
-        statusMsg.textContent = `Active: ${name}`;
-      }
-    }
-
     async function queryDeviceInfo() {
       const raw = new Uint8Array([0xFF, 0x03, 0x00, 0x0A, 0x00, 0x0B]);
       await sendModbusFrame(raw);
     }
 
     let lastTelemetryQueryTime = 0;
-    let lastTelemetryProcessTime = 0;
 
     async function queryRealtimeTelemetry() {
       const now = Date.now();
@@ -2048,645 +614,74 @@
       });
 
       const newBuf = new Uint8Array(rxBuffer.length + chunk.length);
-      newBuf.set(rxBuffer);
+      newBuf.set(rxBuffer, 0);
       newBuf.set(chunk, rxBuffer.length);
       rxBuffer = newBuf;
 
-      if (rxTimeout) clearTimeout(rxTimeout);
-
-      // Modbus 0x06 Write Echo (8 bytes)
-      if (rxBuffer.length >= 8 && rxBuffer[1] === 0x06) {
-        const fullFrame = rxBuffer.slice(0, 8);
-        rxBuffer = rxBuffer.slice(8);
-        parseCompleteModbusFrame(fullFrame);
-        return;
-      }
-
-      // Modbus Exception Response (5 bytes)
-      if (rxBuffer.length >= 5 && (rxBuffer[1] === 0x86 || rxBuffer[1] === 0x83)) {
-        const fullFrame = rxBuffer.slice(0, 5);
-        rxBuffer = rxBuffer.slice(5);
-        parseCompleteModbusFrame(fullFrame);
-        return;
-      }
-
-      // Modbus 0x03 Read Response
       if (rxBuffer.length >= 3 && rxBuffer[1] === 0x03) {
         const expectedLen = 3 + rxBuffer[2] + 2;
         if (rxBuffer.length >= expectedLen) {
-          const fullFrame = rxBuffer.slice(0, expectedLen);
+          const completeFrame = rxBuffer.slice(0, expectedLen);
           rxBuffer = rxBuffer.slice(expectedLen);
-          parseCompleteModbusFrame(fullFrame);
-          return;
+          const crc = calcCrc16(completeFrame.slice(0, completeFrame.length - 2));
+          if (completeFrame[completeFrame.length - 2] === crc[0] && completeFrame[completeFrame.length - 1] === crc[1]) {
+            // Frame verified
+          }
         }
       }
-
-      rxTimeout = setTimeout(() => {
-        if (rxBuffer.length >= 5) {
-          parseCompleteModbusFrame(rxBuffer);
-        }
-        rxBuffer = new Uint8Array(0);
-      }, 350);
+      if (rxBuffer.length > 512) rxBuffer = new Uint8Array(0);
     }
 
-    function parseCompleteModbusFrame(bytes) {
-      if (bytes.length < 5) return;
-
-      // Handle Modbus 0x06 Write Response Echo
-      if (bytes[1] === 0x06 && bytes.length >= 6) {
-        const reg = (bytes[2] << 8) | bytes[3];
-        const val = (bytes[4] << 8) | bytes[5];
-        if (reg === 0xE004) {
-          const pName = PROFILE_NAMES[val] || `Profile #${val}`;
-          log(`🎉 SUCCESS: Renogy Rover Battery Profile updated to [${pName}]!`, 'success');
-          updateProfileBadge(val);
-        } else {
-          log(`✅ Modbus Write 0x06 Echo: Register 0x${reg.toString(16).toUpperCase()} set to ${val}`, 'success');
-        }
-        return;
-      }
-
-      // Handle Modbus Exception responses
-      if (bytes[1] === 0x86 || bytes[1] === 0x83) {
-        const errCode = bytes[2];
-        const errMap = {1: 'Illegal Function', 2: 'Illegal Data Address', 3: 'Illegal Data Value', 4: 'Slave Device Failure'};
-        const errMsg = errMap[errCode] || `Error Code ${errCode}`;
-        log(`❌ Controller Modbus Exception: ${errMsg}`, 'error');
-        return;
-      }
-
-      if (bytes[1] !== 0x03) return;
-      const byteCount = bytes[2];
-      const data = bytes.slice(3, 3 + byteCount);
-
-      // Handle Single Register 0xE004 Battery Type Read (2 bytes payload)
-      if (byteCount === 2) {
-        const val = (data[0] << 8) | data[1];
-        if (val >= 0 && val <= 4) {
-          updateProfileBadge(val);
-          log(`🔋 Rover Active Setting Confirmed: ${PROFILE_NAMES[val]} (Reg 0xE004 = 0x0${val})`, 'success');
-          return;
-        }
-      }
-
-      if (byteCount >= 60 || data.length >= 20) {
-        const now = Date.now();
-        if (now - lastTelemetryProcessTime < (pollIntervalMs - 1500)) {
-          return;
-        }
-        lastTelemetryProcessTime = now;
-
-        packetCounter++;
-        document.getElementById('packetCount').textContent = packetCounter;
-        document.getElementById('cloudSubText').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
-
-        const battSoc = (data[0] << 8) | data[1];
-        if (battSoc > 0) latestEdgeSOC = battSoc;
-        updateEdgePowerBudget();
-        updateEdgeSunsetDigest();
-        const battVolts = ((data[2] << 8) | data[3]) * 0.1;
-        const pvPower = (data[18] << 8) | data[19];
-        const pvVolts = ((data[14] << 8) | data[15]) * 0.1;
-
-        const stateCode = data.length >= 66 ? data[65] : (data.length > 33 ? data[33] : 0);
-        const stateMap = {
-          0: 'Deactivated', 1: 'Activated', 2: 'MPPT Charging',
-          3: 'Equalizing', 4: 'Boost', 5: 'Floating', 6: 'Current Limiting'
-        };
-        const stateStr = stateMap[stateCode] || `0x${stateCode.toString(16).toUpperCase()}`;
-
-        log(`📡 Modbus RTU #${packetCounter}: PV ${pvPower}W (${pvVolts.toFixed(1)}V) | Batt ${battVolts.toFixed(1)}V (${battSoc}%) | ${stateStr} ➔ Streamed to Cloud`, 'solar');
-      } else if (byteCount >= 20) {
-        const modelBytes = data.slice(4, 20);
-        let modelStr = new TextDecoder().decode(modelBytes).replace(/\0/g, '').trim();
-        if (modelStr) {
-          document.getElementById('hwModelVal').textContent = modelStr;
-        }
-      }
-    }
+    let pollIntervalTimer = null;
 
     function startPollingLoop() {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      const select = document.getElementById('pollIntervalSelect');
-      if (select) {
-        pollIntervalMs = parseInt(select.value, 10) || 10000;
-      }
-      if (pollIntervalMs > 0) {
-        queryRealtimeTelemetry();
-        pollTimer = setInterval(queryRealtimeTelemetry, pollIntervalMs);
-      }
-    }
-
-    function updatePollRate() {
-      pollIntervalMs = parseInt(document.getElementById('pollIntervalSelect').value, 10);
-      startPollingLoop();
-    }
-
-    function toggleAutoReconnect(enabled) {
-      autoReconnectEnabled = enabled;
-      log(`Auto-reconnect loop set to: ${enabled ? 'ENABLED' : 'DISABLED'}`, 'info');
-    }
-
-    function disconnectDevice() {
-      autoReconnectEnabled = false;
-      document.getElementById('autoReconnectCheck').checked = false;
-      if (pollTimer) clearInterval(pollTimer);
-      if (bleDevice && bleDevice.gatt.connected) {
-        try { bleDevice.gatt.disconnect(); } catch (e) {}
-      }
-      onDisconnected();
+      if (pollIntervalTimer) clearInterval(pollIntervalTimer);
+      queryRealtimeTelemetry();
+      pollIntervalTimer = setInterval(() => {
+        if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
+          queryRealtimeTelemetry();
+        }
+      }, pollIntervalMs);
     }
 
     function onDisconnected() {
-      log('Bluetooth device disconnected.', 'warn');
-      if (pollTimer) clearInterval(pollTimer);
-      document.getElementById('bleBadge').className = 'badge badge-offline';
-      document.getElementById('bleBadge').textContent = 'BLE Disconnected';
-      document.getElementById('bleStatusVal').innerHTML = '<span style="color:#f87171;">Disconnected</span>';
-      document.getElementById('disconnectBtn').disabled = true;
-      sendToLinux({ type: 'device_disconnected' });
+      const devName = (bleDevice && bleDevice.name) || 'Renogy BT Module';
+      log(`⚠️ Bluetooth disconnected from ${devName}`, 'warn');
+      sendToLinux({ type: 'disconnected', name: devName });
 
-      if (autoReconnectEnabled && bleDevice) {
-        log('Auto-reconnect active. Continuous retry starting...', 'warn');
+      document.getElementById('connectBtn').disabled = false;
+      document.getElementById('disconnectBtn').disabled = true;
+
+      const bleBadge = document.getElementById('bleBadge');
+      bleBadge.className = 'badge badge-offline';
+      bleBadge.textContent = 'DISCONNECTED';
+
+      document.getElementById('bleStatusVal').innerHTML = '<span style="color:#f87171;">Disconnected</span>';
+
+      if (pollIntervalTimer) {
+        clearInterval(pollIntervalTimer);
+        pollIntervalTimer = null;
+      }
+
+      if (document.getElementById('autoReconnectCheck').checked && bleDevice) {
+        log('Auto-reconnect is enabled: attempting reconnection in 3s...', 'warn');
         setTimeout(() => {
-          if (autoReconnectEnabled && bleDevice) {
+          if (!isConnectingGatt && (!gattServer || !gattServer.connected)) {
             startRenogySession(bleDevice);
           }
         }, 3000);
       }
     }
 
-    async function reconnectGattSession() {
-      if (isConnectingGatt) return;
-      log('🔄 Re-syncing GATT connection with Renogy controller...', 'warn');
-      if (pollTimer) clearInterval(pollTimer);
-      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
-        try {
-          bleDevice.gatt.disconnect();
-        } catch (e) {}
-      }
-      isConnectingGatt = false;
-      await new Promise(r => setTimeout(r, 1000));
-      if (bleDevice) {
-        startRenogySession(bleDevice);
-      } else {
-        tryAutoConnectSavedDevice();
+    async function disconnectGatt() {
+      if (bleDevice && bleDevice.gatt) {
+        log('User initiated GATT disconnect.', 'warn');
+        bleDevice.gatt.disconnect();
       }
     }
 
-    function toggleBtGuide() {
-      const card = document.getElementById('btGuideCard');
-      if (card) {
-        card.style.display = card.style.display === 'none' ? 'block' : 'none';
-      }
-    }
-
-    function toggleSunlightMode() {
-      const isSun = document.body.classList.toggle('sunlight-mode');
-      localStorage.setItem('solaria_sunlight_mode', isSun ? '1' : '0');
-      const btn = document.getElementById('sunlightToggle');
-      if (btn) {
-        btn.innerHTML = isSun ? '🌙 Standard Mode' : '☀️ Sunlight Mode';
-        btn.style.background = isSun ? '#d97706' : 'transparent';
-        btn.style.color = isSun ? '#ffffff' : '#f59e0b';
-      }
-    }
-
-    // Restore sunlight preference
-    if (localStorage.getItem('solaria_sunlight_mode') === '1') {
-      document.body.classList.add('sunlight-mode');
-      const btn = document.getElementById('sunlightToggle');
-      if (btn) {
-        btn.innerHTML = '🌙 Standard Mode';
-        btn.style.background = '#d97706';
-        btn.style.color = '#ffffff';
-      }
-    }
-
-    // Immediate auto-connect on page boot
-    document.addEventListener('DOMContentLoaded', () => {
-      initLiveCharts();
+    window.addEventListener('DOMContentLoaded', () => {
       connectWebSocket();
-      tryAutoConnectSavedDevice();
-    });
-
-    // Screen WakeLock & Page Visibility Re-engagement
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        requestWakeLock();
-        if (autoReconnectEnabled && (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected)) {
-          tryAutoConnectSavedDevice();
-        }
-      }
-    });
-
-    let simInterval = null;
-    let simMinute = 720;
-
-    function toggleLocalSimulation() {
-      const btn = document.getElementById('simBtn');
-      if (simInterval) {
-        clearInterval(simInterval);
-        simInterval = null;
-        if (btn) {
-          btn.style.background = 'transparent';
-          btn.textContent = '⚡ Offline Simulation';
-        }
-        log('[Simulation] Offline simulation stopped.', 'info');
-      } else {
-        log('[Simulation] Starting client-side 400W 2S2P solar physics simulation (Dorset ON model)...', 'success');
-        if (btn) {
-          btn.style.background = 'rgba(245, 158, 11, 0.2)';
-          btn.textContent = '⏹️ Stop Simulation';
-        }
-        const runSimStep = () => {
-          const hourFloat = (simMinute % 1440) / 60.0;
-          simMinute = (simMinute + 2) % 1440;
-          
-          let pvWatts = 0, pvV = 0.2, pvA = 0, battV = 13.2, battA = -1.2, soc = 90, rad = 0;
-          if (hourFloat > 6.25 && hourFloat < 20.25) {
-            const angle = (hourFloat - 6.25) / (20.25 - 6.25) * Math.PI;
-            const sun = Math.sin(angle);
-            rad = Math.round(sun * 880);
-            pvWatts = Math.round(380 * sun);
-            pvV = Math.round((36.8 + 2.0 * (1 - sun)) * 10) / 10;
-            pvA = Math.round((pvWatts / pvV) * 100) / 100;
-            battV = Math.round((13.4 + sun * 0.7) * 10) / 10;
-            battA = Math.round((pvWatts / battV) * 100) / 100;
-            soc = Math.min(100, Math.round(65 + sun * 35));
-          }
-
-          const simRecord = {
-            timestamp: new Date().toISOString(),
-            site: '1296 Wren Lake Drive, Dorset, ON',
-            telemetry: {
-              pv_power_w: pvWatts,
-              pv_voltage_v: pvV,
-              pv_current_a: pvA,
-              battery_soc_pct: soc,
-              battery_voltage_v: battV,
-              battery_current_a: battA,
-              controller_temp_c: 28,
-              battery_temp_c: 22,
-              load_power_w: 15,
-              charging_state: pvWatts > 10 ? 'MPPT' : 'DEACTIVATED',
-              fault_flags: 'NONE',
-              array_capacity_w: 400,
-              array_utilization_pct: Math.round((pvWatts / 400) * 1000) / 10,
-              mppt_efficiency_pct: 98.4,
-              string_health_status: 'NOMINAL_2S2P_ACTIVE',
-              daily_yield_wh: 1450,
-              total_yield_kwh: 412
-            },
-            weather: {
-              temperature_c: 24.5,
-              cloud_cover_pct: 12,
-              direct_radiation_w_m2: rad,
-              diffuse_radiation_w_m2: 90,
-              is_day: hourFloat > 6 && hourFloat < 20
-            },
-            sun_classification: hourFloat > 6 && hourFloat < 20 ? 'FULL_SUN' : 'NIGHT'
-          };
-          pushTelemetryToCharts(simRecord);
-        };
-        runSimStep();
-        simInterval = setInterval(runSimStep, 2000);
-      }
-    }
-
-    function exportEdgeTelemetryCSV() {
-      const buffer = window.edgeTelemetryBuffer || [];
-      if (!buffer.length) {
-        alert('No telemetry packets buffered yet. Connect controller or start simulation to collect telemetry.');
-        return;
-      }
-      const rows = [
-        ['Timestamp', 'PV_Power_W', 'PV_Voltage_V', 'PV_Current_A', 'Battery_Voltage_V', 'Battery_SOC_Pct', 'Battery_Current_A', 'Controller_Temp_C', 'Battery_Temp_C', 'Load_Power_W', 'Charging_State', 'Fault_Flags', 'Irradiance_W_m2', 'Cloud_Cover_Pct', 'Sun_Class', 'Site']
-      ];
-      buffer.forEach(item => {
-        const t = item.telemetry || item;
-        const w = item.weather || {};
-        rows.push([
-          `"${item.timestamp || new Date().toISOString()}"`,
-          t.pv_power_w ?? '',
-          t.pv_voltage_v ?? '',
-          t.pv_current_a ?? '',
-          t.battery_voltage_v ?? '',
-          t.battery_soc_pct ?? '',
-          t.battery_current_a ?? '',
-          t.controller_temp_c ?? '',
-          t.battery_temp_c ?? '',
-          t.load_power_w ?? '',
-          `"${t.charging_state || ''}"`,
-          `"${t.fault_flags || ''}"`,
-          w.direct_radiation_w_m2 !== undefined ? (w.direct_radiation_w_m2 + (w.diffuse_radiation_w_m2 || 0)) : '',
-          w.cloud_cover_pct ?? '',
-          `"${item.sun_classification || ''}"`,
-          '"1296 Wren Lake Drive, Dorset, ON"'
-        ]);
-      });
-      const csvContent = rows.map(r => r.join(',')).join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `solaria_edge_telemetry_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // PWA Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(reg => {
-          console.log('[PWA] Solaria Edge Service Worker registered with scope:', reg.scope);
-        }).catch(err => {
-          console.log('[PWA] Service Worker registration skipped/failed:', err);
-        });
-      });
-    }
-
-    const EDGE_CONTROLLER_PRESETS = {
-      'RVR20': { name: 'Renogy Rover 20A MPPT', amps: 20 },
-      'RVR30': { name: 'Renogy Rover 30A MPPT', amps: 30 },
-      'RVR40': { name: 'Renogy Rover 40A MPPT', amps: 40 },
-      'RVR60': { name: 'Renogy Rover 60A MPPT', amps: 60 },
-      'RCC20RVE': { name: 'Renogy Rover Elite 20A MPPT', amps: 20 },
-      'RCC40RVE': { name: 'Renogy Rover Elite 40A MPPT', amps: 40 },
-      'WND10': { name: 'Renogy Wanderer 10A PWM', amps: 10 },
-      'WND30': { name: 'Renogy Wanderer 30A PWM', amps: 30 },
-      'ADV30': { name: 'Renogy Adventurer 30A Flush Mount', amps: 30 }
-    };
-
-    const EDGE_BATTERY_PRESETS = {
-      'RENOGY_170_LFP': { name: 'Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)', ah: 170, boostV: 14.4 },
-      'RENOGY_100_LFP': { name: 'Renogy 12V 100Ah LiFePO4 (RBT100LFP12-BT)', ah: 100, boostV: 14.4 },
-      'RENOGY_200_LFP': { name: 'Renogy 12V 200Ah LiFePO4 Core', ah: 200, boostV: 14.4 },
-      'CUSTOM_LFP': { name: 'Custom 12V LiFePO4', ah: 170, boostV: 14.4 },
-      'AGM': { name: 'Deep-Cycle Sealed AGM (12V)', ah: 100, boostV: 14.4 },
-      'GEL': { name: 'Gel Cell Deep Cycle (12V)', ah: 100, boostV: 14.2 },
-      'FLOODED': { name: 'Flooded Lead-Acid (12V)', ah: 100, boostV: 14.6 }
-    };
-
-    function toggleHwConfig() {
-      const c = document.getElementById('hwConfigCard');
-      if (c) c.style.display = c.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function onEdgeConfigChange() {
-      const cKey = document.getElementById('edgeControllerSelect').value;
-      const bKey = document.getElementById('edgeBatterySelect').value;
-      const cPreset = EDGE_CONTROLLER_PRESETS[cKey] || EDGE_CONTROLLER_PRESETS['RVR20'];
-      const bPreset = EDGE_BATTERY_PRESETS[bKey] || EDGE_BATTERY_PRESETS['RENOGY_170_LFP'];
-
-      const ah = parseFloat(document.getElementById('edgeBatteryAh').value) || 170;
-      const arrayW = parseFloat(document.getElementById('edgeArrayW').value) || 400;
-
-      const storageWh = Math.round(ah * 12.8);
-      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
-      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
-
-      const statsEl = document.getElementById('edgeDerivedStats');
-      if (statsEl) {
-        statsEl.textContent = `Reserve: ${storageWh.toLocaleString()} Wh | Max Ctrl: ${maxCtrlOutputW}W (${cPreset.amps}A) | Over-Panel: ${ratio}%`;
-      }
-    }
-
-    function saveEdgeHardwareConfig() {
-      const cKey = document.getElementById('edgeControllerSelect').value;
-      const bKey = document.getElementById('edgeBatterySelect').value;
-      const ah = parseFloat(document.getElementById('edgeBatteryAh').value) || 170;
-      const arrayW = parseFloat(document.getElementById('edgeArrayW').value) || 400;
-
-      const cfg = { controllerKey: cKey, batteryKey: bKey, ah, arrayW };
-      localStorage.setItem('solaria_hardware_config', JSON.stringify(cfg));
-      applyEdgeHardwareConfig(cfg);
-      toggleHwConfig();
-      log(`⚙️ Hardware profile updated: ${EDGE_CONTROLLER_PRESETS[cKey]?.name || cKey} + ${EDGE_BATTERY_PRESETS[bKey]?.name || bKey} (${ah}Ah)`, 'success');
-    }
-
-    function applyEdgeHardwareConfig(cfg) {
-      if (!cfg) return;
-      const cPreset = EDGE_CONTROLLER_PRESETS[cfg.controllerKey] || EDGE_CONTROLLER_PRESETS['RVR20'];
-      const bPreset = EDGE_BATTERY_PRESETS[cfg.batteryKey] || EDGE_BATTERY_PRESETS['RENOGY_170_LFP'];
-      const ah = cfg.ah || 170;
-      const arrayW = cfg.arrayW || 400;
-
-      const storageWh = Math.round(ah * 12.8);
-      const maxCtrlOutputW = Math.round(cPreset.amps * bPreset.boostV);
-      const ratio = ((arrayW / maxCtrlOutputW) * 100).toFixed(1);
-
-      if (document.getElementById('hwModelVal')) document.getElementById('hwModelVal').textContent = cPreset.name;
-      if (document.getElementById('hwSubText')) document.getElementById('hwSubText').textContent = `${arrayW}W Array (${ratio}% Over-Paneled)`;
-      if (document.getElementById('controllerModelText')) document.getElementById('controllerModelText').textContent = cPreset.name;
-      if (document.getElementById('batteryTypeText')) document.getElementById('batteryTypeText').textContent = `Profile: ${bPreset.name}`;
-    }
-
-    function loadSavedEdgeHardwareConfig() {
-      try {
-        const saved = localStorage.getItem('solaria_hardware_config');
-        if (saved) {
-          const cfg = JSON.parse(saved);
-          if (document.getElementById('edgeControllerSelect')) document.getElementById('edgeControllerSelect').value = cfg.controllerKey || 'RVR20';
-          if (document.getElementById('edgeBatterySelect')) document.getElementById('edgeBatterySelect').value = cfg.batteryKey || 'RENOGY_170_LFP';
-          if (document.getElementById('edgeBatteryAh')) document.getElementById('edgeBatteryAh').value = cfg.ah || 170;
-          if (document.getElementById('edgeArrayW')) document.getElementById('edgeArrayW').value = cfg.arrayW || 400;
-          onEdgeConfigChange();
-          applyEdgeHardwareConfig(cfg);
-        } else {
-          onEdgeConfigChange();
-        }
-      } catch (e) {}
-    }
-
-    let latestEdgeSOC = 85;
-
-    function updateEdgePowerBudget() {
-      let totalW = 0;
-      if (document.getElementById('edgeAppStarlink')?.checked) totalW += 45;
-      if (document.getElementById('edgeAppFridge')?.checked) totalW += 30;
-      if (document.getElementById('edgeAppLights')?.checked) totalW += 15;
-      if (document.getElementById('edgeAppPump')?.checked) totalW += 60;
-      if (document.getElementById('edgeAppLaptop')?.checked) totalW += 65;
-      const customW = parseFloat(document.getElementById('edgeAppCustomWatts')?.value) || 0;
-      totalW += customW;
-
-      if (document.getElementById('edgeBudgetTotalWatts')) {
-        document.getElementById('edgeBudgetTotalWatts').textContent = `${Math.round(totalW)} W`;
-      }
-
-      const soc = latestEdgeSOC;
-      let capAh = 170;
-      try {
-        const saved = localStorage.getItem('solaria_hardware_config');
-        if (saved) {
-          const cfg = JSON.parse(saved);
-          if (cfg.ah) capAh = parseFloat(cfg.ah) || 170;
-        }
-      } catch(e) {}
-
-      const totalWh = capAh * 12.8;
-      const usableWh = Math.round(totalWh * (soc / 100));
-
-      if (document.getElementById('edgeBudgetUsableWh')) {
-        document.getElementById('edgeBudgetUsableWh').textContent = `${usableWh.toLocaleString()} Wh (${soc}% SOC)`;
-      }
-
-      const runtimeH = totalW > 0 ? (usableWh / totalW) : 999;
-      const runtimeDisplay = runtimeH > 100 ? '> 100 Hours' : `${runtimeH.toFixed(1)} Hours`;
-
-      if (document.getElementById('edgeBudgetRuntimeHours')) {
-        document.getElementById('edgeBudgetRuntimeHours').textContent = runtimeDisplay;
-      }
-
-      const badge = document.getElementById('edgeBudgetStatusBadge');
-      const adv = document.getElementById('edgeBudgetAdvisoryText');
-
-      if (runtimeH >= 16) {
-        if (badge) {
-          badge.className = 'badge badge-online';
-          badge.textContent = 'AMPLE RESERVE';
-        }
-        if (adv) {
-          adv.style.color = '#93c5fd';
-          adv.textContent = `💡 Ample battery reserve (${runtimeH.toFixed(1)} hrs). Safe for overnight operation of Starlink, 12V fridge, and lighting.`;
-        }
-      } else if (runtimeH >= 8) {
-        if (badge) {
-          badge.className = 'badge badge-array';
-          badge.textContent = 'MODERATE RESERVE';
-        }
-        if (adv) {
-          adv.style.color = '#fde68a';
-          adv.textContent = `⚠️ Moderate reserve (${runtimeH.toFixed(1)} hrs). Will sustain selected loads through the night until ~7:30 AM sunrise.`;
-        }
-      } else {
-        if (badge) {
-          badge.className = 'badge badge-alert';
-          badge.textContent = 'CRITICAL RESERVE';
-        }
-        if (adv) {
-          adv.style.color = '#fca5a5';
-          adv.textContent = `🚨 High Load Warning! Battery projected to deplete in ${runtimeH.toFixed(1)} hrs before morning sunrise. Turn off high-draw appliances.`;
-        }
-      }
-    }
-
-    function openEdgeCommissioningModal() {
-      const modal = document.getElementById('edgeCommissioningModal');
-      if (modal) modal.style.display = 'flex';
-    }
-
-    function closeEdgeCommissioningModal() {
-      const modal = document.getElementById('edgeCommissioningModal');
-      if (modal) modal.style.display = 'none';
-    }
-
-    function openEdgeWinterizeModal() {
-      const modal = document.getElementById('edgeWinterizeModal');
-      if (modal) modal.style.display = 'flex';
-      const soc = latestEdgeSOC;
-      if (document.getElementById('edgeWinCurrentSoc')) document.getElementById('edgeWinCurrentSoc').textContent = `${soc}%`;
-      const badge = document.getElementById('edgeWinStorageBadge');
-      const recText = document.getElementById('edgeWinRecText');
-      if (soc >= 45 && soc <= 65) {
-        if (badge) { badge.className = 'badge badge-online'; badge.textContent = 'OPTIMAL STORAGE (50-60%)'; }
-        if (recText) recText.innerHTML = `<div>&bull; Battery is at ${soc}% SOC — ideal 50%-60% storage range for sub-zero winter freeze.</div><div>&bull; Sub-zero lithium charge inhibit logic armed.</div>`;
-      } else if (soc > 65) {
-        if (badge) { badge.className = 'badge badge-array'; badge.textContent = 'HIGH SOC (> 65%)'; }
-        if (recText) recText.innerHTML = `<div>&bull; Battery SOC is ${soc}% (High). LiFePO4 cells store best at 50%-60% SOC over winter freeze.</div><div>&bull; Recommend running Starlink or cabin lighting for a few hours before final departure.</div>`;
-      } else {
-        if (badge) { badge.className = 'badge badge-alert'; badge.textContent = 'LOW SOC (< 45%)'; }
-        if (recText) recText.innerHTML = `<div>&bull; Battery SOC is ${soc}% (Low). Recommend charging to 50%-60% before leaving to prevent BMS low-voltage disconnect.</div>`;
-      }
-    }
-
-    function closeEdgeWinterizeModal() {
-      const modal = document.getElementById('edgeWinterizeModal');
-      if (modal) modal.style.display = 'none';
-    }
-
-    function downloadEdgeWinterCertificate() {
-      const soc = document.getElementById('edgeWinCurrentSoc')?.textContent || '85%';
-      const chk1 = document.getElementById('edgeWinChk1')?.checked ? '[X]' : '[ ]';
-      const chk2 = document.getElementById('edgeWinChk2')?.checked ? '[X]' : '[ ]';
-      const chk3 = document.getElementById('edgeWinChk3')?.checked ? '[X]' : '[ ]';
-      const chk4 = document.getElementById('edgeWinChk4')?.checked ? '[X]' : '[ ]';
-      const chk5 = document.getElementById('edgeWinChk5')?.checked ? '[X]' : '[ ]';
-
-      const cert = `===============================================================
-SOLARIA COTTAGE WINTERIZATION & DEPARTURE CERTIFICATE
-Site: 1296 Wren Lake Drive, Dorset, ON (45.186 N, 78.863 W)
-Date/Time: ${new Date().toISOString()}
-===============================================================
-
-[BATTERY BANK STORAGE STATUS]
-- Battery Profile: Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)
-- Departure SOC: ${soc}
-- Low-Temp Inhibit: VERIFIED ARMED (0 deg C Cutoff)
-
-[VERIFIED DEPARTURE CHECKLIST]
-${chk1} 1. Sub-Zero Lithium Charge Inhibit Verified
-${chk2} 2. Inverter & Non-Essential 12V DC Loads Disconnected
-${chk3} 3. PV Array Pitched (~55-60 deg) for Snow Shedding
-${chk4} 4. RTS Temperature Probe Secured to Battery Casing
-${chk5} 5. Physical Breakers Checked & Cabinet Sealed
-
-System ready for Algonquin Highlands sub-zero winter (-25 deg C).
-Signed: Solaria Autonomous Solar Guardian
-===============================================================`;
-      const blob = new Blob([cert], { type: 'text/plain;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `solaria_winterization_record_${new Date().toISOString().split('T')[0]}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function updateEdgeSunsetDigest() {
-      const soc = latestEdgeSOC;
-      if (document.getElementById('edgeDigestEveningSoc')) {
-        document.getElementById('edgeDigestEveningSoc').textContent = `${soc}% (13.4V)`;
-      }
-      const banner = document.getElementById('edgeDigestGuidanceBanner');
-      if (banner) {
-        if (soc >= 80) {
-          banner.textContent = `🌟 Perfect solar harvest today! Battery ${soc}% full. You have ample reserve to run Starlink, cabin lights, and fridge overnight with zero concerns.`;
-          banner.style.color = '#fef08a';
-        } else {
-          banner.textContent = `⚠️ Partial harvest today (Battery at ${soc}%). Suggest limiting high-draw loads until tomorrow's 11:30 AM peak solar window.`;
-          banner.style.color = '#fde68a';
-        }
-      }
-    }
-
-    window.addEventListener('load', () => {
-      loadSavedEdgeHardwareConfig();
-      updateEdgePowerBudget();
-      updateEdgeSunsetDigest();
-      initLiveCharts();
-      tryAutoConnectSavedDevice();
-      // Watchdog: ensures connection is maintained and un-wedged automatically
-      setInterval(() => {
-        if (!autoReconnectEnabled) return;
-        
-        // If not connected, attempt auto-connect
-        if (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected) {
-          tryAutoConnectSavedDevice();
-          return;
-        }
-
-        // If connected but no packets received in > 35 seconds, trigger reconnection
-        const now = Date.now();
-        if (lastTelemetryProcessTime > 0 && (now - lastTelemetryProcessTime) > 35000 && !isConnectingGatt) {
-          log(`⚠️ Telemetry stream stalled (${Math.round((now - lastTelemetryProcessTime)/1000)}s silent). Restarting GATT session...`, 'warn');
-          reconnectGattSession();
-        }
-      }, 5000);
     });
   </script>
 </body>
