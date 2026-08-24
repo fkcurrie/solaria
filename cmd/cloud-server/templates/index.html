@@ -278,7 +278,7 @@
       </p>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-      <span class="badge badge-array">⚡ 400W (2S2P)</span>
+      <span id="arrayBadge" class="badge badge-array">⚡ 400W (2S2P)</span>
       <span id="faultBadge" class="badge badge-ok">HEALTHY</span>
       <span id="sunConditionBadge" class="badge badge-night">🌙 Initializing...</span>
       <span id="chargeStateBadge" class="badge badge-float">MPPT</span>
@@ -573,9 +573,10 @@
     let monthPrChart = null;
     let yearYieldChart = null;
     let yearCumulativeChart = null;
+    let activeTabId = 'tab-live';
 
     function getWeatherMeta(item) {
-      if (!item) return { icon: '☀️', text: 'Clear / Sunny', cloud: 0, temp: '--' };
+      if (!item) return { icon: '🌤️', text: 'Daytime', cloud: 0, temp: '--' };
       const wx = item.weather || {};
       const sun = item.sun_classification || '';
       const isDay = wx.is_day !== undefined ? wx.is_day : true;
@@ -583,7 +584,7 @@
       const rad = (wx.direct_radiation_w_m2 || 0) + (wx.diffuse_radiation_w_m2 || 0);
       const temp = wx.temperature_c !== undefined && wx.temperature_c !== null ? wx.temperature_c : '--';
 
-      if (!isDay || (rad < 5 && (sun === 'NIGHT' || sun === ''))) {
+      if (!isDay) {
         return { icon: '🌙', text: 'Night', cloud, temp };
       }
       if (sun.includes('RAIN') || sun.includes('STORM')) {
@@ -597,6 +598,9 @@
       }
       if (cloud <= 85) {
         return { icon: '🌥️', text: 'Mostly Cloudy', cloud, temp };
+      }
+      if (rad < 25 && isDay) {
+        return { icon: '🌅', text: 'Dawn / Low Light', cloud, temp };
       }
       return { icon: '☁️', text: 'Overcast', cloud, temp };
     }
@@ -668,16 +672,34 @@
     Chart.register(dayWeatherPlugin, liveWeatherMarkerPlugin);
 
     function switchTab(tabId, btn) {
+      activeTabId = tabId;
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       if (btn) btn.classList.add('active');
 
-      if (tabId === 'tab-day' && !daySolarChart) initDayCharts();
-      if (tabId === 'tab-week' && !weekYieldChart) initWeekCharts();
-      if (tabId === 'tab-month' && !monthYieldChart) initMonthCharts();
-      if (tabId === 'tab-year' && !yearYieldChart) initYearCharts();
-      if (tabId === 'tab-specs') fetchSystemSpecs();
+      if (tabId === 'tab-live') {
+        fetchLiveData();
+        fetchHistoryData();
+      } else if (tabId === 'tab-day') {
+        fetchDayData();
+      } else if (tabId === 'tab-week') {
+        fetchWeekData();
+      } else if (tabId === 'tab-month') {
+        fetchMonthData();
+      } else if (tabId === 'tab-year') {
+        fetchYearData();
+      } else if (tabId === 'tab-specs') {
+        fetchSystemSpecs();
+      }
+    }
+
+    function refreshActiveTab() {
+      if (activeTabId === 'tab-day') fetchDayData();
+      else if (activeTabId === 'tab-week') fetchWeekData();
+      else if (activeTabId === 'tab-month') fetchMonthData();
+      else if (activeTabId === 'tab-year') fetchYearData();
+      else if (activeTabId === 'tab-specs') fetchSystemSpecs();
     }
 
     function setChartWindow(limit, btn) {
@@ -722,15 +744,15 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: false,
           interaction: { mode: 'index', intersect: false },
           scales: {
             x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
-            y: { position: 'left', min: 0, max: 420, ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watts (Max 400W)', color: '#f59e0b' } },
-            y1: { position: 'right', min: 0, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
+            y: { position: 'left', min: 0, ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'PV Watts (W)', color: '#f59e0b' } },
+            y1: { position: 'right', min: 0, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Irradiance (W/m²)', color: '#38bdf8' } }
           },
           plugins: {
             legend: { labels: { color: '#cbd5e1' } },
+            liveWeatherItems: [],
             tooltip: {
               backgroundColor: '#0f172a',
               borderColor: '#334155',
@@ -740,13 +762,13 @@
               padding: 10,
               callbacks: {
                 title: (items) => {
-                  const idx = items[0].dataIndex;
-                  const item = liveHistoryCache[idx];
-                  if (item) {
-                    const meta = getWeatherMeta(item);
-                    return `${items[0].label} ${meta.icon} ${meta.text} (${meta.cloud}% Clouds, ${meta.temp}°C)`;
+                  const idx = items[0]?.dataIndex;
+                  const list = solarChart?.options?.plugins?.liveWeatherItems;
+                  if (list && list[idx]) {
+                    const meta = getWeatherMeta(list[idx]);
+                    return `${items[0].label} ${meta.icon} (${meta.cloud}% Clouds)`;
                   }
-                  return items[0].label;
+                  return items[0]?.label || '';
                 }
               }
             }
@@ -754,14 +776,14 @@
         }
       });
 
-      const ctxBattery = document.getElementById('batteryChart').getContext('2d');
-      batteryChart = new Chart(ctxBattery, {
+      const ctxBatt = document.getElementById('batteryChart').getContext('2d');
+      batteryChart = new Chart(ctxBatt, {
         type: 'line',
         data: {
           labels: [],
           datasets: [
             {
-              label: 'Battery Voltage (V)',
+              label: 'Battery Volts (V)',
               data: [],
               borderColor: '#10b981',
               borderWidth: 2,
@@ -771,10 +793,11 @@
               yAxisID: 'y'
             },
             {
-              label: 'Battery SOC (%)',
+              label: 'SOC (%)',
               data: [],
-              borderColor: '#a855f7',
-              borderWidth: 2,
+              borderColor: '#8b5cf6',
+              borderDash: [4, 4],
+              borderWidth: 1.5,
               pointRadius: 0,
               pointHoverRadius: 5,
               tension: 0.2,
@@ -785,12 +808,11 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          animation: false,
           interaction: { mode: 'index', intersect: false },
           scales: {
             x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
             y: { position: 'left', min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } },
-            y1: { position: 'right', min: 0, max: 100, ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#a855f7' } }
+            y1: { position: 'right', min: 0, max: 100, ticks: { color: '#8b5cf6' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#8b5cf6' } }
           },
           plugins: {
             legend: { labels: { color: '#cbd5e1' } },
@@ -800,384 +822,418 @@
               borderWidth: 1,
               titleColor: '#f8fafc',
               bodyColor: '#cbd5e1',
-              padding: 10,
-              callbacks: {
-                title: (items) => {
-                  const idx = items[0].dataIndex;
-                  const item = liveHistoryCache[idx];
-                  if (item) {
-                    const meta = getWeatherMeta(item);
-                    return `${items[0].label} ${meta.icon} (${meta.cloud}% Clouds)`;
-                  }
-                  return items[0].label;
-                }
-              }
+              padding: 10
             }
           }
         }
       });
     }
 
-    async function initDayCharts() {
-      const resp = await fetch('/api/v1/stats/day');
-      const data = await resp.json();
-      dayDataCache = data;
+    async function fetchDayData() {
+      try {
+        const resp = await fetch('/api/v1/stats/day');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        dayDataCache = data;
 
-      const banner = document.getElementById('dayStatusBanner');
-      if (banner && data.status_message) {
-        banner.style.display = 'flex';
-        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">DAY TELEMETRY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Date: ${data.date}</div>`;
-      }
+        const banner = document.getElementById('dayStatusBanner');
+        if (banner && data.status_message) {
+          banner.style.display = 'flex';
+          banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">DAY TELEMETRY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Date: ${data.date}</div>`;
+        }
 
-      // Populate 24-hour weather timeline strip
-      const strip = document.getElementById('dayWeatherStrip');
-      if (strip && data.hours) {
-        strip.style.display = 'flex';
-        let html = '';
-        data.hours.forEach((h, i) => {
-          const hasData = (data.generation_wh && data.generation_wh[i] !== null) || (data.irradiance_w_m2 && data.irradiance_w_m2[i] !== null);
-          const icon = (data.weather_icons && data.weather_icons[i]) || '🌙';
-          const cloud = (data.cloud_cover_pct && data.cloud_cover_pct[i] !== null) ? `${data.cloud_cover_pct[i]}%` : '--';
-          const yieldWh = (data.generation_wh && data.generation_wh[i] !== null) ? `${data.generation_wh[i]} Wh` : '--';
-          const cond = (data.weather_conditions && data.weather_conditions[i]) || 'No Data';
+        const strip = document.getElementById('dayWeatherStrip');
+        if (strip && data.hours) {
+          strip.style.display = 'flex';
+          let html = '';
+          data.hours.forEach((h, i) => {
+            const hasData = (data.generation_wh && data.generation_wh[i] !== null) || (data.irradiance_w_m2 && data.irradiance_w_m2[i] !== null);
+            const icon = (data.weather_icons && data.weather_icons[i]) || '🌙';
+            const cloud = (data.cloud_cover_pct && data.cloud_cover_pct[i] !== null) ? `${data.cloud_cover_pct[i]}%` : '--';
+            const yieldWh = (data.generation_wh && data.generation_wh[i] !== null) ? `${data.generation_wh[i]} Wh` : '--';
+            const cond = (data.weather_conditions && data.weather_conditions[i]) || 'No Data';
 
-          html += `
-            <div class="weather-hour-chip ${hasData ? 'has-data' : ''}" title="${h}: ${cond}">
-              <span style="font-weight:600; color:#94a3b8; font-size:0.7rem;">${h}</span>
-              <span class="wh-icon">${hasData ? icon : '·'}</span>
-              <span class="wh-cloud">${hasData ? cloud : '--'}</span>
-              <span class="wh-yield">${yieldWh}</span>
-            </div>
-          `;
-        });
-        strip.innerHTML = html;
-      }
+            html += `
+              <div class="weather-hour-chip ${hasData ? 'has-data' : ''}" title="${h}: ${cond}">
+                <span style="font-weight:600; color:#94a3b8; font-size:0.7rem;">${h}</span>
+                <span class="wh-icon">${hasData ? icon : '·'}</span>
+                <span class="wh-cloud">${hasData ? cloud : '--'}</span>
+                <span class="wh-yield">${yieldWh}</span>
+              </div>
+            `;
+          });
+          strip.innerHTML = html;
+        }
 
-      const ctxSolar = document.getElementById('daySolarChart').getContext('2d');
-      daySolarChart = new Chart(ctxSolar, {
-        type: 'bar',
-        data: {
-          labels: data.hours,
-          datasets: [
-            {
-              type: 'bar',
-              label: 'Hourly Energy (Wh)',
-              data: data.generation_wh,
-              backgroundColor: 'rgba(245, 158, 11, 0.7)',
-              borderRadius: 4,
-              yAxisID: 'y'
-            },
-            {
-              type: 'line',
-              label: 'Atmospheric Irradiance (W/m²)',
-              data: data.irradiance_w_m2,
-              borderColor: '#38bdf8',
-              borderWidth: 2,
-              tension: 0.2,
-              pointRadius: 2,
-              spanGaps: false,
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watt-Hours (Wh)', color: '#f59e0b' } },
-            y1: { position: 'right', ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
-          },
-          plugins: {
-            legend: { labels: { color: '#cbd5e1' } },
-            weatherIcons: data.weather_icons || [],
-            tooltip: {
-              backgroundColor: '#0f172a',
-              borderColor: '#334155',
-              borderWidth: 1,
-              titleColor: '#f8fafc',
-              bodyColor: '#cbd5e1',
-              padding: 10,
-              callbacks: {
-                title: (items) => {
-                  const idx = items[0].dataIndex;
-                  const h = data.hours[idx];
-                  const icon = (data.weather_icons && data.weather_icons[idx]) || '';
-                  const cond = (data.weather_conditions && data.weather_conditions[idx]) || '';
-                  return `${h} ${icon} ${cond}`;
+        if (daySolarChart) {
+          daySolarChart.data.labels = data.hours;
+          daySolarChart.data.datasets[0].data = data.generation_wh;
+          daySolarChart.data.datasets[1].data = data.irradiance_w_m2;
+          daySolarChart.options.plugins.weatherIcons = data.weather_icons || [];
+          daySolarChart.update('none');
+        } else {
+          const ctxSolar = document.getElementById('daySolarChart').getContext('2d');
+          daySolarChart = new Chart(ctxSolar, {
+            type: 'bar',
+            data: {
+              labels: data.hours,
+              datasets: [
+                {
+                  type: 'bar',
+                  label: 'Hourly Energy (Wh)',
+                  data: data.generation_wh,
+                  backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                  borderRadius: 4,
+                  yAxisID: 'y'
                 },
-                afterTitle: (items) => {
-                  const idx = items[0].dataIndex;
-                  const cloud = data.cloud_cover_pct?.[idx];
-                  const temp = data.temperature_c?.[idx];
-                  if (cloud !== undefined && cloud !== null && temp !== undefined && temp !== null) {
-                    return `☁️ Cloud Cover: ${cloud}% | 🌡️ Ambient: ${temp}°C`;
+                {
+                  type: 'line',
+                  label: 'Atmospheric Irradiance (W/m²)',
+                  data: data.irradiance_w_m2,
+                  borderColor: '#38bdf8',
+                  borderWidth: 2,
+                  tension: 0.2,
+                  pointRadius: 2,
+                  spanGaps: false,
+                  yAxisID: 'y1'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watt-Hours (Wh)', color: '#f59e0b' } },
+                y1: { position: 'right', ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
+              },
+              plugins: {
+                legend: { labels: { color: '#cbd5e1' } },
+                weatherIcons: data.weather_icons || [],
+                tooltip: {
+                  backgroundColor: '#0f172a',
+                  borderColor: '#334155',
+                  borderWidth: 1,
+                  titleColor: '#f8fafc',
+                  bodyColor: '#cbd5e1',
+                  padding: 10,
+                  callbacks: {
+                    title: (items) => {
+                      const idx = items[0].dataIndex;
+                      const h = data.hours[idx];
+                      const icon = (data.weather_icons && data.weather_icons[idx]) || '';
+                      const cond = (data.weather_conditions && data.weather_conditions[idx]) || '';
+                      return `${h} ${icon} ${cond}`;
+                    },
+                    afterTitle: (items) => {
+                      const idx = items[0].dataIndex;
+                      const cloud = data.cloud_cover_pct?.[idx];
+                      const temp = data.temperature_c?.[idx];
+                      if (cloud !== undefined && cloud !== null && temp !== undefined && temp !== null) {
+                        return `☁️ Cloud Cover: ${cloud}% | 🌡️ Ambient: ${temp}°C`;
+                      }
+                      return '';
+                    }
                   }
-                  return '';
                 }
               }
             }
-          }
+          });
         }
-      });
 
-      const ctxBatt = document.getElementById('dayBatteryChart').getContext('2d');
-      dayBatteryChart = new Chart(ctxBatt, {
-        type: 'line',
-        data: {
-          labels: data.hours,
-          datasets: [{
-            label: 'Battery SOC (%)',
-            data: data.battery_soc_pct,
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-            fill: true,
-            borderWidth: 2,
-            tension: 0.2,
-            spanGaps: false
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { min: 0, max: 100, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'SOC (%)', color: '#10b981' } }
-          },
-          plugins: {
-            legend: { labels: { color: '#cbd5e1' } },
-            weatherIcons: data.weather_icons || [],
-            tooltip: {
-              backgroundColor: '#0f172a',
-              borderColor: '#334155',
-              borderWidth: 1,
-              titleColor: '#f8fafc',
-              bodyColor: '#cbd5e1',
-              padding: 10,
-              callbacks: {
-                title: (items) => {
-                  const idx = items[0].dataIndex;
-                  const h = data.hours[idx];
-                  const icon = (data.weather_icons && data.weather_icons[idx]) || '';
-                  const cond = (data.weather_conditions && data.weather_conditions[idx]) || '';
-                  return `${h} ${icon} ${cond}`;
-                }
+        if (dayBatteryChart) {
+          dayBatteryChart.data.labels = data.hours;
+          dayBatteryChart.data.datasets[0].data = data.battery_soc_pct;
+          dayBatteryChart.update('none');
+        } else {
+          const ctxBatt = document.getElementById('dayBatteryChart').getContext('2d');
+          dayBatteryChart = new Chart(ctxBatt, {
+            type: 'line',
+            data: {
+              labels: data.hours,
+              datasets: [{
+                label: 'Battery SOC (%)',
+                data: data.battery_soc_pct,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                fill: true,
+                borderWidth: 2,
+                tension: 0.2,
+                spanGaps: false
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { min: 0, max: 100, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'SOC (%)', color: '#10b981' } }
+              },
+              plugins: {
+                legend: { labels: { color: '#cbd5e1' } }
               }
             }
-          }
+          });
         }
-      });
+      } catch (e) {}
     }
 
-    async function initWeekCharts() {
-      const resp = await fetch('/api/v1/stats/week');
-      const data = await resp.json();
+    async function fetchWeekData() {
+      try {
+        const resp = await fetch('/api/v1/stats/week');
+        if (!resp.ok) return;
+        const data = await resp.json();
 
-      const banner = document.getElementById('weekStatusBanner');
-      if (banner && data.status_message) {
-        banner.style.display = 'flex';
-        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">7-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Accumulating Multi-Day History</div>`;
-      }
-
-      const ctxYield = document.getElementById('weekYieldChart').getContext('2d');
-      weekYieldChart = new Chart(ctxYield, {
-        type: 'bar',
-        data: {
-          labels: data.days,
-          datasets: [{
-            label: 'Daily Generation (kWh)',
-            data: data.yield_kwh,
-            backgroundColor: 'rgba(245, 158, 11, 0.75)',
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Day', color: '#f59e0b' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        const banner = document.getElementById('weekStatusBanner');
+        if (banner && data.status_message) {
+          banner.style.display = 'flex';
+          banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">7-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Accumulating Multi-Day History</div>`;
         }
-      });
 
-      const ctxBatt = document.getElementById('weekBattChart').getContext('2d');
-      weekBattChart = new Chart(ctxBatt, {
-        type: 'line',
-        data: {
-          labels: data.days,
-          datasets: [
-            {
-              label: 'Max Daily Batt Volts (V)',
-              data: data.max_batt_v,
-              borderColor: '#10b981',
-              borderWidth: 2,
-              tension: 0.2,
-              spanGaps: false
+        if (weekYieldChart) {
+          weekYieldChart.data.labels = data.days;
+          weekYieldChart.data.datasets[0].data = data.yield_kwh;
+          weekYieldChart.update('none');
+        } else {
+          const ctxYield = document.getElementById('weekYieldChart').getContext('2d');
+          weekYieldChart = new Chart(ctxYield, {
+            type: 'bar',
+            data: {
+              labels: data.days,
+              datasets: [{
+                label: 'Daily Generation (kWh)',
+                data: data.yield_kwh,
+                backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                borderRadius: 6
+              }]
             },
-            {
-              label: 'Min Daily Batt Volts (V)',
-              data: data.min_batt_v,
-              borderColor: '#f59e0b',
-              borderWidth: 2,
-              tension: 0.2,
-              spanGaps: false
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Day', color: '#f59e0b' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
             }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          });
         }
-      });
-    }
 
-    async function initMonthCharts() {
-      const resp = await fetch('/api/v1/stats/month');
-      const data = await resp.json();
-
-      const banner = document.getElementById('monthStatusBanner');
-      if (banner && data.status_message) {
-        banner.style.display = 'flex';
-        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">30-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Month: ${data.month}</div>`;
-      }
-
-      const ctxYield = document.getElementById('monthYieldChart').getContext('2d');
-      monthYieldChart = new Chart(ctxYield, {
-        type: 'bar',
-        data: {
-          labels: data.days,
-          datasets: [
-            {
-              type: 'bar',
-              label: 'Daily Yield (kWh)',
-              data: data.daily_kwh,
-              backgroundColor: 'rgba(245, 158, 11, 0.65)',
-              borderRadius: 4,
-              yAxisID: 'y'
+        if (weekBattChart) {
+          weekBattChart.data.labels = data.days;
+          weekBattChart.data.datasets[0].data = data.max_batt_v;
+          weekBattChart.data.datasets[1].data = data.min_batt_v;
+          weekBattChart.update('none');
+        } else {
+          const ctxBatt = document.getElementById('weekBattChart').getContext('2d');
+          weekBattChart = new Chart(ctxBatt, {
+            type: 'line',
+            data: {
+              labels: data.days,
+              datasets: [
+                {
+                  label: 'Max Daily Batt Volts (V)',
+                  data: data.max_batt_v,
+                  borderColor: '#10b981',
+                  borderWidth: 2,
+                  tension: 0.2,
+                  spanGaps: false
+                },
+                {
+                  label: 'Min Daily Batt Volts (V)',
+                  data: data.min_batt_v,
+                  borderColor: '#f59e0b',
+                  borderWidth: 2,
+                  tension: 0.2,
+                  spanGaps: false
+                }
+              ]
             },
-            {
-              type: 'line',
-              label: 'Cumulative Month (kWh)',
-              data: data.cumulative_kwh,
-              borderColor: '#a855f7',
-              borderWidth: 2,
-              tension: 0.2,
-              pointRadius: 2,
-              spanGaps: false,
-              yAxisID: 'y1'
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
             }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
-            y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Daily kWh', color: '#f59e0b' } },
-            y1: { position: 'right', ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Cumulative kWh', color: '#a855f7' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          });
         }
-      });
-
-      const ctxPr = document.getElementById('monthPrChart').getContext('2d');
-      monthPrChart = new Chart(ctxPr, {
-        type: 'line',
-        data: {
-          labels: data.days,
-          datasets: [{
-            label: 'Performance Ratio (PR %)',
-            data: data.perf_ratio_pct,
-            borderColor: '#38bdf8',
-            backgroundColor: 'rgba(56, 189, 248, 0.1)',
-            fill: true,
-            borderWidth: 2,
-            tension: 0.3,
-            spanGaps: false
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
-            y: { min: 0, max: 100, ticks: { color: '#38bdf8' }, grid: { color: '#1e293b' }, title: { display: true, text: 'PR %', color: '#38bdf8' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
-        }
-      });
+      } catch (e) {}
     }
 
-    async function initYearCharts() {
-      const resp = await fetch('/api/v1/stats/year');
-      const data = await resp.json();
+    async function fetchMonthData() {
+      try {
+        const resp = await fetch('/api/v1/stats/month');
+        if (!resp.ok) return;
+        const data = await resp.json();
 
-      const banner = document.getElementById('yearStatusBanner');
-      if (banner && data.status_message) {
-        banner.style.display = 'flex';
-        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">ANNUAL BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Year: ${data.year}</div>`;
-      }
+        const banner = document.getElementById('monthStatusBanner');
+        if (banner && data.status_message) {
+          banner.style.display = 'flex';
+          banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">30-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Month: ${data.month}</div>`;
+        }
 
-      const ctxYield = document.getElementById('yearYieldChart').getContext('2d');
-      yearYieldChart = new Chart(ctxYield, {
-        type: 'bar',
-        data: {
-          labels: data.months,
-          datasets: [
-            {
-              type: 'bar',
-              label: 'Actual / Logged Yield (kWh)',
-              data: data.monthly_kwh,
-              backgroundColor: 'rgba(245, 158, 11, 0.75)',
-              borderRadius: 6,
-              yAxisID: 'y'
+        if (monthYieldChart) {
+          monthYieldChart.data.labels = data.days;
+          monthYieldChart.data.datasets[0].data = data.daily_kwh;
+          monthYieldChart.data.datasets[1].data = data.cumulative_kwh;
+          monthYieldChart.update('none');
+        } else {
+          const ctxYield = document.getElementById('monthYieldChart').getContext('2d');
+          monthYieldChart = new Chart(ctxYield, {
+            type: 'bar',
+            data: {
+              labels: data.days,
+              datasets: [
+                {
+                  type: 'bar',
+                  label: 'Daily Yield (kWh)',
+                  data: data.daily_kwh,
+                  backgroundColor: 'rgba(245, 158, 11, 0.65)',
+                  borderRadius: 4,
+                  yAxisID: 'y'
+                },
+                {
+                  type: 'line',
+                  label: 'Cumulative Month (kWh)',
+                  data: data.cumulative_kwh,
+                  borderColor: '#a855f7',
+                  borderWidth: 2,
+                  tension: 0.2,
+                  pointRadius: 2,
+                  spanGaps: false,
+                  yAxisID: 'y1'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
+                y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Daily kWh', color: '#f59e0b' } },
+                y1: { position: 'right', ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Cumulative kWh', color: '#a855f7' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
             }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Month', color: '#f59e0b' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+          });
         }
-      });
 
-      const ctxCumul = document.getElementById('yearCumulativeChart').getContext('2d');
-      yearCumulativeChart = new Chart(ctxCumul, {
-        type: 'line',
-        data: {
-          labels: data.months,
-          datasets: [{
-            label: 'Cumulative Annual Yield (MWh)',
-            data: data.cumulative_mwh,
-            borderColor: '#a855f7',
-            backgroundColor: 'rgba(168, 85, 247, 0.15)',
-            fill: true,
-            borderWidth: 2,
-            tension: 0.3,
-            spanGaps: false
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
-            y: { ticks: { color: '#a855f7' }, grid: { color: '#1e293b' }, title: { display: true, text: 'MegaWatt-Hours (MWh)', color: '#a855f7' } }
-          },
-          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        if (monthPrChart) {
+          monthPrChart.data.labels = data.days;
+          monthPrChart.data.datasets[0].data = data.perf_ratio_pct;
+          monthPrChart.update('none');
+        } else {
+          const ctxPr = document.getElementById('monthPrChart').getContext('2d');
+          monthPrChart = new Chart(ctxPr, {
+            type: 'line',
+            data: {
+              labels: data.days,
+              datasets: [{
+                label: 'Performance Ratio (PR %)',
+                data: data.perf_ratio_pct,
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                fill: true,
+                borderWidth: 2,
+                tension: 0.3,
+                spanGaps: false
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
+                y: { min: 0, max: 100, ticks: { color: '#38bdf8' }, grid: { color: '#1e293b' }, title: { display: true, text: 'PR %', color: '#38bdf8' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
+            }
+          });
         }
-      });
+      } catch (e) {}
+    }
+
+    async function fetchYearData() {
+      try {
+        const resp = await fetch('/api/v1/stats/year');
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        const banner = document.getElementById('yearStatusBanner');
+        if (banner && data.status_message) {
+          banner.style.display = 'flex';
+          banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">ANNUAL BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Year: ${data.year}</div>`;
+        }
+
+        if (yearYieldChart) {
+          yearYieldChart.data.labels = data.months;
+          yearYieldChart.data.datasets[0].data = data.monthly_kwh;
+          yearYieldChart.update('none');
+        } else {
+          const ctxYield = document.getElementById('yearYieldChart').getContext('2d');
+          yearYieldChart = new Chart(ctxYield, {
+            type: 'bar',
+            data: {
+              labels: data.months,
+              datasets: [
+                {
+                  type: 'bar',
+                  label: 'Actual / Logged Yield (kWh)',
+                  data: data.monthly_kwh,
+                  backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                  borderRadius: 6,
+                  yAxisID: 'y'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Month', color: '#f59e0b' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
+            }
+          });
+        }
+
+        if (yearCumulativeChart) {
+          yearCumulativeChart.data.labels = data.months;
+          yearCumulativeChart.data.datasets[0].data = data.cumulative_mwh;
+          yearCumulativeChart.update('none');
+        } else {
+          const ctxCumul = document.getElementById('yearCumulativeChart').getContext('2d');
+          yearCumulativeChart = new Chart(ctxCumul, {
+            type: 'line',
+            data: {
+              labels: data.months,
+              datasets: [{
+                label: 'Cumulative Annual Yield (MWh)',
+                data: data.cumulative_mwh,
+                borderColor: '#a855f7',
+                backgroundColor: 'rgba(168, 85, 247, 0.15)',
+                fill: true,
+                borderWidth: 2,
+                tension: 0.3,
+                spanGaps: false
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#a855f7' }, grid: { color: '#1e293b' }, title: { display: true, text: 'MegaWatt-Hours (MWh)', color: '#a855f7' } }
+              },
+              plugins: { legend: { labels: { color: '#cbd5e1' } } }
+            }
+          });
+        }
+      } catch (e) {}
     }
 
     async function fetchSystemSpecs() {
@@ -1238,34 +1294,80 @@
         document.getElementById('tempSummary').textContent = `Ambient: ${weather.temperature_c ?? '--'}°C | Ctrl: ${telem.controller_temp_c ?? '--'}°C`;
         document.getElementById('lifetimeStats').textContent = `Lifetime: ${telem.total_generated_kwh || 0} kWh | Full: ${telem.total_battery_fullcharge_count || 0} cycles`;
 
+        // 1. Array Badge
+        const arrayBadge = document.getElementById('arrayBadge');
+        if (arrayBadge) {
+          if (pvWatts > 0) {
+            arrayBadge.textContent = `⚡ 400W (2S2P) • ${pvWatts}W`;
+          } else {
+            arrayBadge.textContent = `⚡ 400W (2S2P) • Idle`;
+          }
+        }
+
+        // 2. Fault Badge
+        const faultBadge = document.getElementById('faultBadge');
+        if (faultBadge) {
+          if (telem.fault_flags && telem.fault_flags !== "NORMAL" && telem.fault_flags !== "NONE") {
+            faultBadge.textContent = `⚠️ ${telem.fault_flags}`;
+            faultBadge.className = 'badge badge-alert';
+          } else {
+            faultBadge.textContent = 'SYSTEM HEALTHY';
+            faultBadge.className = 'badge badge-ok';
+          }
+        }
+
+        // 3. Sun Condition Badge
+        const sunBadge = document.getElementById('sunConditionBadge');
+        if (sunBadge) {
+          const isDay = weather.is_day !== undefined ? weather.is_day : true;
+          const cloud = weather.cloud_cover_pct !== undefined && weather.cloud_cover_pct !== null ? weather.cloud_cover_pct : 0;
+          let sunText = '☀️ FULL SUN';
+          let sunCls = 'badge-full-sun';
+
+          if (!isDay) {
+            sunText = '🌙 NIGHT';
+            sunCls = 'badge-night';
+          } else if (sunClass === 'ABSORPTION_FLOAT_CLIPPED') {
+            sunText = '🔋 BATTERY FULL (FLOAT)';
+            sunCls = 'badge-float';
+          } else if (sunClass === 'FULL_SUN' || (cloud <= 20 && (weather.direct_radiation_w_m2 || 0) > 200)) {
+            sunText = '☀️ FULL SUN';
+            sunCls = 'badge-full-sun';
+          } else if (sunClass === 'DIFFUSE_OVERCAST' || cloud > 70) {
+            sunText = '☁️ DIFFUSE OVERCAST';
+            sunCls = 'badge-diffuse';
+          } else if (sunClass === 'DAWN_LOW_LIGHT' || (radTotal < 25 && isDay)) {
+            sunText = '🌅 DAWN / LOW LIGHT';
+            sunCls = 'badge-partial-sun';
+          } else {
+            sunText = '⛅ PARTIAL SUN / SHADE';
+            sunCls = 'badge-partial-sun';
+          }
+          sunBadge.textContent = sunText;
+          sunBadge.className = `badge ${sunCls}`;
+        }
+
+        // 4. Charge State Badge
+        const chargeBadge = document.getElementById('chargeStateBadge');
+        if (chargeBadge) {
+          const state = telem.charging_state || 'Idle';
+          chargeBadge.textContent = state;
+          if (state.includes('MPPT') || state.includes('Boost')) {
+            chargeBadge.className = 'badge badge-full-sun';
+          } else if (state.includes('Float')) {
+            chargeBadge.className = 'badge badge-float';
+          } else if (state.includes('Deactivated') || state.includes('Idle')) {
+            chargeBadge.className = 'badge badge-night';
+          } else {
+            chargeBadge.className = 'badge badge-array';
+          }
+        }
+
         const livePill = document.getElementById('liveWxPill');
         if (livePill) {
           const m = getWeatherMeta({ weather, sun_classification: sunClass });
           livePill.textContent = `${m.icon} ${m.text} (${m.cloud}% Clouds, ${m.temp}°C)`;
         }
-
-        const badge = document.getElementById('sunConditionBadge');
-        const map = {
-          'FULL_SUN': { text: '☀️ FULL SUN', cls: 'badge-full-sun' },
-          'PARTIAL_SUN_OR_SHADE': { text: '⛅ PARTIAL SUN / SHADE', cls: 'badge-partial-sun' },
-          'DIFFUSE_OVERCAST': { text: '☁️ DIFFUSE OVERCAST', cls: 'badge-diffuse' },
-          'ABSORPTION_FLOAT_CLIPPED': { text: '🔋 BATTERY FULL (FLOAT)', cls: 'badge-float' },
-          'NIGHT': { text: '🌙 NIGHT', cls: 'badge-night' }
-        };
-        const conf = map[sunClass] || { text: sunClass, cls: 'badge-partial-sun' };
-        badge.textContent = conf.text;
-        badge.className = `badge ${conf.cls}`;
-
-        const faultBadge = document.getElementById('faultBadge');
-        if (telem.fault_flags && telem.fault_flags !== "NORMAL" && telem.fault_flags !== "NONE") {
-          faultBadge.textContent = `⚠️ ${telem.fault_flags}`;
-          faultBadge.className = 'badge badge-alert';
-        } else {
-          faultBadge.textContent = 'SYSTEM HEALTHY';
-          faultBadge.className = 'badge badge-ok';
-        }
-
-        document.getElementById('chargeStateBadge').textContent = telem.charging_state || 'Idle';
       } catch (e) {}
     }
 
@@ -1308,8 +1410,12 @@
       initLiveCharts();
       fetchLiveData();
       fetchHistoryData();
+      fetchSystemSpecs();
+      fetchDayData();
+      
       setInterval(fetchLiveData, 3000);
       setInterval(fetchHistoryData, 4000);
+      setInterval(refreshActiveTab, 60000);
     });
   </script>
 </body>

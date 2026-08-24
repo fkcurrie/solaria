@@ -503,7 +503,7 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyWeather(cloudPct float64, tempC float64, isDay bool, avgIrr float64, sunClass string) (string, string) {
-	if !isDay || (avgIrr < 5.0 && (sunClass == "NIGHT" || sunClass == "")) {
+	if !isDay {
 		return "🌙", "Night / Dark"
 	}
 	if strings.Contains(sunClass, "RAIN") || strings.Contains(sunClass, "STORM") {
@@ -517,6 +517,9 @@ func classifyWeather(cloudPct float64, tempC float64, isDay bool, avgIrr float64
 	}
 	if cloudPct <= 85 {
 		return "🌥️", fmt.Sprintf("Mostly Cloudy (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
+	}
+	if avgIrr < 25.0 && (sunClass == "DAWN_LOW_LIGHT" || sunClass == "NIGHT") {
+		return "🌅", fmt.Sprintf("Dawn / Low Light (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
 	}
 	return "☁️", fmt.Sprintf("Overcast (%.0f%% clouds, %.1f°C)", cloudPct, tempC)
 }

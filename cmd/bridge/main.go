@@ -223,22 +223,25 @@ func classifySunCondition(telem Telemetry, wx WeatherMetrics) string {
 		cloudCover = *wx.CloudCoverPct
 	}
 
-	if !wx.IsDay || totalRad < 5.0 || (telem.PVPowerW <= 2 && wx.DirectRadiationWM2 < 5.0) {
+	if !wx.IsDay {
 		return "NIGHT"
 	}
 	if telem.BatterySOCPct >= 99 && (strings.Contains(telem.ChargingState, "Float") || strings.Contains(telem.ChargingState, "Boost")) {
 		return "ABSORPTION_FLOAT_CLIPPED"
 	}
-	if cloudCover < 25 && wx.DirectRadiationWM2 > 300 && telem.PVPowerW > 10 {
+	if cloudCover < 25 && (wx.DirectRadiationWM2 > 250 || totalRad > 300) {
 		return "FULL_SUN"
 	}
-	if cloudCover > 80 || (wx.DiffuseRadiationWM2 > wx.DirectRadiationWM2 && wx.DirectRadiationWM2 < 150) {
+	if cloudCover > 70 || (wx.DiffuseRadiationWM2 > wx.DirectRadiationWM2) {
 		return "DIFFUSE_OVERCAST"
 	}
-	if cloudCover >= 25 && cloudCover <= 80 {
+	if cloudCover >= 25 && cloudCover <= 70 {
 		return "PARTIAL_SUN_OR_SHADE"
 	}
-	return "VARIABLE_SUN"
+	if totalRad < 20.0 {
+		return "DAWN_LOW_LIGHT"
+	}
+	return "DIFFUSE_OVERCAST"
 }
 
 func decodeTelemetry(raw []byte) (Telemetry, error) {
