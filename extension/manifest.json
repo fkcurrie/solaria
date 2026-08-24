@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Renogy Solar BLE ↔ Linux Proxy",
+  "version": "1.0.0",
+  "description": "Persistent ChromeOS Bluetooth Low Energy bridge relaying Renogy Solar metrics to Crostini Linux",
+  "permissions": [
+    "storage",
+    "alarms",
+    "sidePanel",
+    "power",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "ws://localhost:*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Renogy Solar BLE Bridge"
+  }
+}

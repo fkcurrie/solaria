@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solaria: Dorset Solar & Atmospheric Intelligence (400W 2S2P)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131b2a;
+      --card-border: #1f2b3e;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --solar: #f59e0b;
+      --battery: #10b981;
+      --sky: #38bdf8;
+      --purple: #a855f7;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 24px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .badge {
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .badge-full-sun { background: #78350f; color: #fde68a; border: 1px solid #d97706; }
+    .badge-partial-sun { background: #1e293b; color: #cbd5e1; border: 1px solid #64748b; }
+    .badge-diffuse { background: #334155; color: #94a3b8; border: 1px solid #475569; }
+    .badge-night { background: #1e1b4b; color: #c7d2fe; border: 1px solid #4338ca; }
+    .badge-float { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .badge-ok { background: #064e3b; color: #34d399; border: 1px solid #059669; }
+    .badge-alert { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+    .badge-array { background: #1e293b; color: #f59e0b; border: 1px solid #d97706; }
+
+    /* Tab Navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+      overflow-x: auto;
+    }
+    .nav-tab-btn {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .nav-tab-btn:hover {
+      background: #1e293b;
+      color: var(--text);
+    }
+    .nav-tab-btn.active {
+      background: #f59e0b;
+      color: #0b0f19;
+      border-color: #d97706;
+      font-weight: 700;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .metric-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .metric-val {
+      font-size: 1.8rem;
+      font-weight: 800;
+      font-family: var(--mono);
+    }
+    .metric-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .gauge-bar {
+      height: 10px;
+      background: #090d16;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid var(--card-border);
+    }
+    .gauge-fill-solar {
+      height: 100%;
+      background: linear-gradient(90deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .gauge-fill-battery {
+      height: 100%;
+      background: linear-gradient(90deg, #ef4444 0%, #f59e0b 40%, #10b981 100%);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 1024px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+
+    .chart-container {
+      position: relative;
+      height: 280px;
+      width: 100%;
+    }
+
+    .site-banner {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .array-spec-tag {
+      background: #1f2937;
+      border: 1px solid #374151;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: #fbbf24;
+    }
+
+    .btn-window {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 600;
+    }
+    .btn-window:hover { background: #334155; color: white; }
+    .btn-window.active { background: #f59e0b; color: #0b0f19; border-color: #d97706; font-weight: 700; }
+
+    /* Specification Tables */
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.85rem;
+    }
+    .spec-table th, .spec-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--card-border);
+      text-align: left;
+    }
+    .spec-table th {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    .spec-table td.val {
+      font-family: var(--mono);
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1 style="font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+        ☀️ Solaria: Renogy Rover 20A & Atmospheric Intelligence
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 2px;">
+        Real-time telemetry streaming to Google BigQuery (<code>solaria-solar.solaria.telemetry</code>)
+      </p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <span class="badge badge-array">⚡ 400W (2S2P)</span>
+      <span id="faultBadge" class="badge badge-ok">HEALTHY</span>
+      <span id="sunConditionBadge" class="badge badge-night">🌙 Initializing...</span>
+      <span id="chargeStateBadge" class="badge badge-float">MPPT</span>
+    </div>
+  </header>
+
+  <div class="site-banner">
+    <div>
+      <span style="color: var(--text-muted); font-size: 0.75rem;">LOCATION & HARDWARE</span>
+      <div style="font-weight: 700; color: #f59e0b;">1296 Wren Lake Drive, Dorset, ON</div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <span class="array-spec-tag">Array: 4 x 100W (400Wp)</span>
+      <span class="array-spec-tag">Wiring: 2S2P (2 Strings of 2)</span>
+      <span class="array-spec-tag">String Vmp: ~36V-40V</span>
+      <span class="array-spec-tag">Controller: Rover 20A MPPT</span>
+    </div>
+    <div id="liveClock" style="font-family: var(--mono); font-size: 0.85rem; color: #38bdf8;">--:--:--</div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="nav-tabs">
+    <button class="nav-tab-btn active" onclick="switchTab('tab-live', this)">⚡ Live Monitor</button>
+    <button class="nav-tab-btn" onclick="switchTab('tab-day', this)">📅 Day View (Hourly)</button>
+    <button class="nav-tab-btn" onclick="switchTab('tab-week', this)">🗓️ Week View (7 Days)</button>
+    <button class="nav-tab-btn" onclick="switchTab('tab-month', this)">📆 Month View (30 Days)</button>
+    <button class="nav-tab-btn" onclick="switchTab('tab-year', this)">📈 Year View (Seasonal)</button>
+    <button class="nav-tab-btn" onclick="switchTab('tab-specs', this)">⚙️ System Specs & Hardware</button>
+  </div>
+
+  <!-- TAB 1: LIVE MONITOR -->
+  <div id="tab-live" class="tab-content active">
+    <!-- Key Metrics Top Grid -->
+    <div class="grid-top">
+      <!-- Solar PV Card -->
+      <div class="card">
+        <div class="metric-title">☀️ Solar Generation (400W Peak)</div>
+        <div class="metric-val" id="pvWatts" style="color: var(--solar);">-- W</div>
+        <div class="gauge-bar"><div id="arrayCapFill" class="gauge-fill-solar"></div></div>
+        <div class="metric-sub" id="pvVoltsAmps" style="margin-top: 6px;">-- V @ -- A</div>
+        <div class="metric-sub" id="arrayUtilText" style="font-size: 0.75rem; color: #fbbf24;">Util: 0% of 400W | Peak: -- W</div>
+      </div>
+
+      <!-- Battery Bank Card -->
+      <div class="card">
+        <div class="metric-title">🔋 Battery Bank (12V)</div>
+        <div class="metric-val" id="battSoc" style="color: var(--battery);">-- %</div>
+        <div class="gauge-bar"><div id="socFill" class="gauge-fill-battery"></div></div>
+        <div class="metric-sub" id="battVoltsAmps" style="margin-top: 6px;">-- V | Charge: -- A</div>
+        <div class="metric-sub" id="battMinMax" style="font-size: 0.75rem; color: #10b981;">Min: --V | Max: --V</div>
+      </div>
+
+      <!-- Solar Irradiance Card -->
+      <div class="card">
+        <div class="metric-title">🌤️ Atmospheric Irradiance</div>
+        <div class="metric-val" id="irradianceGhi" style="color: var(--sky);">-- W/m²</div>
+        <div class="metric-sub" id="cloudCoverText">Cloud Cover: --%</div>
+        <div class="metric-sub" id="perfRatioText" style="font-size: 0.75rem; color: #38bdf8;">Harvest PR: --% vs Irradiance</div>
+      </div>
+
+      <!-- Today's Yield & Lifetime Stats -->
+      <div class="card">
+        <div class="metric-title">📊 Yield & Health Counters</div>
+        <div class="metric-val" id="dailyYield" style="color: var(--purple);">-- Wh</div>
+        <div class="metric-sub" id="tempSummary">Ambient: --°C | Ctrl: --°C</div>
+        <div class="metric-sub" id="lifetimeStats" style="font-size: 0.75rem; color: #c084fc;">Lifetime: -- kWh | Full: -- cycles</div>
+      </div>
+    </div>
+
+    <!-- Live Oscilloscope Chart Section -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+      <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
+        📈 LIVE OSCILLOSCOPE STREAM (SLIDING WINDOW):
+      </span>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn-window active" id="btnWin40" onclick="setChartWindow(40, this)">⚡ Live 40 Pts</button>
+        <button class="btn-window" id="btnWin100" onclick="setChartWindow(100, this)">⏱️ 15 Mins</button>
+        <button class="btn-window" id="btnWin360" onclick="setChartWindow(360, this)">🕒 1 Hour</button>
+        <button class="btn-window" id="btnWinMax" onclick="setChartWindow(1440, this)">📅 Full Session</button>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          ☀️ 400W Array Generation (W) vs Atmospheric Irradiance (W/m²)
+        </h3>
+        <div class="chart-container">
+          <canvas id="solarChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          🔋 Battery Voltage (V) & State of Charge (%)
+        </h3>
+        <div class="chart-container">
+          <canvas id="batteryChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: DAY VIEW (HOURLY BREAKDOWN) -->
+  <div id="tab-day" class="tab-content">
+    <div id="dayStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          ☀️ 24-Hour Solar Energy Harvest (Wh per Hour) vs Irradiance Model
+        </h3>
+        <div class="chart-container">
+          <canvas id="daySolarChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          🔋 24-Hour Battery SOC (%) Daily Charge Profile
+        </h3>
+        <div class="chart-container">
+          <canvas id="dayBatteryChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: WEEK VIEW (7 DAYS) -->
+  <div id="tab-week" class="tab-content">
+    <div id="weekStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          🗓️ 7-Day Solar Generation Harvest (kWh / Day)
+        </h3>
+        <div class="chart-container">
+          <canvas id="weekYieldChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          ⚡ Daily Peak Watts & Battery Voltage Envelope (Min vs Max V)
+        </h3>
+        <div class="chart-container">
+          <canvas id="weekBattChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: MONTH VIEW (30 DAYS) -->
+  <div id="tab-month" class="tab-content">
+    <div id="monthStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          📆 30-Day Daily Generation (kWh) & Cumulative Yield (kWh)
+        </h3>
+        <div class="chart-container">
+          <canvas id="monthYieldChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          🌤️ Daily Harvest Performance Ratio (PR %) vs Irradiance
+        </h3>
+        <div class="chart-container">
+          <canvas id="monthPrChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: YEAR VIEW (SEASONAL) -->
+  <div id="tab-year" class="tab-content">
+    <div id="yearStatusBanner" class="site-banner" style="display: none; border-color: #38bdf8;"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          📈 12-Month Solar Generation Profile (kWh / Month) vs Cottage Insolation
+        </h3>
+        <div class="chart-container">
+          <canvas id="yearYieldChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="font-size: 0.95rem; margin-bottom: 14px;">
+          ⚡ Annual Cumulative Energy Generation (MWh)
+        </h3>
+        <div class="chart-container">
+          <canvas id="yearCumulativeChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 6: STATIC SYSTEM SPECS & HARDWARE (INFREQUENTLY CHANGING) -->
+  <div id="tab-specs" class="tab-content">
+    <div class="spec-grid">
+      <!-- Hardware Controller Card -->
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--solar); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          ⚙️ Charge Controller Hardware
+        </h3>
+        <table class="spec-table">
+          <tr><th>Parameter</th><th>Specification</th></tr>
+          <tr><td>Controller Model</td><td class="val" id="specModel">Renogy Rover 20A MPPT</td></tr>
+          <tr><td>Controller Part #</td><td class="val">RNG-CTRL-RVR20</td></tr>
+          <tr><td>Bluetooth Module</td><td class="val">Renogy BT-1 (BT-TH-66F984D6)</td></tr>
+          <tr><td>Protocol & Channels</td><td class="val">BLE GATT 0xFFD0 / Modbus RTU</td></tr>
+          <tr><td>Software Firmware</td><td class="val" id="specSwVer">v1.0.4</td></tr>
+          <tr><td>Hardware Version</td><td class="val" id="specHwVer">v1.0.0</td></tr>
+          <tr><td>Max PV Input Voltage</td><td class="val" style="color: #ef4444;">100V DC Max</td></tr>
+          <tr><td>Rated Charging Current</td><td class="val" style="color: #10b981;">20A DC Max</td></tr>
+          <tr><td>Rated Load Current</td><td class="val">20A DC Max</td></tr>
+        </table>
+      </div>
+
+      <!-- Photovoltaic Array Card -->
+      <div class="card">
+        <h3 style="font-size: 1rem; color: #fbbf24; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          ☀️ Solar Photovoltaic Array
+        </h3>
+        <table class="spec-table">
+          <tr><th>Array Spec</th><th>Engineering Value</th></tr>
+          <tr><td>Array Peak Rating</td><td class="val" style="color: #fbbf24;">400 Watts Peak (400 Wp)</td></tr>
+          <tr><td>Panels Installed</td><td class="val">4 x 100W Monocrystalline</td></tr>
+          <tr><td>Wiring Topology</td><td class="val" style="color: #38bdf8;">2S2P (2 Strings of 2 Panels)</td></tr>
+          <tr><td>Nominal String Vmp</td><td class="val">~36.0V - 40.8V DC</td></tr>
+          <tr><td>Array Open Circuit Voc</td><td class="val">~43.2V - 48.6V DC</td></tr>
+          <tr><td>Array Nominal Current Imp</td><td class="val">~9.8A - 11.0A DC</td></tr>
+          <tr><td>Over-Paneling Ratio</td><td class="val" style="color: #10b981;">138% on 20A Controller</td></tr>
+          <tr><td>Site Location</td><td class="val">1296 Wren Lake Dr, Dorset, ON</td></tr>
+          <tr><td>GPS Coordinates</td><td class="val">45.186° N, -78.863° W</td></tr>
+        </table>
+      </div>
+
+      <!-- Battery Bank Card -->
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--battery); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          🔋 Battery Storage Thresholds
+        </h3>
+        <table class="spec-table">
+          <tr><th>Threshold</th><th>Voltage Setting</th></tr>
+          <tr><td>Nominal Voltage</td><td class="val">12V DC</td></tr>
+          <tr><td>Battery Chemistry</td><td class="val">Deep-Cycle AGM / Lithium</td></tr>
+          <tr><td>Boost Charging Setpoint</td><td class="val" style="color: #10b981;">14.4 V</td></tr>
+          <tr><td>Float Charging Setpoint</td><td class="val" style="color: #38bdf8;">13.8 V</td></tr>
+          <tr><td>Equalize Charging Setpoint</td><td class="val">14.6 V</td></tr>
+          <tr><td>Over-Voltage Disconnect</td><td class="val" style="color: #ef4444;">16.0 V</td></tr>
+          <tr><td>Low-Voltage Disconnect (LVD)</td><td class="val" style="color: #f59e0b;">11.1 V</td></tr>
+          <tr><td>Over-Voltage Reconnect</td><td class="val">15.0 V</td></tr>
+        </table>
+      </div>
+
+      <!-- Lifetime Cumulative Statistics Card -->
+      <div class="card">
+        <h3 style="font-size: 1rem; color: var(--purple); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          📊 Lifetime Hardware Counters
+        </h3>
+        <table class="spec-table">
+          <tr><th>Counter Name</th><th>Accumulated Value</th></tr>
+          <tr><td>Operating Days</td><td class="val" id="specDays">107 Days</td></tr>
+          <tr><td>Lifetime Solar Harvest</td><td class="val" id="specKwh" style="color: #c084fc;">8,363 kWh</td></tr>
+          <tr><td>Lifetime Charge Throughput</td><td class="val" id="specAh">631 Ah</td></tr>
+          <tr><td>Full Charge Cycles</td><td class="val" id="specFullChg">0 Cycles</td></tr>
+          <tr><td>Over-Discharge Events</td><td class="val" id="specOverDischg" style="color: #f59e0b;">35 Events</td></tr>
+          <tr><td>Hardware Diagnostics</td><td class="val" style="color: #10b981;">0x0000 (NORMAL)</td></tr>
+          <tr><td>GCP Project Store</td><td class="val">solaria-solar.solaria.telemetry</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let solarChart = null;
+    let batteryChart = null;
+    let currentLimit = 40;
+
+    // Additional Horizon Chart Handles
+    let daySolarChart = null;
+    let dayBatteryChart = null;
+    let weekYieldChart = null;
+    let weekBattChart = null;
+    let monthYieldChart = null;
+    let monthPrChart = null;
+    let yearYieldChart = null;
+    let yearCumulativeChart = null;
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      if (btn) btn.classList.add('active');
+
+      if (tabId === 'tab-day' && !daySolarChart) initDayCharts();
+      if (tabId === 'tab-week' && !weekYieldChart) initWeekCharts();
+      if (tabId === 'tab-month' && !monthYieldChart) initMonthCharts();
+      if (tabId === 'tab-year' && !yearYieldChart) initYearCharts();
+      if (tabId === 'tab-specs') fetchSystemSpecs();
+    }
+
+    function setChartWindow(limit, btn) {
+      currentLimit = limit;
+      document.querySelectorAll('.btn-window').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      fetchHistoryData();
+    }
+
+    function initLiveCharts() {
+      const ctxSolar = document.getElementById('solarChart').getContext('2d');
+      solarChart = new Chart(ctxSolar, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Solar PV Output (W)',
+              data: [],
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              fill: true,
+              tension: 0.2,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Atmospheric Irradiance (W/m²)',
+              data: [],
+              borderColor: '#38bdf8',
+              borderDash: [5, 5],
+              borderWidth: 1.5,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
+            y: { position: 'left', min: 0, max: 420, ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watts (Max 400W)', color: '#f59e0b' } },
+            y1: { position: 'right', min: 0, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+
+      const ctxBattery = document.getElementById('batteryChart').getContext('2d');
+      batteryChart = new Chart(ctxBattery, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Battery Voltage (V)',
+              data: [],
+              borderColor: '#10b981',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Battery SOC (%)',
+              data: [],
+              borderColor: '#a855f7',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
+            y: { position: 'left', min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } },
+            y1: { position: 'right', min: 0, max: 100, ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#a855f7' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+    }
+
+    async function initDayCharts() {
+      const resp = await fetch('/api/v1/stats/day');
+      const data = await resp.json();
+
+      const banner = document.getElementById('dayStatusBanner');
+      if (banner && data.status_message) {
+        banner.style.display = 'flex';
+        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">DAY TELEMETRY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Date: ${data.date}</div>`;
+      }
+
+      const ctxSolar = document.getElementById('daySolarChart').getContext('2d');
+      daySolarChart = new Chart(ctxSolar, {
+        type: 'bar',
+        data: {
+          labels: data.hours,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Hourly Energy (Wh)',
+              data: data.generation_wh,
+              backgroundColor: 'rgba(245, 158, 11, 0.7)',
+              borderRadius: 4,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Atmospheric Irradiance (W/m²)',
+              data: data.irradiance_w_m2,
+              borderColor: '#38bdf8',
+              borderWidth: 2,
+              tension: 0.2,
+              pointRadius: 2,
+              spanGaps: false,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Watt-Hours (Wh)', color: '#f59e0b' } },
+            y1: { position: 'right', ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'W/m²', color: '#38bdf8' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+
+      const ctxBatt = document.getElementById('dayBatteryChart').getContext('2d');
+      dayBatteryChart = new Chart(ctxBatt, {
+        type: 'line',
+        data: {
+          labels: data.hours,
+          datasets: [{
+            label: 'Battery SOC (%)',
+            data: data.battery_soc_pct,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            fill: true,
+            borderWidth: 2,
+            tension: 0.2,
+            spanGaps: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { min: 0, max: 100, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'SOC (%)', color: '#10b981' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+    }
+
+    async function initWeekCharts() {
+      const resp = await fetch('/api/v1/stats/week');
+      const data = await resp.json();
+
+      const banner = document.getElementById('weekStatusBanner');
+      if (banner && data.status_message) {
+        banner.style.display = 'flex';
+        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">7-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Accumulating Multi-Day History</div>`;
+      }
+
+      const ctxYield = document.getElementById('weekYieldChart').getContext('2d');
+      weekYieldChart = new Chart(ctxYield, {
+        type: 'bar',
+        data: {
+          labels: data.days,
+          datasets: [{
+            label: 'Daily Generation (kWh)',
+            data: data.yield_kwh,
+            backgroundColor: 'rgba(245, 158, 11, 0.75)',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Day', color: '#f59e0b' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+
+      const ctxBatt = document.getElementById('weekBattChart').getContext('2d');
+      weekBattChart = new Chart(ctxBatt, {
+        type: 'line',
+        data: {
+          labels: data.days,
+          datasets: [
+            {
+              label: 'Max Daily Batt Volts (V)',
+              data: data.max_batt_v,
+              borderColor: '#10b981',
+              borderWidth: 2,
+              tension: 0.2,
+              spanGaps: false
+            },
+            {
+              label: 'Min Daily Batt Volts (V)',
+              data: data.min_batt_v,
+              borderColor: '#f59e0b',
+              borderWidth: 2,
+              tension: 0.2,
+              spanGaps: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+    }
+
+    async function initMonthCharts() {
+      const resp = await fetch('/api/v1/stats/month');
+      const data = await resp.json();
+
+      const banner = document.getElementById('monthStatusBanner');
+      if (banner && data.status_message) {
+        banner.style.display = 'flex';
+        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">30-DAY BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Month: ${data.month}</div>`;
+      }
+
+      const ctxYield = document.getElementById('monthYieldChart').getContext('2d');
+      monthYieldChart = new Chart(ctxYield, {
+        type: 'bar',
+        data: {
+          labels: data.days,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Daily Yield (kWh)',
+              data: data.daily_kwh,
+              backgroundColor: 'rgba(245, 158, 11, 0.65)',
+              borderRadius: 4,
+              yAxisID: 'y'
+            },
+            {
+              type: 'line',
+              label: 'Cumulative Month (kWh)',
+              data: data.cumulative_kwh,
+              borderColor: '#a855f7',
+              borderWidth: 2,
+              tension: 0.2,
+              pointRadius: 2,
+              spanGaps: false,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
+            y: { position: 'left', ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Daily kWh', color: '#f59e0b' } },
+            y1: { position: 'right', ticks: { color: '#a855f7' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Cumulative kWh', color: '#a855f7' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+
+      const ctxPr = document.getElementById('monthPrChart').getContext('2d');
+      monthPrChart = new Chart(ctxPr, {
+        type: 'line',
+        data: {
+          labels: data.days,
+          datasets: [{
+            label: 'Performance Ratio (PR %)',
+            data: data.perf_ratio_pct,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            borderWidth: 2,
+            tension: 0.3,
+            spanGaps: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b', maxTicksLimit: 15 }, grid: { color: '#1e293b' } },
+            y: { min: 0, max: 100, ticks: { color: '#38bdf8' }, grid: { color: '#1e293b' }, title: { display: true, text: 'PR %', color: '#38bdf8' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+    }
+
+    async function initYearCharts() {
+      const resp = await fetch('/api/v1/stats/year');
+      const data = await resp.json();
+
+      const banner = document.getElementById('yearStatusBanner');
+      if (banner && data.status_message) {
+        banner.style.display = 'flex';
+        banner.innerHTML = `<div><span style="color:var(--text-muted); font-size:0.75rem;">ANNUAL BIGQUERY LOG</span><div style="font-weight:700; color:#38bdf8;">${data.status_message}</div></div><div style="font-size:0.8rem; color:#94a3b8;">Year: ${data.year}</div>`;
+      }
+
+      const ctxYield = document.getElementById('yearYieldChart').getContext('2d');
+      yearYieldChart = new Chart(ctxYield, {
+        type: 'bar',
+        data: {
+          labels: data.months,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Actual / Logged Yield (kWh)',
+              data: data.monthly_kwh,
+              backgroundColor: 'rgba(245, 158, 11, 0.75)',
+              borderRadius: 6,
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'kWh / Month', color: '#f59e0b' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+
+      const ctxCumul = document.getElementById('yearCumulativeChart').getContext('2d');
+      yearCumulativeChart = new Chart(ctxCumul, {
+        type: 'line',
+        data: {
+          labels: data.months,
+          datasets: [{
+            label: 'Cumulative Annual Yield (MWh)',
+            data: data.cumulative_mwh,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.15)',
+            fill: true,
+            borderWidth: 2,
+            tension: 0.3,
+            spanGaps: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#a855f7' }, grid: { color: '#1e293b' }, title: { display: true, text: 'MegaWatt-Hours (MWh)', color: '#a855f7' } }
+          },
+          plugins: { legend: { labels: { color: '#cbd5e1' } } }
+        }
+      });
+    }
+
+    async function fetchSystemSpecs() {
+      try {
+        const resp = await fetch('/api/v1/system-info');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const life = data.lifetime_statistics || {};
+        const dev = data.device || {};
+
+        if (dev.model) document.getElementById('specModel').textContent = dev.model;
+        if (dev.software_version) document.getElementById('specSwVer').textContent = dev.software_version;
+        if (dev.hardware_version) document.getElementById('specHwVer').textContent = dev.hardware_version;
+        if (life.operating_days) document.getElementById('specDays').textContent = `${life.operating_days} Days`;
+        if (life.total_generated_kwh) document.getElementById('specKwh').textContent = `${life.total_generated_kwh} kWh`;
+        if (life.total_charging_ah) document.getElementById('specAh').textContent = `${life.total_charging_ah} Ah`;
+        if (life.total_battery_fullcharge_count !== undefined) document.getElementById('specFullChg').textContent = `${life.total_battery_fullcharge_count} Cycles`;
+        if (life.total_battery_overdischarge_count !== undefined) document.getElementById('specOverDischg').textContent = `${life.total_battery_overdischarge_count} Events`;
+      } catch (e) {}
+    }
+
+    async function fetchLiveData() {
+      try {
+        const resp = await fetch('/api/v1/live');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const telem = data.telemetry || {};
+        const weather = data.weather || {};
+        const sunClass = data.sun_classification || 'UNKNOWN';
+
+        const pvWatts = telem.pv_power_w || 0;
+        document.getElementById('pvWatts').textContent = `${pvWatts} W`;
+        document.getElementById('pvVoltsAmps').textContent = `${(telem.pv_voltage_v || 0).toFixed(1)} V @ ${(telem.pv_current_a || 0).toFixed(2)} A`;
+        
+        const utilPct = ((pvWatts / 400.0) * 100).toFixed(1);
+        document.getElementById('arrayCapFill').style.width = `${Math.min(100, Math.max(0, utilPct))}%`;
+        document.getElementById('arrayUtilText').textContent = `Util: ${utilPct}% of 400W | Peak: ${telem.daily_max_pv_w || pvWatts} W`;
+
+        const soc = telem.battery_soc_pct || 0;
+        document.getElementById('battSoc').textContent = `${soc} %`;
+        document.getElementById('socFill').style.width = `${Math.min(100, Math.max(0, soc))}%`;
+        document.getElementById('battVoltsAmps').textContent = `${(telem.battery_voltage_v || 0).toFixed(1)} V | Charge: ${(telem.battery_current_a || 0).toFixed(2)} A`;
+        document.getElementById('battMinMax').textContent = `Min: ${(telem.daily_min_battery_voltage_v || telem.battery_voltage_v || 0).toFixed(1)}V | Max: ${(telem.daily_max_battery_voltage_v || telem.battery_voltage_v || 0).toFixed(1)}V`;
+
+        const radTotal = (weather.direct_radiation_w_m2 || 0) + (weather.diffuse_radiation_w_m2 || 0);
+        document.getElementById('irradianceGhi').textContent = `${(weather.direct_radiation_w_m2 || 0).toFixed(1)} W/m²`;
+        document.getElementById('cloudCoverText').textContent = `Cloud Cover: ${weather.cloud_cover_pct ?? '--'}%`;
+        
+        let prStr = '--%';
+        if (radTotal > 20) {
+          const expectedWatts = (radTotal / 1000.0) * 400.0;
+          const pr = Math.min(100, Math.max(0, (pvWatts / expectedWatts) * 100));
+          prStr = `${pr.toFixed(0)}%`;
+        }
+        document.getElementById('perfRatioText').textContent = `Harvest PR: ${prStr} vs Irradiance`;
+
+        document.getElementById('dailyYield').textContent = `${telem.daily_generated_wh || 0} Wh`;
+        document.getElementById('tempSummary').textContent = `Ambient: ${weather.temperature_c ?? '--'}°C | Ctrl: ${telem.controller_temp_c ?? '--'}°C`;
+        document.getElementById('lifetimeStats').textContent = `Lifetime: ${telem.total_generated_kwh || 0} kWh | Full: ${telem.total_battery_fullcharge_count || 0} cycles`;
+
+        const badge = document.getElementById('sunConditionBadge');
+        const map = {
+          'FULL_SUN': { text: '☀️ FULL SUN', cls: 'badge-full-sun' },
+          'PARTIAL_SUN_OR_SHADE': { text: '⛅ PARTIAL SUN / SHADE', cls: 'badge-partial-sun' },
+          'DIFFUSE_OVERCAST': { text: '☁️ DIFFUSE OVERCAST', cls: 'badge-diffuse' },
+          'ABSORPTION_FLOAT_CLIPPED': { text: '🔋 BATTERY FULL (FLOAT)', cls: 'badge-float' },
+          'NIGHT': { text: '🌙 NIGHT', cls: 'badge-night' }
+        };
+        const conf = map[sunClass] || { text: sunClass, cls: 'badge-partial-sun' };
+        badge.textContent = conf.text;
+        badge.className = `badge ${conf.cls}`;
+
+        const faultBadge = document.getElementById('faultBadge');
+        if (telem.fault_flags && telem.fault_flags !== "NORMAL" && telem.fault_flags !== "NONE") {
+          faultBadge.textContent = `⚠️ ${telem.fault_flags}`;
+          faultBadge.className = 'badge badge-alert';
+        } else {
+          faultBadge.textContent = 'SYSTEM HEALTHY';
+          faultBadge.className = 'badge badge-ok';
+        }
+
+        document.getElementById('chargeStateBadge').textContent = telem.charging_state || 'Idle';
+      } catch (e) {}
+    }
+
+    async function fetchHistoryData() {
+      try {
+        const resp = await fetch(`/api/v1/history?limit=${currentLimit}`);
+        if (!resp.ok) return;
+        const list = await resp.json();
+        if (!list || list.length === 0) return;
+
+        const labels = list.map(item => new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        const pvWatts = list.map(item => item.telemetry?.pv_power_w || 0);
+        const irradiance = list.map(item => item.weather?.direct_radiation_w_m2 || 0);
+        const battVolts = list.map(item => item.telemetry?.battery_voltage_v || 0);
+        const battSoc = list.map(item => item.telemetry?.battery_soc_pct || 0);
+
+        if (solarChart) {
+          solarChart.data.labels = labels;
+          solarChart.data.datasets[0].data = pvWatts;
+          solarChart.data.datasets[1].data = irradiance;
+          solarChart.update('none');
+        }
+
+        if (batteryChart) {
+          batteryChart.data.labels = labels;
+          batteryChart.data.datasets[0].data = battVolts;
+          batteryChart.data.datasets[1].data = battSoc;
+          batteryChart.update('none');
+        }
+      } catch (e) {}
+    }
+
+    setInterval(() => {
+      document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
+    }, 1000);
+
+    window.addEventListener('load', () => {
+      initLiveCharts();
+      fetchLiveData();
+      fetchHistoryData();
+      setInterval(fetchLiveData, 3000);
+      setInterval(fetchHistoryData, 4000);
+    });
+  </script>
+</body>
+</html>

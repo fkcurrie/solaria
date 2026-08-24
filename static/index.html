@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solaria BLE Bridge & Daemon Gateway</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2a;
+      --card-border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --solar: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+    }
+
+    .badge {
+      font-size: 0.78rem;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-online { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #059669; }
+    .badge-offline { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #dc2626; }
+    .badge-retry { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #d97706; }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      display: inline-block;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .card-val {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+
+    .controls-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      transition: all 0.15s ease;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.btn-solar { background: #f59e0b; color: #0b0f19; font-weight: 700; }
+    button.btn-danger { background: #ef4444; }
+    button.btn-outline { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
+    button.btn-outline:hover { background: #1e293b; }
+
+    select {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+
+    .log-box {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      height: 480px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry { line-height: 1.45; word-break: break-all; }
+    .log-info { color: #94a3b8; }
+    .log-success { color: #34d399; }
+    .log-warn { color: #fbbf24; }
+    .log-error { color: #f87171; }
+    .log-solar { color: #f59e0b; font-weight: 600; }
+    .log-data { color: #38bdf8; }
+
+    .cloud-link-banner {
+      background: linear-gradient(90deg, rgba(37, 99, 235, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>⚡ Solaria BLE Gateway & Bridge Daemon</h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 2px;">
+        Local Modbus RTU Proxy ↔ Google Cloud Run & BigQuery Pipeline
+      </p>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span id="wsBadge" class="badge badge-offline">Linux Bridge Offline</span>
+      <span id="bleBadge" class="badge badge-offline">BLE Disconnected</span>
+      <span id="wakeLockBadge" class="badge badge-online" style="display: none;">Keep-Alive Active</span>
+    </div>
+  </header>
+
+  <!-- Banner linking to Cloud Run -->
+  <div class="cloud-link-banner">
+    <div>
+      <div style="font-weight: 700; color: #38bdf8;">📊 Live Solaria Multi-Tab Cloud Dashboard</div>
+      <div style="font-size: 0.8rem; color: #94a3b8;">View Day, Week, Month, and Year analytics powered by BigQuery.</div>
+    </div>
+    <a href="https://solaria-dashboard-952659886764.us-central1.run.app" target="_blank" style="text-decoration: none;">
+      <button class="btn-solar" style="font-size: 0.85rem; padding: 8px 16px;">
+        🚀 Open Cloud Dashboard
+      </button>
+    </a>
+  </div>
+
+  <!-- Status Cards -->
+  <div class="status-grid">
+    <div class="card">
+      <div class="card-label">Bluetooth Controller Link</div>
+      <div class="card-val" id="bleStatusVal" style="color: #f87171;">
+        <span>Disconnected</span>
+      </div>
+      <div class="card-sub" id="bleSubText">Auto-Reconnect: Armed</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Linux Gateway Process</div>
+      <div class="card-val" id="wsStatusVal" style="color: #f87171;">
+        <span>ws://localhost:8765</span>
+      </div>
+      <div class="card-sub" id="wsSubText">Connecting...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Cloud Pipeline & BigQuery</div>
+      <div class="card-val" id="cloudStatusVal" style="color: #38bdf8;">
+        <span id="packetCount">0</span> pkts sent
+      </div>
+      <div class="card-sub" id="cloudSubText">solaria.telemetry</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Hardware Controller</div>
+      <div class="card-val" id="hwModelVal" style="color: #f59e0b; font-size: 1.05rem;">
+        Renogy Rover 20A
+      </div>
+      <div class="card-sub" id="hwSubText">400W 2S2P Monocrystalline</div>
+    </div>
+  </div>
+
+  <!-- Controls Panel -->
+  <div class="controls-panel">
+    <div class="btn-group">
+      <button class="btn-solar" id="connectBtn" onclick="connectRenogyByService()">
+        ⚡ Connect Bluetooth (BT-TH-66F984D6)
+      </button>
+      <button class="btn-outline" onclick="connectAnyBle()">
+        🔍 Pick Any Device
+      </button>
+      <button class="btn-danger" id="disconnectBtn" onclick="disconnectDevice()" disabled>
+        ⏹️ Disconnect
+      </button>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <label style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <input type="checkbox" id="autoReconnectCheck" checked onchange="toggleAutoReconnect(this.checked)">
+        Auto-Reconnect Loop
+      </label>
+      <select id="pollIntervalSelect" onchange="updatePollRate()">
+        <option value="1000">Poll 1s</option>
+        <option value="2000" selected>Poll 2s</option>
+        <option value="5000">Poll 5s</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Realtime Modbus & Transmission Terminal -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div style="font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+        <span class="pulse-dot"></span> Live Modbus RTU & Cloud Bridge Stream
+      </div>
+      <button class="btn-outline" style="padding: 4px 10px; font-size: 0.75rem;" onclick="clearLogs()">Clear Log</button>
+    </div>
+    <div id="logBox" class="log-box"></div>
+  </div>
+
+  <script>
+    let ws = null;
+    let bleDevice = null;
+    let gattServer = null;
+    let pollTimer = null;
+    let pollIntervalMs = 2000;
+    let autoReconnectEnabled = true;
+    let wakeLock = null;
+    let packetCounter = 0;
+    let isConnectingGatt = false;
+
+    let rxBuffer = new Uint8Array(0);
+    let rxTimeout = null;
+
+    const RENOGY_SERVICE_WRITE = '0000ffd0-0000-1000-8000-00805f9b34fb';
+    const RENOGY_CHAR_WRITE = '0000ffd1-0000-1000-8000-00805f9b34fb';
+    const RENOGY_SERVICE_READ = '0000fff0-0000-1000-8000-00805f9b34fb';
+    const RENOGY_CHAR_NOTIFY = '0000fff1-0000-1000-8000-00805f9b34fb';
+
+    const ALL_SERVICES = [
+      RENOGY_SERVICE_WRITE,
+      RENOGY_SERVICE_READ,
+      '0000ffe0-0000-1000-8000-00805f9b34fb',
+      '0000ff00-0000-1000-8000-00805f9b34fb',
+      'battery_service',
+      'device_information'
+    ];
+
+    let writeCharObj = null;
+    let notifyCharObj = null;
+
+    function log(msg, type = 'info') {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = `log-entry log-${type}`;
+      div.textContent = `[${time}] ${msg}`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() { document.getElementById('logBox').innerHTML = ''; }
+
+    function calcCrc16(buffer) {
+      let crc = 0xFFFF;
+      for (let pos = 0; pos < buffer.length; pos++) {
+        crc ^= buffer[pos];
+        for (let i = 8; i !== 0; i--) {
+          if ((crc & 0x0001) !== 0) {
+            crc >>= 1;
+            crc ^= 0xA001;
+          } else {
+            crc >>= 1;
+          }
+        }
+      }
+      return [crc & 0xFF, (crc >> 8) & 0xFF];
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          document.getElementById('wakeLockBadge').style.display = 'inline-flex';
+          log('Screen Keep-Alive (WakeLock) active.', 'info');
+        }
+      } catch (err) {}
+    }
+
+    // --- WEBSOCKET TO LINUX BRIDGE ---
+    function connectWebSocket() {
+      const wsUrl = 'ws://localhost:8765';
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        const badge = document.getElementById('wsBadge');
+        badge.className = 'badge badge-online';
+        badge.textContent = 'Linux Gateway Online';
+        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#34d399;">Connected (Active)</span>';
+        document.getElementById('wsSubText').textContent = 'Relaying to Cloud Run';
+        log('Connected to Linux WebSocket gateway (ws://localhost:8765)!', 'success');
+        tryAutoConnectSavedDevice();
+      };
+
+      ws.onclose = () => {
+        const badge = document.getElementById('wsBadge');
+        badge.className = 'badge badge-offline';
+        badge.textContent = 'Linux Gateway Offline';
+        document.getElementById('wsStatusVal').innerHTML = '<span style="color:#f87171;">Offline</span>';
+        document.getElementById('wsSubText').textContent = 'Reconnecting in 3s...';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    function sendToLinux(payload) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+      }
+    }
+
+    let hasLoggedNoGetDevices = false;
+
+    async function tryAutoConnectSavedDevice() {
+      if (isConnectingGatt || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) return;
+      if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
+        if (!hasLoggedNoGetDevices) {
+          hasLoggedNoGetDevices = true;
+          log('👉 Ready: Click "⚡ Connect Bluetooth (BT-TH-66F984D6)" to start the persistent streaming session.', 'info');
+        }
+        return;
+      }
+      try {
+        const devices = await navigator.bluetooth.getDevices();
+        if (devices.length > 0) {
+          const renogy = devices.find(d => d.name && (d.name.includes('BT') || d.name.includes('RN') || d.name.includes('Rover'))) || devices[0];
+          const devName = renogy.name || 'BT-TH-66F984D6';
+          log(`⚡ Authorized controller found (${devName}). Auto-connecting...`, 'info');
+          await startRenogySession(renogy);
+        } else if (!hasLoggedNoGetDevices) {
+          hasLoggedNoGetDevices = true;
+          log('👉 Click "⚡ Connect Bluetooth (BT-TH-66F984D6)" to pair and start streaming.', 'info');
+        }
+      } catch (e) {
+        if (!hasLoggedNoGetDevices) {
+          hasLoggedNoGetDevices = true;
+          log(`Auto-connect note: ${e.message}`, 'warn');
+        }
+      }
+    }
+
+    async function connectRenogyByService() {
+      try {
+        log('Scanning specifically for Renogy BT-1 / BT-2 (Service 0xFFD0)...', 'info');
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [RENOGY_SERVICE_WRITE] }],
+          optionalServices: ALL_SERVICES
+        });
+        await startRenogySession(bleDevice);
+      } catch (err) {
+        log(`Scan cancelled: ${err.message}`, 'warn');
+      }
+    }
+
+    async function connectAnyBle() {
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ALL_SERVICES
+        });
+        await startRenogySession(bleDevice);
+      } catch (err) {
+        log(`Scan cancelled: ${err.message}`, 'warn');
+      }
+    }
+
+    // --- BLE GATT SETUP WITH INFINITE AUTO RETRY ---
+    async function startRenogySession(device) {
+      if (isConnectingGatt) return;
+      isConnectingGatt = true;
+      bleDevice = device;
+      autoReconnectEnabled = document.getElementById('autoReconnectCheck').checked;
+      const devName = device.name || 'Renogy BT Module';
+      log(`Acquiring GATT session with ${devName}...`, 'info');
+      sendToLinux({ type: 'device_selected', name: devName, id: device.id });
+
+      device.removeEventListener('gattserverdisconnected', onDisconnected);
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+
+      let attempt = 0;
+      let connected = false;
+
+      while (!connected && autoReconnectEnabled) {
+        attempt++;
+        try {
+          if (attempt > 1) {
+            document.getElementById('bleStatusVal').innerHTML = `<span style="color:#fbbf24;">Retrying (${attempt})...</span>`;
+            document.getElementById('bleSubText').textContent = 'Waiting for BT-1 socket';
+            log(`Retrying GATT connection (attempt ${attempt} — continuous mode active)...`, 'warn');
+          }
+          gattServer = await device.gatt.connect();
+          if (gattServer && gattServer.connected) {
+            connected = true;
+            break;
+          }
+        } catch (err) {
+          log(`GATT attempt ${attempt} failed: ${err.message}. Retrying in 3s...`, 'error');
+          sendToLinux({ type: 'error', message: `GATT attempt ${attempt}: ${err.message}` });
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+
+      isConnectingGatt = false;
+      if (!connected) return;
+
+      document.getElementById('disconnectBtn').disabled = false;
+      const bleBadge = document.getElementById('bleBadge');
+      bleBadge.className = 'badge badge-online';
+      bleBadge.textContent = devName;
+
+      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#34d399;">Connected</span>`;
+      document.getElementById('bleSubText').textContent = `${devName} (Channels 0xFFD1/0xFFF1)`;
+
+      log(`🎉 GATT Connected successfully to ${devName}! Initializing channels...`, 'success');
+      requestWakeLock();
+
+      try {
+        const rxService = await gattServer.getPrimaryService(RENOGY_SERVICE_READ);
+        notifyCharObj = await rxService.getCharacteristic(RENOGY_CHAR_NOTIFY);
+        await notifyCharObj.startNotifications();
+        notifyCharObj.addEventListener('characteristicvaluechanged', onIncomingChunk);
+        log('RX Notification Channel (0xFFF1) hooked.', 'success');
+      } catch (e) {
+        log(`RX Service setup: ${e.message}`, 'warn');
+      }
+
+      try {
+        const txService = await gattServer.getPrimaryService(RENOGY_SERVICE_WRITE);
+        writeCharObj = await txService.getCharacteristic(RENOGY_CHAR_WRITE);
+        log('TX Write Channel (0xFFD1) ready.', 'success');
+      } catch (e) {
+        log(`TX Service setup: ${e.message}`, 'warn');
+      }
+
+      sendToLinux({ type: 'gatt_connected', name: devName, id: device.id });
+
+      setTimeout(queryDeviceInfo, 500);
+      setTimeout(() => {
+        queryRealtimeTelemetry();
+        startPollingLoop();
+      }, 1500);
+    }
+
+    async function sendModbusFrame(rawCommand) {
+      if (!writeCharObj) return;
+      try {
+        const crc = calcCrc16(rawCommand);
+        const fullFrame = new Uint8Array([...rawCommand, ...crc]);
+        if (writeCharObj.properties.write) {
+          await writeCharObj.writeValueWithResponse(fullFrame);
+        } else {
+          await writeCharObj.writeValueWithoutResponse(fullFrame);
+        }
+      } catch (e) {}
+    }
+
+    async function queryDeviceInfo() {
+      const raw = new Uint8Array([0xFF, 0x03, 0x00, 0x0A, 0x00, 0x0B]);
+      await sendModbusFrame(raw);
+    }
+
+    async function queryRealtimeTelemetry() {
+      const raw = new Uint8Array([0xFF, 0x03, 0x01, 0x00, 0x00, 0x22]);
+      await sendModbusFrame(raw);
+    }
+
+    function onIncomingChunk(event) {
+      const chunk = new Uint8Array(event.target.value.buffer, event.target.value.byteOffset, event.target.value.byteLength);
+
+      sendToLinux({
+        type: 'notification',
+        characteristic: RENOGY_CHAR_NOTIFY,
+        bytes: Array.from(chunk)
+      });
+
+      const newBuf = new Uint8Array(rxBuffer.length + chunk.length);
+      newBuf.set(rxBuffer);
+      newBuf.set(chunk, rxBuffer.length);
+      rxBuffer = newBuf;
+
+      if (rxTimeout) clearTimeout(rxTimeout);
+
+      if (rxBuffer.length >= 3 && rxBuffer[1] === 0x03) {
+        const expectedLen = 3 + rxBuffer[2] + 2;
+        if (rxBuffer.length >= expectedLen) {
+          const fullFrame = rxBuffer.slice(0, expectedLen);
+          rxBuffer = rxBuffer.slice(expectedLen);
+          parseCompleteModbusFrame(fullFrame);
+          return;
+        }
+      }
+
+      rxTimeout = setTimeout(() => {
+        if (rxBuffer.length >= 5) {
+          parseCompleteModbusFrame(rxBuffer);
+        }
+        rxBuffer = new Uint8Array(0);
+      }, 350);
+    }
+
+    function parseCompleteModbusFrame(bytes) {
+      if (bytes.length < 5 || bytes[1] !== 0x03) return;
+      const byteCount = bytes[2];
+      const data = bytes.slice(3, 3 + byteCount);
+
+      if (byteCount >= 60 || data.length >= 20) {
+        packetCounter++;
+        document.getElementById('packetCount').textContent = packetCounter;
+        document.getElementById('cloudSubText').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
+
+        const battSoc = (data[0] << 8) | data[1];
+        const battVolts = ((data[2] << 8) | data[3]) * 0.1;
+        const pvPower = (data[18] << 8) | data[19];
+        const pvVolts = ((data[14] << 8) | data[15]) * 0.1;
+
+        const stateCode = data.length >= 66 ? data[65] : (data.length > 33 ? data[33] : 0);
+        const stateMap = {
+          0: 'Deactivated', 1: 'Activated', 2: 'MPPT Charging',
+          3: 'Equalizing', 4: 'Boost', 5: 'Floating', 6: 'Current Limiting'
+        };
+        const stateStr = stateMap[stateCode] || `0x${stateCode.toString(16).toUpperCase()}`;
+
+        log(`📡 Modbus RTU #${packetCounter}: PV ${pvPower}W (${pvVolts.toFixed(1)}V) | Batt ${battVolts.toFixed(1)}V (${battSoc}%) | ${stateStr} ➔ Streamed to Cloud`, 'solar');
+      } else if (byteCount >= 20) {
+        const modelBytes = data.slice(4, 20);
+        let modelStr = new TextDecoder().decode(modelBytes).replace(/\0/g, '').trim();
+        if (modelStr) {
+          document.getElementById('hwModelVal').textContent = modelStr;
+        }
+      }
+    }
+
+    function startPollingLoop() {
+      if (pollTimer) clearInterval(pollTimer);
+      if (pollIntervalMs > 0) {
+        pollTimer = setInterval(queryRealtimeTelemetry, pollIntervalMs);
+      }
+    }
+
+    function updatePollRate() {
+      pollIntervalMs = parseInt(document.getElementById('pollIntervalSelect').value, 10);
+      startPollingLoop();
+    }
+
+    function toggleAutoReconnect(enabled) {
+      autoReconnectEnabled = enabled;
+      log(`Auto-reconnect loop set to: ${enabled ? 'ENABLED' : 'DISABLED'}`, 'info');
+    }
+
+    function disconnectDevice() {
+      autoReconnectEnabled = false;
+      document.getElementById('autoReconnectCheck').checked = false;
+      if (pollTimer) clearInterval(pollTimer);
+      if (bleDevice && bleDevice.gatt.connected) {
+        try { bleDevice.gatt.disconnect(); } catch (e) {}
+      }
+      onDisconnected();
+    }
+
+    function onDisconnected() {
+      log('Bluetooth device disconnected.', 'warn');
+      if (pollTimer) clearInterval(pollTimer);
+      document.getElementById('bleBadge').className = 'badge badge-offline';
+      document.getElementById('bleBadge').textContent = 'BLE Disconnected';
+      document.getElementById('bleStatusVal').innerHTML = '<span style="color:#f87171;">Disconnected</span>';
+      document.getElementById('disconnectBtn').disabled = true;
+      sendToLinux({ type: 'device_disconnected' });
+
+      if (autoReconnectEnabled && bleDevice) {
+        log('Auto-reconnect active. Continuous retry starting...', 'warn');
+        setTimeout(() => {
+          if (autoReconnectEnabled && bleDevice) {
+            startRenogySession(bleDevice);
+          }
+        }, 3000);
+      }
+    }
+
+    // Immediate auto-connect on page boot
+    document.addEventListener('DOMContentLoaded', () => {
+      connectWebSocket();
+      tryAutoConnectSavedDevice();
+    });
+
+    window.addEventListener('load', () => {
+      tryAutoConnectSavedDevice();
+      // Watchdog: ensures connection is maintained if tab was in background
+      setInterval(() => {
+        if (autoReconnectEnabled && (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected)) {
+          tryAutoConnectSavedDevice();
+        }
+      }, 5000);
+    });
+  </script>
+</body>
+</html>

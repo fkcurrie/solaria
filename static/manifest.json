@@ -1,0 +1,9 @@
+{
+  "name": "Renogy Solar Bluetooth Proxy",
+  "short_name": "Renogy Solar",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#f59e0b",
+  "description": "Persistent Bluetooth Low Energy proxy for Renogy Rover and BT-1/BT-2 solar controllers to Linux"
+}

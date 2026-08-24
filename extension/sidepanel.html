@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Renogy BLE Solar Proxy</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151e2e;
+      --card-border: #243247;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --solar: #f59e0b;
+      --battery: #10b981;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 14px;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .badge-online { background: #064e3b; color: #6ee7b7; }
+    .badge-offline { background: #7f1d1d; color: #fca5a5; }
+    .badge-solar { background: #78350f; color: #fde68a; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .metric {
+      background: #090d16;
+      border-radius: 4px;
+      padding: 8px;
+      text-align: center;
+    }
+    .metric-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--solar);
+    }
+    .metric-lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    button {
+      background: var(--solar);
+      color: #0b0f19;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+    button:hover { filter: brightness(1.1); }
+    .log-box {
+      background: #090d16;
+      border-radius: 4px;
+      padding: 8px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .log-solar { color: #f59e0b; }
+    .log-err { color: #f87171; }
+    .log-ok { color: #4ade80; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <b>☀️ Renogy BLE Proxy</b>
+    <span id="proxyBadge" class="badge badge-offline">Offline</span>
+  </div>
+
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="color: var(--text-muted);">BLE STATUS</span>
+      <span id="bleStatus" class="badge badge-offline">Not Connected</span>
+    </div>
+    <div id="devName" style="font-weight: 700; margin-top: 4px; color: #f59e0b;">No Device</div>
+    <button id="pairBtn">Pair / Reconnect Renogy</button>
+  </div>
+
+  <div class="card">
+    <div style="font-weight: 600; margin-bottom: 6px;">Live Telemetry</div>
+    <div class="grid">
+      <div class="metric">
+        <div class="metric-lbl">Solar PV</div>
+        <div class="metric-val" id="pvWatts">-- W</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Battery SOC</div>
+        <div class="metric-val" id="battSoc" style="color: #10b981;">-- %</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Battery Volts</div>
+        <div class="metric-val" id="battVolts" style="color: #38bdf8;">-- V</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">State</div>
+        <div class="metric-val" id="chargeState" style="font-size: 0.8rem; color: #a78bfa;">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight: 600; margin-bottom: 6px;">Proxy Log</div>
+    <div id="logBox" class="log-box"></div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
