@@ -291,3 +291,31 @@ func TestHandleWinterizeStatus(t *testing.T) {
 		t.Errorf("Expected winter recommendations, got %v", res["winter_recommendations"])
 	}
 }
+
+func TestHandleSunsetDigest(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sunset-digest", nil)
+	w := httptest.NewRecorder()
+	handleSunsetDigest(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/sunset-digest, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode sunset digest response: %v", err)
+	}
+
+	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
+		t.Errorf("Expected Dorset site, got %v", res["site"])
+	}
+
+	if res["today_generated_kwh"] == nil || res["evening_battery_soc_pct"] == nil {
+		t.Errorf("Expected today_generated_kwh and evening_battery_soc_pct, got %v", res)
+	}
+
+	if res["tomorrow_peak_window"] != "11:30 AM - 02:30 PM" {
+		t.Errorf("Expected tomorrow_peak_window 11:30 AM - 02:30 PM, got %v", res["tomorrow_peak_window"])
+	}
+}
+
