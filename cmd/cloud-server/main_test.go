@@ -319,6 +319,62 @@ func TestHandleSunsetDigest(t *testing.T) {
 	}
 }
 
+func TestHandleSunTimes(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sun-times", nil)
+	w := httptest.NewRecorder()
+	handleSunTimes(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/sun-times, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode sun-times response: %v", err)
+	}
+
+	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
+		t.Errorf("Expected Dorset site, got %v", res["site"])
+	}
+	if res["next_event"] != "sunset" && res["next_event"] != "sunrise" {
+		t.Errorf("Expected next_event to be sunset or sunrise, got %v", res["next_event"])
+	}
+	if res["countdown_text"] == nil || res["countdown_text"] == "" {
+		t.Errorf("Expected non-empty countdown_text")
+	}
+}
+
+func TestCalculateSunTimes(t *testing.T) {
+	// Dorset ON (45.2536 N, -78.8978 W) at solar noon in August
+	loc, _ := time.LoadLocation("America/Toronto")
+	if loc == nil {
+		loc = time.FixedZone("EDT", -4*3600)
+	}
+	// 2026-08-24 13:00:00 EDT (17:00 UTC) -> should be daytime
+	testDateDay := time.Date(2026, 8, 24, 13, 0, 0, 0, loc)
+	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(testDateDay, 45.2536, -78.8978)
+
+	if !isDay {
+		t.Errorf("Expected 13:00 EDT to be daytime, got isDay=false (sunrise=%v, sunset=%v)", sunrise, sunset)
+	}
+	if sunrise.Hour() < 5 || sunrise.Hour() > 8 {
+		t.Errorf("Expected realistic sunrise between 5am and 8am, got %v", sunrise)
+	}
+	if sunset.Hour() < 19 || sunset.Hour() > 22 {
+		t.Errorf("Expected realistic sunset between 7pm and 10pm, got %v", sunset)
+	}
+	if solarNoon.Hour() < 12 || solarNoon.Hour() > 14 {
+		t.Errorf("Expected realistic solar noon between 12pm and 2pm, got %v", solarNoon)
+	}
+
+	// 2026-08-24 02:00:00 EDT -> should be night
+	testDateNight := time.Date(2026, 8, 24, 2, 0, 0, 0, loc)
+	_, _, _, isDayNight := CalculateSunTimes(testDateNight, 45.2536, -78.8978)
+	if isDayNight {
+		t.Errorf("Expected 02:00 EDT to be night, got isDay=true")
+	}
+}
+
 func TestHandleShadingAnalysis(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/shading-analysis", nil)
 	w := httptest.NewRecorder()
