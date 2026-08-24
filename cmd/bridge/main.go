@@ -485,7 +485,7 @@ var (
 )
 
 func uploadToCloud(record SolarRecord) {
-	if storageMode == "local" || cloudEndpoint == "" {
+	if storageMode == "local" && cloudEndpoint == "" {
 		return
 	}
 	uploadMu.Lock()
@@ -504,20 +504,31 @@ func uploadToCloud(record SolarRecord) {
 			return
 		}
 
-		req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
-		if err != nil {
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+cloudToken)
-		req.Header.Set("X-API-Key", cloudToken)
-
 		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return
+
+		// 1. Post to Production Cloud Endpoint
+		if cloudEndpoint != "" {
+			req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
+			if err == nil {
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+cloudToken)
+				req.Header.Set("X-API-Key", cloudToken)
+				if resp, err := client.Do(req); err == nil {
+					resp.Body.Close()
+				}
+			}
 		}
-		defer resp.Body.Close()
+
+		// 2. Post to Local Cloud Server (port 8081) if active
+		localReq, err := http.NewRequest("POST", "http://localhost:8081/api/v1/telemetry", bytes.NewBuffer(payload))
+		if err == nil {
+			localReq.Header.Set("Content-Type", "application/json")
+			localReq.Header.Set("Authorization", "Bearer "+cloudToken)
+			localReq.Header.Set("X-API-Key", cloudToken)
+			if resp, err := client.Do(localReq); err == nil {
+				resp.Body.Close()
+			}
+		}
 	}()
 }
 
