@@ -160,6 +160,32 @@ func (s *DiskSpooler) Spool(record SolarRecord) error {
 	return nil
 }
 
+func (s *DiskSpooler) Count() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := os.Stat(s.spoolPath); os.IsNotExist(err) {
+		return 0
+	}
+	f, err := os.Open(s.spoolPath)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if len(bytes.TrimSpace(scanner.Bytes())) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
 func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -729,9 +755,21 @@ func getIDToken() string {
 }
 
 var (
-	uploadMu        sync.Mutex
-	lastCloudUpload time.Time
+	uploadMu            sync.Mutex
+	lastCloudUpload     time.Time
+	lastSuccessUpload   time.Time
+	totalSuccessUploads int64
 )
+
+func getCloudUploadStats() (time.Time, int64, int) {
+	uploadMu.Lock()
+	defer uploadMu.Unlock()
+	spoolCount := 0
+	if diskSpooler != nil {
+		spoolCount = diskSpooler.Count()
+	}
+	return lastSuccessUpload, totalSuccessUploads, spoolCount
+}
 
 func uploadSingleRecord(record SolarRecord) error {
 	if cloudEndpoint == "" {
@@ -779,10 +817,39 @@ func uploadToCloud(record SolarRecord) {
 	go func() {
 		// 1. Post to Production Cloud Endpoint
 		if err := uploadSingleRecord(record); err != nil {
+			spoolCount := 0
 			if diskSpooler != nil {
 				_ = diskSpooler.Spool(record)
-				fmt.Printf("[\033[33mSPOOL\033[0m] Cloud offline (%v). Telemetry safely spooled to disk.\n", err)
+				spoolCount = diskSpooler.Count()
+				fmt.Printf("[\033[33mSPOOL\033[0m] Cloud offline (%v). Telemetry safely spooled to disk (Queue: %d).\n", err, spoolCount)
 			}
+			broadcastControlMsg(map[string]interface{}{
+				"type":        "cloud_upload",
+				"status":      "error",
+				"error":       err.Error(),
+				"spooled":     true,
+				"spool_count": spoolCount,
+			})
+		} else {
+			uploadMu.Lock()
+			lastSuccessUpload = time.Now()
+			totalSuccessUploads++
+			succTime := lastSuccessUpload
+			succCount := totalSuccessUploads
+			uploadMu.Unlock()
+
+			spoolCount := 0
+			if diskSpooler != nil {
+				spoolCount = diskSpooler.Count()
+			}
+
+			broadcastControlMsg(map[string]interface{}{
+				"type":          "cloud_upload",
+				"status":        "success",
+				"timestamp":     succTime.Format(time.RFC3339),
+				"total_uploads": succCount,
+				"spool_count":   spoolCount,
+			})
 		}
 
 		// 2. Post to Local Cloud Server (port 8081) if active
@@ -818,15 +885,32 @@ func startSpoolDrainer(ctx context.Context) {
 		case <-ticker.C:
 			drained, err := diskSpooler.Drain(uploadSingleRecord)
 			if err == nil && drained > 0 {
+				uploadMu.Lock()
+				lastSuccessUpload = time.Now()
+				totalSuccessUploads += int64(drained)
+				succTime := lastSuccessUpload
+				succCount := totalSuccessUploads
+				uploadMu.Unlock()
+
+				spoolCount := diskSpooler.Count()
 				fmt.Printf("[\033[32mSPOOL DRAINED\033[0m] Successfully restored network uplink: uploaded %d spooled records to Cloud Run!\n", drained)
+				broadcastControlMsg(map[string]interface{}{
+					"type":          "cloud_upload",
+					"status":        "success",
+					"timestamp":     succTime.Format(time.RFC3339),
+					"total_uploads": succCount,
+					"spool_count":   spoolCount,
+					"drained":       drained,
+				})
 			}
 		}
 	}
 }
 
 var (
-	frameMu          sync.Mutex
-	lastFrameProcess time.Time
+	frameMu              sync.Mutex
+	lastFrameProcess     time.Time
+	totalFramesProcessed int64
 )
 
 func processFrame(frame []byte) {
@@ -844,6 +928,8 @@ func processFrame(frame []byte) {
 		return
 	}
 	lastFrameProcess = time.Now()
+	lastFrameTime = lastFrameProcess
+	totalFramesProcessed++
 	frameMu.Unlock()
 
 	nowStr := time.Now().Format("15:04:05.000")
@@ -1338,6 +1424,22 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		_ = conn.WriteMessage(websocket.TextMessage, syncData)
 	}
 
+	// Send initial cloud upload status & spool count
+	lastSucc, totalSucc, spoolCount := getCloudUploadStats()
+	var lastSuccStr string
+	if !lastSucc.IsZero() {
+		lastSuccStr = lastSucc.Format(time.RFC3339)
+	}
+	if cloudSyncData, err := json.Marshal(map[string]interface{}{
+		"type":                     "cloud_sync",
+		"cloud_endpoint":           cloudEndpoint,
+		"last_successful_upload":   lastSuccStr,
+		"total_successful_uploads": totalSucc,
+		"spool_count":              spoolCount,
+	}); err == nil {
+		_ = conn.WriteMessage(websocket.TextMessage, cloudSyncData)
+	}
+
 	var localRx []byte
 
 	for {
@@ -1640,6 +1742,7 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 
 	// 2. Start HTTP Dashboard Server on 8080 (No-cache for instant UI updates)
 	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/api/v1/bridge-status", handleBridgeStatus)
 	httpMux.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
 	fs := http.FileServer(http.Dir("static"))
 	httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -1739,5 +1842,45 @@ func handleNetworkDiscovery(w http.ResponseWriter, r *http.Request) {
 		LocalIPs:        getLocalIPAddresses(),
 	}
 	_ = json.NewEncoder(w).Encode(info)
+}
+
+func handleBridgeStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	lastSucc, totalSucc, spoolCount := getCloudUploadStats()
+	var lastSuccStr string
+	if !lastSucc.IsZero() {
+		lastSuccStr = lastSucc.Format(time.RFC3339)
+	}
+
+	frameMu.Lock()
+	lastFrame := lastFrameTime
+	totalFrames := totalFramesProcessed
+	frameMu.Unlock()
+
+	var lastFrameStr string
+	if !lastFrame.IsZero() {
+		lastFrameStr = lastFrame.Format(time.RFC3339)
+	}
+
+	stats, hist := tracker.GetStats()
+
+	resp := map[string]interface{}{
+		"site":                     siteName,
+		"location": map[string]interface{}{
+			"latitude":  siteLat,
+			"longitude": siteLon,
+		},
+		"cloud_endpoint":           cloudEndpoint,
+		"last_successful_upload":   lastSuccStr,
+		"total_successful_uploads": totalSucc,
+		"last_ble_packet_time":     lastFrameStr,
+		"total_ble_frames":         totalFrames,
+		"spool_count":              spoolCount,
+		"outage_stats":             stats,
+		"outage_history":           hist,
+	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 

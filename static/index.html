@@ -336,6 +336,14 @@
         <span class="info-value" style="color: var(--text-muted);">solaria-solar.solaria.telemetry</span>
       </div>
       <div class="info-row">
+        <span class="info-label">Last Successful Upload:</span>
+        <span class="info-value" id="lastUploadVal" style="color: var(--text-muted);">Never</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Total Cloud Uploads:</span>
+        <span class="info-value" id="totalUploadsVal">0</span>
+      </div>
+      <div class="info-row">
         <span class="info-label">Ingest Status:</span>
         <span class="info-value" id="uplinkStatusVal" style="color: #34d399;">READY (HTTP/2 Auto-Forward)</span>
       </div>
@@ -385,6 +393,34 @@
     let isConnectingGatt = false;
     let wakeLock = null;
     let totalFramesReceived = 0;
+    let lastUploadTimestamp = null;
+    let lastBlePacketTimestamp = null;
+
+    function formatTimeSince(date) {
+      if (!date) return 'Never';
+      const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+      if (seconds < 5) return 'Just now';
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ${minutes % 60}m ago`;
+    }
+
+    function updateRelativeTimestamps() {
+      if (lastUploadTimestamp) {
+        const timeStr = lastUploadTimestamp.toLocaleTimeString();
+        const agoStr = formatTimeSince(lastUploadTimestamp);
+        document.getElementById('lastUploadVal').innerHTML = `<span style="color:#34d399;">${timeStr}</span> <span style="font-size:0.75rem; color:#94a3b8;">(${agoStr})</span>`;
+      }
+      if (lastBlePacketTimestamp) {
+        const timeStr = lastBlePacketTimestamp.toLocaleTimeString();
+        const agoStr = formatTimeSince(lastBlePacketTimestamp);
+        document.getElementById('lastPacketVal').innerHTML = `<span style="color:#34d399;">${timeStr}</span> <span style="font-size:0.75rem; color:#94a3b8;">(${agoStr})</span>`;
+      }
+    }
+
+    setInterval(updateRelativeTimestamps, 1000);
 
     function log(msg, type = 'info') {
       const box = document.getElementById('logBox');
@@ -426,6 +462,26 @@
       return [crc & 0xFF, (crc >> 8) & 0xFF];
     }
 
+    function handleCloudUploadEvent(msg) {
+      if (msg.status === 'success' && msg.timestamp) {
+        lastUploadTimestamp = new Date(msg.timestamp);
+        updateRelativeTimestamps();
+        if (msg.total_uploads !== undefined) {
+          document.getElementById('totalUploadsVal').textContent = msg.total_uploads;
+        }
+        if (msg.spool_count !== undefined) {
+          document.getElementById('spoolCountVal').textContent = `${msg.spool_count} records`;
+        }
+        document.getElementById('uplinkStatusVal').innerHTML = '<span style="color:#34d399;">ACTIVE (Streamed to Cloud Run)</span>';
+        log(`☁️ Cloud Run Ingestion Confirmed: Record uploaded at ${lastUploadTimestamp.toLocaleTimeString()}`, 'success');
+      } else if (msg.status === 'error') {
+        document.getElementById('uplinkStatusVal').innerHTML = '<span style="color:#fbbf24;">SPOOLING (Cloud Offline)</span>';
+        if (msg.spool_count !== undefined) {
+          document.getElementById('spoolCountVal').textContent = `${msg.spool_count} records (buffered to disk)`;
+        }
+      }
+    }
+
     function connectWebSocket() {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${proto}//${window.location.hostname}:8765`;
@@ -435,6 +491,7 @@
         document.getElementById('wsStatusVal').innerHTML = '<span style="color:#34d399;">Connected (ws://127.0.0.1:8765)</span>';
         log('WebSocket bridge connection to Go daemon established on :8765', 'success');
         tryAutoConnectSavedDevice();
+        fetchBridgeStatus();
       };
 
       ws.onmessage = (event) => {
@@ -442,9 +499,23 @@
           const msg = JSON.parse(event.data);
           if (msg.type === 'telemetry') {
             totalFramesReceived++;
+            lastBlePacketTimestamp = new Date();
             document.getElementById('framesCountVal').textContent = totalFramesReceived;
-            document.getElementById('lastPacketVal').textContent = new Date().toLocaleTimeString();
+            updateRelativeTimestamps();
             log(`⚡ Ingested Frame #${totalFramesReceived}: PV ${msg.telemetry.pv_power_w}W | Batt ${msg.telemetry.battery_soc_pct}% (${msg.telemetry.battery_voltage_v}V) ➔ Forwarded to Cloud Run`, 'solar');
+          } else if (msg.type === 'cloud_upload') {
+            handleCloudUploadEvent(msg);
+          } else if (msg.type === 'cloud_sync') {
+            if (msg.last_successful_upload) {
+              lastUploadTimestamp = new Date(msg.last_successful_upload);
+            }
+            if (msg.total_successful_uploads !== undefined) {
+              document.getElementById('totalUploadsVal').textContent = msg.total_successful_uploads;
+            }
+            if (msg.spool_count !== undefined) {
+              document.getElementById('spoolCountVal').textContent = `${msg.spool_count} records`;
+            }
+            updateRelativeTimestamps();
           }
         } catch (e) {}
       };
@@ -456,6 +527,33 @@
 
       ws.onerror = () => {};
     }
+
+    async function fetchBridgeStatus() {
+      try {
+        const res = await fetch('/api/v1/bridge-status');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.last_successful_upload) {
+            lastUploadTimestamp = new Date(data.last_successful_upload);
+          }
+          if (data.total_successful_uploads !== undefined) {
+            document.getElementById('totalUploadsVal').textContent = data.total_successful_uploads;
+          }
+          if (data.total_ble_frames !== undefined && data.total_ble_frames > 0) {
+            document.getElementById('framesCountVal').textContent = data.total_ble_frames;
+          }
+          if (data.last_ble_packet_time) {
+            lastBlePacketTimestamp = new Date(data.last_ble_packet_time);
+          }
+          if (data.spool_count !== undefined) {
+            document.getElementById('spoolCountVal').textContent = `${data.spool_count} records`;
+          }
+          updateRelativeTimestamps();
+        }
+      } catch (e) {}
+    }
+
+    setInterval(fetchBridgeStatus, 10000);
 
     function sendToLinux(payload) {
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -625,7 +723,8 @@
           rxBuffer = rxBuffer.slice(expectedLen);
           const crc = calcCrc16(completeFrame.slice(0, completeFrame.length - 2));
           if (completeFrame[completeFrame.length - 2] === crc[0] && completeFrame[completeFrame.length - 1] === crc[1]) {
-            // Frame verified
+            lastBlePacketTimestamp = new Date();
+            updateRelativeTimestamps();
           }
         }
       }
