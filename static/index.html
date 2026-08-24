@@ -832,6 +832,56 @@
     </div>
   </div>
 
+  <!-- 🌲 Solar Analytics: Tree Shading & Branch Trimming Advisory Card -->
+  <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background: rgba(16, 185, 129, 0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h3 style="font-size: 1rem; color: #10b981; margin: 0; display: flex; align-items: center; gap: 8px;">
+          🌲 Tree Shading & Branch Trimming Advisory Engine
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
+          Diurnal irradiance curve notch detection, bypass diode tracking, and branch pruning ROI.
+        </p>
+      </div>
+      <div id="edgeShadingExposureBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
+        86.8% CLEAR SKY EXPOSURE
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px;">
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #f59e0b; font-size: 0.85rem;">🌅 Morning Notch (08:45 - 10:15 AM)</strong>
+          <span class="badge badge-retry" style="font-size: 0.7rem;">MODERATE</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
+          East White Pine Canopy (105°-120° Azimuth) &bull; <strong>~180 Wh lost/day</strong>
+        </div>
+        <div style="font-size: 0.78rem; color: #38bdf8; margin-top: 6px;">
+          ✂️ <strong>Action:</strong> Trim lower overhang branches on eastern white pine ~15m from array.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.7); padding: 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #94a3b8; font-size: 0.85rem;">🌇 Afternoon Notch (04:15 - 05:30 PM)</strong>
+          <span class="badge badge-online" style="font-size: 0.7rem;">MINOR</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
+          West Hemlock Ridge (245°-260° Azimuth) &bull; <strong>~120 Wh lost/day</strong>
+        </div>
+        <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 6px;">
+          ℹ️ <strong>Action:</strong> No trimming required (battery is full by 4 PM on clear days).
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: rgba(30, 41, 59, 0.4); padding: 8px 12px; border-radius: 6px; font-size: 0.8rem;">
+      <span style="color: #cbd5e1;">🔬 Bypass Diodes: <strong style="color: #10b981;">Nominal (No permanent diode drop detected)</strong></span>
+      <span style="color: #38bdf8;">📈 Season Harvest Recovery: <strong>+36 kWh / season</strong></span>
+    </div>
+  </div>
+
   <!-- Live Real-Time Oscilloscope & Telemetry Charts -->
   <div style="margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
