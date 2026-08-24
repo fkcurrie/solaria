@@ -365,7 +365,7 @@
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
           <h3 style="font-size: 0.95rem; margin: 0;">
-            ☀️ 400W Array Generation (W) vs Atmospheric Irradiance (W/m²)
+            ☀️ 400W Array: Voltage (V) & Output (W) vs Atmospheric Irradiance (W/m²)
           </h3>
           <span id="liveWxPill" class="badge badge-array" style="font-size: 0.75rem;">🌤️ Weather Tracking</span>
         </div>
@@ -717,6 +717,17 @@
           labels: [],
           datasets: [
             {
+              label: 'PV Voltage (V)',
+              data: [],
+              borderColor: '#38bdf8',
+              backgroundColor: 'rgba(56, 189, 248, 0.08)',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              yAxisID: 'yVolts'
+            },
+            {
               label: 'Solar PV Output (W)',
               data: [],
               borderColor: '#f59e0b',
@@ -726,18 +737,18 @@
               pointHoverRadius: 5,
               fill: true,
               tension: 0.2,
-              yAxisID: 'y'
+              yAxisID: 'yWatts'
             },
             {
               label: 'Atmospheric Irradiance (W/m²)',
               data: [],
-              borderColor: '#38bdf8',
+              borderColor: '#a855f7',
               borderDash: [5, 5],
               borderWidth: 1.5,
               pointRadius: 0,
               pointHoverRadius: 5,
               tension: 0.2,
-              yAxisID: 'y1'
+              yAxisID: 'yWatts'
             }
           ]
         },
@@ -747,8 +758,22 @@
           interaction: { mode: 'index', intersect: false },
           scales: {
             x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
-            y: { position: 'left', min: 0, ticks: { color: '#f59e0b' }, grid: { color: '#1e293b' }, title: { display: true, text: 'PV Watts (W)', color: '#f59e0b' } },
-            y1: { position: 'right', min: 0, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Irradiance (W/m²)', color: '#38bdf8' } }
+            yVolts: {
+              position: 'left',
+              suggestedMin: 0,
+              suggestedMax: 45,
+              ticks: { color: '#38bdf8' },
+              grid: { color: '#1e293b' },
+              title: { display: true, text: 'PV Volts (V)', color: '#38bdf8' }
+            },
+            yWatts: {
+              position: 'right',
+              suggestedMin: 0,
+              suggestedMax: 100,
+              ticks: { color: '#f59e0b' },
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Watts & W/m²', color: '#f59e0b' }
+            }
           },
           plugins: {
             legend: { labels: { color: '#cbd5e1' } },
@@ -795,13 +820,23 @@
             {
               label: 'SOC (%)',
               data: [],
-              borderColor: '#8b5cf6',
+              borderColor: '#38bdf8',
               borderDash: [4, 4],
               borderWidth: 1.5,
               pointRadius: 0,
               pointHoverRadius: 5,
               tension: 0.2,
               yAxisID: 'y1'
+            },
+            {
+              label: 'Charge Current (A)',
+              data: [],
+              borderColor: '#fbbf24',
+              borderWidth: 1.5,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.2,
+              yAxisID: 'yAmps'
             }
           ]
         },
@@ -812,7 +847,8 @@
           scales: {
             x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: '#1e293b' } },
             y: { position: 'left', min: 11.0, max: 15.0, ticks: { color: '#10b981' }, grid: { color: '#1e293b' }, title: { display: true, text: 'Volts (V)', color: '#10b981' } },
-            y1: { position: 'right', min: 0, max: 100, ticks: { color: '#8b5cf6' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#8b5cf6' } }
+            y1: { position: 'right', min: 0, max: 100, ticks: { color: '#38bdf8' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'SOC (%)', color: '#38bdf8' } },
+            yAmps: { display: false, min: 0, max: 25 }
           },
           plugins: {
             legend: { labels: { color: '#cbd5e1' } },
@@ -1380,15 +1416,18 @@
 
         liveHistoryCache = list;
         const labels = list.map(item => new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        const pvWatts = list.map(item => item.telemetry?.pv_power_w || 0);
-        const irradiance = list.map(item => item.weather?.direct_radiation_w_m2 || 0);
-        const battVolts = list.map(item => item.telemetry?.battery_voltage_v || 0);
-        const battSoc = list.map(item => item.telemetry?.battery_soc_pct || 0);
+        const pvVolts = list.map(item => item.telemetry?.pv_voltage_v !== undefined ? item.telemetry.pv_voltage_v : 0);
+        const pvWatts = list.map(item => item.telemetry?.pv_power_w !== undefined ? item.telemetry.pv_power_w : 0);
+        const irradiance = list.map(item => item.weather?.direct_radiation_w_m2 !== undefined ? item.weather.direct_radiation_w_m2 : (item.weather?.global_tilted_irradiance_w_m2 || 0));
+        const battVolts = list.map(item => item.telemetry?.battery_voltage_v !== undefined ? item.telemetry.battery_voltage_v : 0);
+        const battSoc = list.map(item => item.telemetry?.battery_soc_pct !== undefined ? item.telemetry.battery_soc_pct : 0);
+        const battAmps = list.map(item => item.telemetry?.battery_current_a !== undefined ? item.telemetry.battery_current_a : 0);
 
         if (solarChart) {
           solarChart.data.labels = labels;
-          solarChart.data.datasets[0].data = pvWatts;
-          solarChart.data.datasets[1].data = irradiance;
+          solarChart.data.datasets[0].data = pvVolts;
+          solarChart.data.datasets[1].data = pvWatts;
+          solarChart.data.datasets[2].data = irradiance;
           solarChart.options.plugins.liveWeatherItems = list;
           solarChart.update('none');
         }
@@ -1397,6 +1436,7 @@
           batteryChart.data.labels = labels;
           batteryChart.data.datasets[0].data = battVolts;
           batteryChart.data.datasets[1].data = battSoc;
+          batteryChart.data.datasets[2].data = battAmps;
           batteryChart.update('none');
         }
       } catch (e) {}
