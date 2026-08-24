@@ -783,6 +783,7 @@
         document.getElementById('wsStatusVal').innerHTML = '<span style="color:#34d399;">Connected (Active)</span>';
         document.getElementById('wsSubText').textContent = 'Relaying to Cloud Run';
         log('Connected to Linux WebSocket gateway (ws://localhost:8765)!', 'success');
+        sendToLinux({ type: 'get_outages' });
         tryAutoConnectSavedDevice();
       };
 
