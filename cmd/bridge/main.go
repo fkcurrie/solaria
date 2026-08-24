@@ -579,6 +579,11 @@ func processFrame(frame []byte) {
 			uploadToCloud(record)
 		}
 
+		broadcastControlMsg(map[string]interface{}{
+			"type":   "telemetry_frame",
+			"record": record,
+		})
+
 		tempStr := "N/A"
 		if wx.TemperatureC != nil {
 			tempStr = fmt.Sprintf("%.1f", *wx.TemperatureC)

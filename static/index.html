@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solaria BLE Bridge & Daemon Gateway</title>
   <link rel="manifest" href="/manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0b0f19;
@@ -437,6 +438,47 @@
     </div>
   </div>
 
+  <!-- Live Real-Time Oscilloscope & Telemetry Charts -->
+  <div style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <h2 style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; margin: 0;">
+          Live Telemetry Oscilloscope & Atmospheric Dynamics
+        </h2>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+          High-frequency real-time stream (PV Voltage, Power, Amps vs Atmospheric Irradiance & Battery Bank)
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span id="chartLiveIndicator" class="badge badge-online" style="font-size: 0.72rem;">Live Stream</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px;">
+      <!-- Solar Array & Irradiance Chart -->
+      <div class="card" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+          <span style="font-size: 0.88rem; font-weight: 600; color: #fbbf24;">400W Array: Voltage (V) & Power (W) vs Irradiance (W/m²)</span>
+          <span id="chartPvLivePill" style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-muted);">--V | --W</span>
+        </div>
+        <div style="position: relative; height: 210px; width: 100%;">
+          <canvas id="liveSolarChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Battery Bank & Current Chart -->
+      <div class="card" style="padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+          <span style="font-size: 0.88rem; font-weight: 600; color: #34d399;">Battery Bank: Voltage (V), Charge (A) & SOC (%)</span>
+          <span id="chartBattLivePill" style="font-family: var(--mono); font-size: 0.78rem; color: var(--text-muted);">--V | --%</span>
+        </div>
+        <div style="position: relative; height: 210px; width: 100%;">
+          <canvas id="liveBatteryChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Battery Chemistry & Profile Configurator -->
   <div class="battery-config-card">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
@@ -771,6 +813,214 @@
       } catch (err) {}
     }
 
+    // --- LIVE OSCILLOSCOPE CHARTS ---
+    let solarChart = null;
+    let batteryChart = null;
+    const MAX_CHART_POINTS = 40;
+
+    function initLiveCharts() {
+      if (typeof Chart === 'undefined') return;
+
+      const solarCtx = document.getElementById('liveSolarChart');
+      if (solarCtx && !solarChart) {
+        solarChart = new Chart(solarCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'PV Voltage (V)',
+                data: [],
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.2,
+                yAxisID: 'yVolts'
+              },
+              {
+                label: 'PV Power (W)',
+                data: [],
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                borderWidth: 2,
+                pointRadius: 2,
+                fill: true,
+                tension: 0.2,
+                yAxisID: 'yWatts'
+              },
+              {
+                label: 'Irradiance (W/m²)',
+                data: [],
+                borderColor: '#a855f7',
+                borderDash: [4, 4],
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.2,
+                yAxisID: 'yWatts'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: {
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0 }
+              },
+              yVolts: {
+                type: 'linear',
+                position: 'left',
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#38bdf8', font: { size: 10 } },
+                suggestedMin: 0,
+                suggestedMax: 45
+              },
+              yWatts: {
+                type: 'linear',
+                position: 'right',
+                grid: { display: false },
+                ticks: { color: '#f59e0b', font: { size: 10 } },
+                suggestedMin: 0,
+                suggestedMax: 50
+              }
+            },
+            plugins: {
+              legend: { labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 } }
+            }
+          }
+        });
+      }
+
+      const battCtx = document.getElementById('liveBatteryChart');
+      if (battCtx && !batteryChart) {
+        batteryChart = new Chart(battCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'Battery (V)',
+                data: [],
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.2,
+                yAxisID: 'yVolts'
+              },
+              {
+                label: 'SOC (%)',
+                data: [],
+                borderColor: '#38bdf8',
+                borderDash: [3, 3],
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.2,
+                yAxisID: 'yPct'
+              },
+              {
+                label: 'Charge (A)',
+                data: [],
+                borderColor: '#fbbf24',
+                borderWidth: 1.5,
+                pointRadius: 2,
+                tension: 0.2,
+                yAxisID: 'yAmps'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: {
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0 }
+              },
+              yVolts: {
+                type: 'linear',
+                position: 'left',
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#34d399', font: { size: 10 } },
+                suggestedMin: 11.5,
+                suggestedMax: 14.8
+              },
+              yPct: {
+                type: 'linear',
+                position: 'right',
+                grid: { display: false },
+                ticks: { color: '#38bdf8', font: { size: 10 } },
+                suggestedMin: 0,
+                suggestedMax: 100
+              },
+              yAmps: { display: false, suggestedMin: 0, suggestedMax: 20 }
+            },
+            plugins: {
+              legend: { labels: { color: '#cbd5e1', font: { size: 11 }, boxWidth: 12 } }
+            }
+          }
+        });
+      }
+    }
+
+    function pushTelemetryToCharts(record) {
+      if (!solarChart || !batteryChart) {
+        initLiveCharts();
+      }
+      if (!solarChart || !batteryChart || !record) return;
+
+      const t = record.telemetry || {};
+      const w = record.weather || {};
+      const timeLabel = formatLocalTime(record.timestamp, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
+
+      const pvV = t.pv_voltage_v !== undefined ? t.pv_voltage_v : 0;
+      const pvW = t.pv_power_w !== undefined ? t.pv_power_w : 0;
+      const pvA = t.pv_current_a !== undefined ? t.pv_current_a : 0;
+      const rad = w.direct_radiation_w_m2 !== undefined ? w.direct_radiation_w_m2 : (w.global_tilted_irradiance_w_m2 || 0);
+
+      const bV = t.battery_voltage_v !== undefined ? t.battery_voltage_v : 0;
+      const bSOC = t.battery_soc_pct !== undefined ? t.battery_soc_pct : 0;
+      const bA = t.battery_current_a !== undefined ? t.battery_current_a : 0;
+
+      // Update Live Solar Chart
+      solarChart.data.labels.push(timeLabel);
+      solarChart.data.datasets[0].data.push(pvV);
+      solarChart.data.datasets[1].data.push(pvW);
+      solarChart.data.datasets[2].data.push(rad);
+
+      if (solarChart.data.labels.length > MAX_CHART_POINTS) {
+        solarChart.data.labels.shift();
+        solarChart.data.datasets.forEach(ds => ds.data.shift());
+      }
+      solarChart.update('none');
+
+      // Update Live Battery Chart
+      batteryChart.data.labels.push(timeLabel);
+      batteryChart.data.datasets[0].data.push(bV);
+      batteryChart.data.datasets[1].data.push(bSOC);
+      batteryChart.data.datasets[2].data.push(bA);
+
+      if (batteryChart.data.labels.length > MAX_CHART_POINTS) {
+        batteryChart.data.labels.shift();
+        batteryChart.data.datasets.forEach(ds => ds.data.shift());
+      }
+      batteryChart.update('none');
+
+      // Update live pills
+      const pvPill = document.getElementById('chartPvLivePill');
+      if (pvPill) {
+        pvPill.textContent = `${pvV.toFixed(1)}V | ${pvW}W (${pvA.toFixed(2)}A)`;
+      }
+      const battPill = document.getElementById('chartBattLivePill');
+      if (battPill) {
+        battPill.textContent = `${bV.toFixed(1)}V | ${bSOC}% (${t.charging_state || 'Nominal'})`;
+      }
+    }
+
     // --- WEBSOCKET TO LINUX BRIDGE ---
     function connectWebSocket() {
       const wsUrl = 'ws://localhost:8765';
@@ -791,7 +1041,11 @@
         try {
           const msg = JSON.parse(event.data);
           
-          if (msg.type === 'outage_sync') {
+          if (msg.type === 'telemetry_frame') {
+            if (msg.record) {
+              pushTelemetryToCharts(msg.record);
+            }
+          } else if (msg.type === 'outage_sync') {
             updateOutageStats(msg.stats);
             renderOutageHistory(msg.history);
           } else if (msg.type === 'outage_event') {
@@ -1264,6 +1518,7 @@
 
     // Immediate auto-connect on page boot
     document.addEventListener('DOMContentLoaded', () => {
+      initLiveCharts();
       connectWebSocket();
       tryAutoConnectSavedDevice();
     });
@@ -1279,6 +1534,7 @@
     });
 
     window.addEventListener('load', () => {
+      initLiveCharts();
       tryAutoConnectSavedDevice();
       // Watchdog: ensures connection is maintained and un-wedged automatically
       setInterval(() => {
