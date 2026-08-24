@@ -506,6 +506,12 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	loc, err := time.LoadLocation("America/Toronto")
+	if err != nil {
+		loc = time.FixedZone("EDT", -4*3600)
+	}
+	nowLocal := time.Now().In(loc)
+
 	hours := make([]string, 24)
 	genWh := make([]interface{}, 24)
 	irradiance := make([]interface{}, 24)
@@ -527,7 +533,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 		q := bqClient.Query(fmt.Sprintf(`
 			SELECT 
-				EXTRACT(HOUR FROM timestamp) as hour,
+				EXTRACT(HOUR FROM timestamp AT TIME ZONE "America/Toronto") as hour,
 				AVG(pv_power_w) as avg_pv_w,
 				MAX(pv_power_w) as max_pv_w,
 				AVG(weather_direct_rad_w_m2 + weather_diffuse_rad_w_m2) as avg_irr,
@@ -535,7 +541,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 				SUM(pv_power_w * (5.0 / 3600.0)) as est_wh,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE DATE(timestamp) = CURRENT_DATE()
+			WHERE DATE(timestamp, "America/Toronto") = CURRENT_DATE("America/Toronto")
 			GROUP BY hour
 			ORDER BY hour
 		`, gcpProject))
@@ -576,8 +582,8 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 		history := ringBuf.GetHistory(1440)
 		for _, item := range history {
 			t, err := time.Parse(time.RFC3339, item.Timestamp)
-			if err == nil && t.Format("2006-01-02") == time.Now().UTC().Format("2006-01-02") {
-				h := t.Hour()
+			if err == nil && t.In(loc).Format("2006-01-02") == nowLocal.Format("2006-01-02") {
+				h := t.In(loc).Hour()
 				if h >= 0 && h < 24 {
 					genWh[h] = float64(item.Telemetry.DailyGeneratedWh)
 					irradiance[h] = item.Weather.DirectRadiationWM2 + item.Weather.DiffuseRadiationWM2
@@ -592,7 +598,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"date":            time.Now().Format("Monday, Jan 02, 2006"),
+		"date":            nowLocal.Format("Monday, Jan 02, 2006"),
 		"hours":           hours,
 		"generation_wh":   genWh,
 		"irradiance_w_m2": irradiance,
@@ -633,14 +639,14 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 		q := bqClient.Query(fmt.Sprintf(`
 			SELECT 
-				CAST(DATE(timestamp) AS STRING) as log_date,
+				CAST(DATE(timestamp, "America/Toronto") AS STRING) as log_date,
 				MAX(daily_generated_wh) / 1000.0 as yield_kwh,
 				MAX(pv_power_w) as peak_w,
 				MIN(battery_voltage_v) as min_batt_v,
 				MAX(battery_voltage_v) as max_batt_v,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE DATE(timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+			WHERE DATE(timestamp, "America/Toronto") >= DATE_SUB(CURRENT_DATE("America/Toronto"), INTERVAL 7 DAY)
 			GROUP BY log_date
 			ORDER BY log_date
 		`, gcpProject))
@@ -725,13 +731,13 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 
 		q := bqClient.Query(fmt.Sprintf(`
 			SELECT 
-				EXTRACT(DAY FROM timestamp) as day_num,
+				EXTRACT(DAY FROM timestamp AT TIME ZONE "America/Toronto") as day_num,
 				MAX(daily_generated_wh) / 1000.0 as yield_kwh,
 				AVG(performance_ratio_pct) as avg_pr,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE EXTRACT(MONTH FROM timestamp) = EXTRACT(MONTH FROM CURRENT_DATE())
-			  AND EXTRACT(YEAR FROM timestamp) = EXTRACT(YEAR FROM CURRENT_DATE())
+			WHERE EXTRACT(MONTH FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(MONTH FROM CURRENT_DATE("America/Toronto"))
+			  AND EXTRACT(YEAR FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(YEAR FROM CURRENT_DATE("America/Toronto"))
 			GROUP BY day_num
 			ORDER BY day_num
 		`, gcpProject))
@@ -795,11 +801,11 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 
 		q := bqClient.Query(fmt.Sprintf(`
 			SELECT 
-				EXTRACT(MONTH FROM timestamp) as month_num,
+				EXTRACT(MONTH FROM timestamp AT TIME ZONE "America/Toronto") as month_num,
 				MAX(total_generated_kwh) - MIN(total_generated_kwh) as month_kwh,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE EXTRACT(YEAR FROM timestamp) = EXTRACT(YEAR FROM CURRENT_DATE())
+			WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(YEAR FROM CURRENT_DATE("America/Toronto"))
 			GROUP BY month_num
 			ORDER BY month_num
 		`, gcpProject))
