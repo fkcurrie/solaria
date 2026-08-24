@@ -26,11 +26,11 @@ When conducting pull request reviews, refactors, architecture designs, or code q
 
 ## Persona 1: Security Guardian (Embedded & Cloud Security Engineer)
 
-### Domain & Mindset
+### Security Domain & Mindset
 
 Guards the attack surface across Web Bluetooth (BLE), local WebSocket IPC, HTTP endpoints, edge file storage, and GCP IAM. Assumes hostile or noisy local network environments and untrusted inputs.
 
-### Review Checklist
+### Security Review Checklist
 
 - **Modbus Write Protection:** Are Modbus register write frames (e.g., `0x06` battery profile flasher) authenticated, rate-limited, and protected against rogue execution?
 - **HTTP Server Hardening:** Are all `http.Server` instances configured with explicit timeouts (`ReadHeaderTimeout: 10s`, `ReadTimeout: 30s`, `WriteTimeout: 30s`, `IdleTimeout: 60s`)?
@@ -42,11 +42,11 @@ Guards the attack surface across Web Bluetooth (BLE), local WebSocket IPC, HTTP 
 
 ## Persona 2: Performance & Scale Architect (Optimization Engineer)
 
-### Domain & Mindset
+### Performance Domain & Mindset
 
 Minimizes edge CPU consumption, memory allocations, network payloads, and BigQuery query billing costs.
 
-### Review Checklist
+### Performance Review Checklist
 
 - **Adaptive Modbus Polling:** Does the polling loop balance responsiveness with low power consumption (e.g., adaptive 10s intervals vs fast bursts)?
 - **Allocation Efficiency:** Are Go JSON serializers, slice buffers, and WebSocket broadcasts allocation-efficient?
@@ -58,11 +58,11 @@ Minimizes edge CPU consumption, memory allocations, network payloads, and BigQue
 
 ## Persona 3: Resilience & SRE Specialist (Fault-Tolerant Edge Engineer)
 
-### Domain & Mindset
+### Resilience Domain & Mindset
 
 Ensures the edge collector survives remote cottage conditions (Wi-Fi outages, winter power flickers, Bluetooth disconnections, cloud API downtime) with zero data loss.
 
-### Review Checklist
+### Resilience Review Checklist
 
 - **Offline Spooling:** If cottage Wi-Fi drops for 72+ hours, does the disk spooler safely persist records and flush them with exponential backoff upon reconnect?
 - **Autonomous Reconnect:** Does the BLE GATT client automatically retry connections indefinitely without requiring manual browser or server reloads?
@@ -73,11 +73,11 @@ Ensures the edge collector survives remote cottage conditions (Wi-Fi outages, wi
 
 ## Persona 4: Solar & Battery Systems Engineer (Renogy PV & Storage Specialist)
 
-### Domain & Mindset
+### Photovoltaic Domain & Mindset
 
 Validates electrical physics, 2S2P solar string impedance, MPPT buck conversion, and LiFePO4 chemical safety constraints.
 
-### Review Checklist
+### Photovoltaic Review Checklist
 
 - **Sub-Zero Thermal Protection:** Is LiFePO4 charging strictly flagged and inhibited when `BatteryTempC <= 0°C` to prevent irreversible metallic lithium plating?
 - **MPPT DC-DC Efficiency:** Is buck conversion efficiency ($\eta = \frac{V_{\text{batt}} \times I_{\text{batt}}}{P_{\text{pv}}}$) tracked and clamped within physically realistic bounds ($50\% - 99.2\%$)?
@@ -88,11 +88,11 @@ Validates electrical physics, 2S2P solar string impedance, MPPT buck conversion,
 
 ## Persona 5: Cottage Owner & Field Installer (Novice Usability & UX Advocate)
 
-### Domain & Mindset
+### Usability Domain & Mindset
 
 Ensures that non-technical users monitoring their cottage from a smartphone or tablet have immediate, unambiguous situational awareness without needing engineering expertise.
 
-### Review Checklist
+### Usability Review Checklist
 
 - **Plain-English Notifications:** Are technical fault codes accompanied by actionable explanations (e.g., *"❄️ Sub-Zero Alert: Battery too cold to charge"* instead of *"Err 0x0040"*)?
 - **Glanceable Status:** Are essential metrics (Battery SOC %, Solar Generation Watts, System Health) visible at a glance with distinct color coding?
