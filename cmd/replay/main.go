@@ -64,7 +64,11 @@ func main() {
 				"sun_classification": rec["sun_condition"],
 			}
 
-			body, _ := json.Marshal(payload)
+			batchPayload := map[string]interface{}{
+				"batch": []interface{}{payload},
+			}
+
+			body, _ := json.Marshal(batchPayload)
 			req, err := http.NewRequest("POST", *endpoint, bytes.NewReader(body))
 			if err != nil {
 				fmt.Printf("[%d/%d] Request creation error: %v\n", i+1, len(rawRecords), err)
@@ -72,6 +76,7 @@ func main() {
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+*token)
+			req.Header.Set("X-API-Key", *token)
 
 			resp, err := client.Do(req)
 			if err != nil {

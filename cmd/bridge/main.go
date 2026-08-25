@@ -368,21 +368,24 @@ type SolarRecord struct {
 }
 
 func loadEnv() {
-	envPath := ".env"
-	data, err := os.ReadFile(envPath)
-	if err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
-				continue
+	envCandidates := []string{".env", "../.env", "../../.env", "/home/fcurrie/Projects/solar-testing/.env"}
+	for _, envPath := range envCandidates {
+		data, err := os.ReadFile(envPath)
+		if err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") || !strings.Contains(line, "=") {
+					continue
+				}
+				parts := strings.SplitN(line, "=", 2)
+				k := strings.TrimSpace(parts[0])
+				v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+				if os.Getenv(k) == "" {
+					os.Setenv(k, v)
+				}
 			}
-			parts := strings.SplitN(line, "=", 2)
-			k := strings.TrimSpace(parts[0])
-			v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
-			if os.Getenv(k) == "" {
-				os.Setenv(k, v)
-			}
+			break
 		}
 	}
 
@@ -1789,8 +1792,14 @@ func startMockSimulator(ctx context.Context) {
 	}
 
 	var items []SimItem
-	if data, err := os.ReadFile("testdata/sample_day.json"); err == nil {
-		_ = json.Unmarshal(data, &items)
+	sampleCandidates := []string{"testdata/sample_day.json", "../testdata/sample_day.json", "../../testdata/sample_day.json", "cmd/cloud-server/testdata/sample_day.json", "/home/fcurrie/Projects/solar-testing/testdata/sample_day.json"}
+	for _, p := range sampleCandidates {
+		if data, err := os.ReadFile(p); err == nil {
+			_ = json.Unmarshal(data, &items)
+			if len(items) > 0 {
+				break
+			}
+		}
 	}
 
 	simIdx := 720 // Start at solar midday

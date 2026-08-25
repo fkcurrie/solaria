@@ -46,6 +46,7 @@ func (u *Uploader) FlushPending() {
 		req.Header.Set("Content-Type", "application/json")
 		if u.token != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", u.token))
+			req.Header.Set("X-API-Key", u.token)
 		}
 
 		resp, err := u.client.Do(req)
