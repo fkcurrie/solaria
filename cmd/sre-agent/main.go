@@ -87,6 +87,24 @@ func (a *SREAgent) saveIncidents() {
 	}
 }
 
+func (a *SREAgent) ResolveCategory(category, title string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	modified := false
+	for i := range a.incidents {
+		if !a.incidents[i].Resolved && a.incidents[i].Category == category {
+			if title == "" || a.incidents[i].Title == title {
+				a.incidents[i].Resolved = true
+				modified = true
+			}
+		}
+	}
+	if modified {
+		a.saveIncidents()
+	}
+}
+
 func (a *SREAgent) RecordIncident(inc Incident) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -219,6 +237,23 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 			})
 		}
 		_ = resp.Body.Close()
+	}
+
+	// Auto-resolve recovered incidents
+	if bridgeActive {
+		a.ResolveCategory("EDGE_CONNECTIVITY", "Local Edge Bridge Unreachable")
+	}
+	if spoolPass {
+		a.ResolveCategory("EDGE_CONNECTIVITY", "Offline Spool Queue Elevated")
+	}
+	if cloudActive && lifepo4Pass {
+		a.ResolveCategory("BATTERY_SAFETY", "")
+	}
+	if cloudActive && stringPass {
+		a.ResolveCategory("ARRAY_TOPOLOGY", "")
+	}
+	if cloudActive && securityPass {
+		a.ResolveCategory("SECURITY", "")
 	}
 
 	overall := "HEALTHY"

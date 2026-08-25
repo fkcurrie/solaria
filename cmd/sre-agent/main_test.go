@@ -170,3 +170,63 @@ func TestSREAgent_RunAudit_DiodeFault(t *testing.T) {
 		t.Errorf("Expected OverallHealth DEGRADED, got %s", status.OverallHealth)
 	}
 }
+
+func TestSREAgent_AutoResolveIncidents(t *testing.T) {
+	tempDir := t.TempDir()
+	incidentFile := tempDir + "/test_incidents.json"
+
+	isBridgeUp := false
+
+	bridgeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isBridgeUp {
+			http.Error(w, "Bridge starting...", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"spool_count": 0})
+	}))
+	defer bridgeServer.Close()
+
+	cloudServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/live" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"telemetry": map[string]interface{}{
+					"pv_power_w":        350,
+					"pv_voltage_v":      36.0,
+					"battery_voltage_v": 13.6,
+					"battery_current_a": 12.0,
+					"battery_temp_c":    22,
+				},
+				"weather": map[string]interface{}{"direct_radiation_w_m2": 400.0},
+			})
+			return
+		}
+		if r.URL.Path == "/api/v1/hardware-config" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}))
+	defer cloudServer.Close()
+
+	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, incidentFile, "test_token")
+
+	// 1. Audit while bridge is down -> records unresolved incident
+	status1 := agent.RunAudit(context.Background())
+	if status1.ActiveIncidents != 1 {
+		t.Fatalf("Expected 1 active incident while bridge down, got %d", status1.ActiveIncidents)
+	}
+	if agent.GetIncidents()[0].Resolved {
+		t.Fatalf("Expected incident to be unresolved initially")
+	}
+
+	// 2. Bridge recovers -> Audit auto-resolves incident
+	isBridgeUp = true
+	status2 := agent.RunAudit(context.Background())
+	if status2.ActiveIncidents != 0 {
+		t.Fatalf("Expected 0 active incidents after recovery, got %d", status2.ActiveIncidents)
+	}
+	if !agent.GetIncidents()[0].Resolved {
+		t.Fatalf("Expected incident to be marked resolved: true after recovery")
+	}
+}
