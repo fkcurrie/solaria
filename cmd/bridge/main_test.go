@@ -116,10 +116,12 @@ func TestIsAllowedOrigin(t *testing.T) {
 		{"", true},
 		{"http://localhost:8080", true},
 		{"http://127.0.0.1:8080", true},
+		{"http://solaria.local:8080", true},
 		{"http://192.168.1.100:8080", true},
 		{"http://10.0.0.45:8080", true},
 		{"https://solaria-dashboard-952659886764.us-central1.run.app", true},
-		{"chrome-extension://solaria-bridge-helper", true},
+		{"https://evil-attacker.run.app", false},
+		{"chrome-extension://solaria-bridge-helper", false},
 		{"https://malicious-site.com", false},
 		{"http://54.210.12.89", false},
 	}
@@ -140,17 +142,18 @@ func TestVerifyBridgeAuth(t *testing.T) {
 	bridgeToken = "test_secret_bridge_token_123"
 	defer func() { bridgeToken = "" }()
 
-	// 1. Valid Query Param
-	req1, _ := http.NewRequest("GET", "ws://localhost:8765?token=test_secret_bridge_token_123", nil)
+	// 1. Valid Authorization Header
+	req1, _ := http.NewRequest("GET", "ws://localhost:8765", nil)
+	req1.Header.Set("Authorization", "Bearer test_secret_bridge_token_123")
 	if !verifyBridgeAuth(req1, "") {
-		t.Errorf("Expected auth with query token to pass")
+		t.Errorf("Expected auth with Bearer header to pass")
 	}
 
-	// 2. Valid Authorization Header
+	// 2. Valid X-API-Key Header
 	req2, _ := http.NewRequest("GET", "ws://localhost:8765", nil)
-	req2.Header.Set("Authorization", "Bearer test_secret_bridge_token_123")
+	req2.Header.Set("X-API-Key", "test_secret_bridge_token_123")
 	if !verifyBridgeAuth(req2, "") {
-		t.Errorf("Expected auth with Bearer header to pass")
+		t.Errorf("Expected auth with X-API-Key header to pass")
 	}
 
 	// 3. Valid Payload Token
@@ -159,9 +162,8 @@ func TestVerifyBridgeAuth(t *testing.T) {
 	}
 
 	// 4. Invalid Token
-	reqInvalid, _ := http.NewRequest("GET", "ws://localhost:8765?token=wrong_token", nil)
-	if verifyBridgeAuth(reqInvalid, "wrong_token") {
-		t.Errorf("Expected invalid token to be rejected")
+	if verifyBridgeAuth(nil, "wrong_token_456") {
+		t.Errorf("Expected auth with invalid token to fail")
 	}
 }
 

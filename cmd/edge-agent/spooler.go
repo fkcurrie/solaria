@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"sync"
@@ -34,10 +35,15 @@ func (s *Spooler) Append(record SolarRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Check file size before appending
+	// Check file size before appending and rotate safely on line boundaries if exceeding limit
 	if fi, err := os.Stat(s.filePath); err == nil && fi.Size() > MaxSpoolBytes {
-		// Log note or truncate older half if needed
-		_ = os.Truncate(s.filePath, MaxSpoolBytes/2)
+		if data, rErr := os.ReadFile(s.filePath); rErr == nil {
+			// Find newline near the midpoint to preserve valid JSON lines
+			mid := len(data) / 2
+			if idx := bytes.IndexByte(data[mid:], '\n'); idx != -1 {
+				_ = os.WriteFile(s.filePath, data[mid+idx+1:], 0600)
+			}
+		}
 	}
 
 	f, err := os.OpenFile(s.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)

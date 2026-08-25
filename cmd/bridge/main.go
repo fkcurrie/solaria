@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/csv"
 	"encoding/hex"
@@ -38,7 +39,7 @@ var (
 	siteName        = "1296 Wren Lake Drive, Dorset, ON"
 	arrayRatedWatts = 400.0
 	cloudEndpoint   = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
-	cloudToken      = "solaria_cottage_secret_token_2026"
+	cloudToken      = ""
 	bridgeToken     = ""
 	storageMode     = "both" // "local", "bigquery" / "cloud", "both"
 	siteTZ          = "America/Toronto"
@@ -72,7 +73,11 @@ func isAllowedOrigin(r *http.Request) bool {
 		return false
 	}
 	host := u.Hostname()
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasSuffix(host, ".run.app") || strings.HasPrefix(origin, "chrome-extension://") {
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "solaria.local" {
+		return true
+	}
+	// Exact production cloud dashboard origin
+	if host == "solaria-dashboard-952659886764.us-central1.run.app" {
 		return true
 	}
 	// Check private LAN IP ranges (192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12)
@@ -94,22 +99,30 @@ func initBridgeAuth() {
 		token = hex.EncodeToString(b)
 	}
 	bridgeToken = token
+	cloudToken = token
+}
+
+func constantTimeEqual(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 func verifyBridgeAuth(r *http.Request, payloadToken string) bool {
 	if bridgeToken == "" {
 		return true
 	}
-	if r != nil && r.URL.Query().Get("token") == bridgeToken {
-		return true
-	}
 	if r != nil {
 		auth := r.Header.Get("Authorization")
-		if strings.HasPrefix(auth, "Bearer ") && strings.TrimPrefix(auth, "Bearer ") == bridgeToken {
+		if strings.HasPrefix(auth, "Bearer ") && constantTimeEqual(strings.TrimPrefix(auth, "Bearer "), bridgeToken) {
+			return true
+		}
+		if apiKey := r.Header.Get("X-API-Key"); apiKey != "" && constantTimeEqual(apiKey, bridgeToken) {
 			return true
 		}
 	}
-	if payloadToken != "" && payloadToken == bridgeToken {
+	if payloadToken != "" && constantTimeEqual(payloadToken, bridgeToken) {
 		return true
 	}
 	return false
