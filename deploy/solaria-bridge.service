@@ -1,0 +1,30 @@
+[Unit]
+Description=Solaria Renogy Solar BLE Bridge & Resilient Telemetry Gateway
+Documentation=https://github.com/fkcurrie/solaria
+After=network-online.target bluetooth.target systemd-resolved.service
+Wants=network-online.target bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+Type=simple
+User=fcurrie
+WorkingDirectory=/home/fcurrie/Projects/solar-testing
+EnvironmentFile=-/home/fcurrie/Projects/solar-testing/.env
+ExecStart=/home/fcurrie/Projects/solar-testing/bin/solaria-bridge
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=3s
+TimeoutStopSec=10s
+
+# Sandboxing & Capabilities
+LimitNOFILE=65536
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_NET_RAW
+
+# Logging to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=solaria-bridge
+
+[Install]
+WantedBy=multi-user.target

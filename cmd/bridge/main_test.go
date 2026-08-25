@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -419,5 +420,137 @@ func TestDiskSpooler_AtomicCountPerformance(t *testing.T) {
 
 	if count := spooler.Count(); count != 10 {
 		t.Errorf("Expected atomic count 10, got %d", count)
+	}
+}
+
+func TestDiskSpooler_DrainBatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	spooler := NewDiskSpooler(tmpDir)
+
+	for i := 0; i < 25; i++ {
+		_ = spooler.Spool(SolarRecord{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Site:      "Test Site",
+			Telemetry: Telemetry{PVPowerW: 100 + i},
+		})
+	}
+
+	if count := spooler.Count(); count != 25 {
+		t.Fatalf("Expected spool count 25, got %d", count)
+	}
+
+	var totalBatches int
+	var totalRecords int
+	drained, err := spooler.DrainBatch(func(batch []SolarRecord) error {
+		totalBatches++
+		totalRecords += len(batch)
+		if len(batch) > 10 {
+			t.Errorf("Batch chunk exceeded max batch size 10: got %d", len(batch))
+		}
+		return nil
+	}, 10)
+
+	if err != nil {
+		t.Fatalf("DrainBatch returned error: %v", err)
+	}
+	if drained != 25 {
+		t.Errorf("Expected 25 records drained, got %d", drained)
+	}
+	if totalBatches != 3 { // 10, 10, 5
+		t.Errorf("Expected 3 batches, got %d", totalBatches)
+	}
+	if spooler.Count() != 0 {
+		t.Errorf("Expected spool count 0 after drain, got %d", spooler.Count())
+	}
+}
+
+func TestHandleHealth(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	w := httptest.NewRecorder()
+	handleHealth(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode health response: %v", err)
+	}
+
+	if resp["status"] != "healthy" && resp["status"] != "degraded" {
+		t.Errorf("Unexpected health status: %v", resp["status"])
+	}
+	if _, ok := resp["uptime_seconds"]; !ok {
+		t.Errorf("Expected uptime_seconds in health response")
+	}
+}
+
+func TestHandleReload_Auth(t *testing.T) {
+	bridgeToken = "secure_reload_token_999"
+	defer func() { bridgeToken = "" }()
+
+	// 1. Unauthorized reload
+	req1, _ := http.NewRequest(http.MethodPost, "/api/v1/reload", nil)
+	w1 := httptest.NewRecorder()
+	handleReload(w1, req1)
+	if w1.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for unauthenticated reload, got %d", w1.Code)
+	}
+
+	// 2. Authorized reload
+	req2, _ := http.NewRequest(http.MethodPost, "/api/v1/reload", nil)
+	req2.Header.Set("Authorization", "Bearer secure_reload_token_999")
+	w2 := httptest.NewRecorder()
+	handleReload(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Errorf("Expected status 200 for authorized reload, got %d", w2.Code)
+	}
+}
+
+func TestUploadBatchRecords(t *testing.T) {
+	var receivedBatches int
+	var receivedAuthHeader string
+	var receivedKeyHeader string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuthHeader = r.Header.Get("Authorization")
+		receivedKeyHeader = r.Header.Get("X-API-Key")
+
+		var body map[string][]SolarRecord
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+			receivedBatches += len(body["batch"])
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer ts.Close()
+
+	origEndpoint := cloudEndpoint
+	origToken := cloudToken
+	cloudEndpoint = ts.URL
+	cloudToken = "test_batch_token_777"
+	defer func() {
+		cloudEndpoint = origEndpoint
+		cloudToken = origToken
+	}()
+
+	records := []SolarRecord{
+		{Timestamp: "2026-08-25T12:00:00Z", Site: "Site A"},
+		{Timestamp: "2026-08-25T12:01:00Z", Site: "Site A"},
+	}
+
+	if err := uploadBatchRecords(records); err != nil {
+		t.Fatalf("uploadBatchRecords failed: %v", err)
+	}
+
+	if receivedBatches != 2 {
+		t.Errorf("Expected 2 received records, got %d", receivedBatches)
+	}
+	if receivedKeyHeader != "test_batch_token_777" {
+		t.Errorf("Expected X-API-Key 'test_batch_token_777', got %q", receivedKeyHeader)
+	}
+	if !strings.HasPrefix(receivedAuthHeader, "Bearer ") {
+		t.Errorf("Expected Authorization starting with 'Bearer ', got %q", receivedAuthHeader)
 	}
 }

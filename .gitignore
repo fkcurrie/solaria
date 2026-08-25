@@ -71,7 +71,6 @@ yarn-error.log*
 *.swo
 *~
 
-# Local Development Files & Scripts (Excluded from Public Repo)
+# Local Development Files (Excluded from Public Repo)
 deploy/deploy.sh
 deploy/config.yaml
-scripts/
