@@ -31,38 +31,38 @@ func NewUploader(endpoint, token string, spooler *Spooler) *Uploader {
 }
 
 func (u *Uploader) FlushPending() {
-	records, err := u.spooler.ReadBatch(30)
-	if err != nil || len(records) == 0 {
-		return
-	}
+	drained, err := u.spooler.Drain(func(rec SolarRecord) error {
+		payload := BatchPayload{Batch: []SolarRecord{rec}}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
 
-	payload := BatchPayload{Batch: records}
-	data, err := json.Marshal(payload)
+		req, err := http.NewRequest("POST", u.endpoint, bytes.NewBuffer(data))
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		if u.token != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", u.token))
+		}
+
+		resp, err := u.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			return fmt.Errorf("ingest rejected with status %d", resp.StatusCode)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return
-	}
-
-	req, err := http.NewRequest("POST", u.endpoint, bytes.NewBuffer(data))
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if u.token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", u.token))
-	}
-
-	resp, err := u.client.Do(req)
-	if err != nil {
-		log.Printf("[Uploader] Cloud offline: %v (data queued safely in spool)", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-		log.Printf("[Uploader] Synced %d record(s) to Cloud Run", len(records))
-		_ = u.spooler.Clear()
-	} else {
-		log.Printf("[Uploader] Ingest rejected status %d", resp.StatusCode)
+		log.Printf("[Uploader] Cloud offline: %v (remaining spooled safely)", err)
+	} else if drained > 0 {
+		log.Printf("[Uploader] Synced %d record(s) to Cloud Run", drained)
 	}
 }

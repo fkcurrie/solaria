@@ -152,9 +152,24 @@ func NewDiskSpooler(dir string) *DiskSpooler {
 	}
 }
 
+const MaxBridgeSpoolBytes int64 = 50 * 1024 * 1024 // 50MB quota
+
 func (s *DiskSpooler) Spool(record SolarRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Check file size and rotate safely on line boundary if exceeding 50MB quota
+	if fi, err := os.Stat(s.spoolPath); err == nil && fi.Size() > MaxBridgeSpoolBytes {
+		if data, rErr := os.ReadFile(s.spoolPath); rErr == nil {
+			mid := len(data) / 2
+			if idx := bytes.IndexByte(data[mid:], '\n'); idx != -1 {
+				tmpPath := s.spoolPath + ".rotate.tmp"
+				if err := os.WriteFile(tmpPath, data[mid+idx+1:], 0600); err == nil {
+					_ = os.Rename(tmpPath, s.spoolPath)
+				}
+			}
+		}
+	}
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -170,7 +185,7 @@ func (s *DiskSpooler) Spool(record SolarRecord) error {
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return err
 	}
-	return nil
+	return f.Sync()
 }
 
 func (s *DiskSpooler) Count() int {
@@ -191,6 +206,7 @@ func (s *DiskSpooler) Count() int {
 
 	count := 0
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		if len(bytes.TrimSpace(scanner.Bytes())) > 0 {
 			count++
@@ -201,19 +217,26 @@ func (s *DiskSpooler) Count() int {
 
 func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if _, err := os.Stat(s.spoolPath); os.IsNotExist(err) {
+		s.mu.Unlock()
 		return 0, nil
 	}
 
-	f, err := os.Open(s.spoolPath)
+	stagingPath := s.spoolPath + ".processing"
+	if err := os.Rename(s.spoolPath, stagingPath); err != nil {
+		s.mu.Unlock()
+		return 0, err
+	}
+	s.mu.Unlock()
+
+	f, err := os.Open(stagingPath)
 	if err != nil {
 		return 0, err
 	}
 
 	var toUpload []SolarRecord
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
 		if len(line) == 0 {
@@ -222,12 +245,19 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 		var r SolarRecord
 		if err := json.Unmarshal(line, &r); err == nil {
 			toUpload = append(toUpload, r)
+		} else {
+			// Quarantine corrupted record
+			qf, qErr := os.OpenFile(s.spoolPath+".corrupt.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if qErr == nil {
+				_, _ = qf.Write(append(line, '\n'))
+				_ = qf.Close()
+			}
 		}
 	}
 	f.Close()
 
 	if len(toUpload) == 0 {
-		_ = os.Remove(s.spoolPath)
+		_ = os.Remove(stagingPath)
 		return 0, nil
 	}
 
@@ -240,21 +270,31 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 			break
 		}
 		drainedCount++
+		// Backpressure pause between records during recovery
+		time.Sleep(10 * time.Millisecond)
 	}
 
-	if len(remaining) == 0 {
-		_ = os.Remove(s.spoolPath)
-	} else {
-		tmpPath := s.spoolPath + ".tmp"
+	_ = os.Remove(stagingPath)
+
+	if len(remaining) > 0 {
+		s.mu.Lock()
+		// Write remaining records back to spool file
+		tmpPath := s.spoolPath + ".requeue.tmp"
 		tf, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 		if err == nil {
 			for _, r := range remaining {
 				d, _ := json.Marshal(r)
 				_, _ = tf.Write(append(d, '\n'))
 			}
+			// If existing spool arrived while we were draining, append it too
+			if existingData, readErr := os.ReadFile(s.spoolPath); readErr == nil && len(existingData) > 0 {
+				_, _ = tf.Write(existingData)
+			}
+			_ = tf.Sync()
 			tf.Close()
 			_ = os.Rename(tmpPath, s.spoolPath)
 		}
+		s.mu.Unlock()
 	}
 
 	return drainedCount, nil
@@ -1175,7 +1215,10 @@ func (t *OutageTracker) save() {
 	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err == nil {
-		_ = os.WriteFile(outageFilePath, data, 0600)
+		tmpPath := outageFilePath + ".tmp"
+		if wErr := os.WriteFile(tmpPath, data, 0600); wErr == nil {
+			_ = os.Rename(tmpPath, outageFilePath)
+		}
 	}
 }
 
@@ -1390,6 +1433,9 @@ func startBluetoothWatchdog(ctx context.Context) {
 
 	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous Bluetooth, Outage Logger & Watchdog active.\n")
 
+	watchdogAttempt := 0
+	var nextReconnectAttempt time.Time
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -1436,17 +1482,30 @@ func startBluetoothWatchdog(ctx context.Context) {
 				// Self-heal Linux bluetooth subsystem
 				checkAndHealBluetoothSubsystem()
 
-				if clientCount > 0 {
+				now := time.Now()
+				if clientCount > 0 && (nextReconnectAttempt.IsZero() || now.After(nextReconnectAttempt)) {
+					// Calculate exponential backoff with jitter (base 2s, factor 1.8, max 60s)
+					watchdogAttempt++
+					backoffSec := math.Min(60.0, 2.0*math.Pow(1.8, float64(watchdogAttempt)))
+					jitterSec := float64(time.Now().UnixNano()%1000) / 1000.0 * 2.0
+					nextReconnectAttempt = now.Add(time.Duration(backoffSec+jitterSec) * time.Second)
+
 					// Instruct browser client to force-reconnect GATT session
 					broadcastControlMsg(map[string]interface{}{
 						"type":                      "watchdog_reconnect",
 						"reason":                    "stalled_telemetry",
 						"seconds_since_last_packet": int(elapsed.Seconds()),
+						"reconnect_attempt":         watchdogAttempt,
+						"next_backoff_sec":          int(backoffSec + jitterSec),
 					})
-				} else {
+				} else if clientCount == 0 {
 					fmt.Printf("[\033[1;31mWATCHDOG\033[0m] No browser WebSocket connected to ws://localhost:%d. Open http://localhost:%d in Chrome.\n", wsPort, httpPort)
 				}
 			} else {
+				// Reset backoff state when fresh telemetry is flowing
+				watchdogAttempt = 0
+				nextReconnectAttempt = time.Time{}
+
 				// Send lightweight heartbeat ping with uptime stats
 				stats, _ := tracker.GetStats()
 				broadcastControlMsg(map[string]interface{}{
