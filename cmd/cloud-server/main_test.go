@@ -579,9 +579,40 @@ func TestHandleSunTimes_SolarElevation(t *testing.T) {
 	}
 }
 
+func TestRingBuffer_ClonedSliceIntegrity(t *testing.T) {
+	rb := NewRingBuffer(10)
 
+	rb.Push([]SolarRecord{
+		{Timestamp: "item-1"},
+		{Timestamp: "item-2"},
+	})
 
+	history := rb.GetHistory(2)
+	if len(history) != 2 {
+		t.Fatalf("Expected 2 items, got %d", len(history))
+	}
 
+	// Mutate returned slice
+	history[0].Timestamp = "MUTATED"
 
+	// Ensure internal ring buffer was NOT mutated
+	freshHistory := rb.GetHistory(2)
+	if freshHistory[0].Timestamp == "MUTATED" {
+		t.Errorf("Data race / aliasing bug: mutating returned slice modified internal ring buffer!")
+	}
+}
 
+func BenchmarkRingBuffer_PushAndHistory(b *testing.B) {
+	rb := NewRingBuffer(1440)
+	item := SolarRecord{
+		Timestamp: "2026-08-25T12:00:00Z",
+		Telemetry: Telemetry{PVPowerW: 350, BatteryVoltageV: 13.4},
+		Weather:   WeatherMetrics{DirectRadiationWM2: 800},
+	}
 
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rb.Push([]SolarRecord{item})
+		_ = rb.GetHistory(60)
+	}
+}

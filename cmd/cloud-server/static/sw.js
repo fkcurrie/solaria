@@ -1,5 +1,5 @@
 // Solaria Service Worker - Offline Shell & Cache Strategy
-const CACHE_NAME = 'solaria-shell-v1';
+const CACHE_NAME = 'solaria-shell-v2';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
@@ -34,6 +34,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request).catch(() => {
         return new Response(JSON.stringify({ offline: true, message: "Offline - displaying cached data" }), {
+          status: 503,
           headers: { 'Content-Type': 'application/json' }
         });
       })
@@ -54,7 +55,7 @@ self.addEventListener('fetch', event => {
         return cachedResponse;
       }
       return fetch(event.request).then(networkResponse => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        if (!networkResponse || (networkResponse.status !== 200 && networkResponse.status !== 0) || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
           return networkResponse;
         }
         const responseToCache = networkResponse.clone();
