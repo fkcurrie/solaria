@@ -6,7 +6,7 @@
 
 ## The Core Mission
 
-To build a resilient, highly accurate, edge-to-cloud solar monitoring and intelligence platform for off-grid and battery systems powered by Renogy charge controllers (BT-1/BT-2 RS232/RS485). The system continuously correlates actual photovoltaic energy harvest with localized atmospheric conditions at **1296 Wren Lake Drive, Dorset, Ontario, Canada (45.186° N, 78.863° W)** to provide actionable insights on solar performance, shading, cloud attenuation, and battery health, streaming real-time and historical analytics into **Google BigQuery** (`solaria-solar.solaria.telemetry`).
+To build a resilient, highly accurate, edge-to-cloud solar monitoring and intelligence platform for off-grid and battery systems powered by Renogy charge controllers (BT-1/BT-2 RS232/RS485). The system continuously correlates actual photovoltaic energy harvest with localized atmospheric conditions at **1296 Wren Lake Drive, Dorset, Ontario, Canada (45.2536° N, 78.8978° W)** to provide actionable insights on solar performance, shading, cloud attenuation, and battery health, streaming real-time and historical analytics into **Google BigQuery** (`solaria-solar.solaria.telemetry`).
 
 ---
 
@@ -48,6 +48,7 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
 - **Offline Autonomy:** The edge node (Raspberry Pi or Linux micro-server) operates autonomously. If cottage Wi-Fi drops, telemetry spools locally with zero data loss.
 - **Self-Healing BLE Link:** Bluetooth Low Energy links to the BT-1 module implement automatic reconnection and chunk reassembly without human intervention.
 - **Pure Modbus RTU:** Communication uses standard Modbus RTU frames over transparent BLE characteristics (`0xFFD1` TX / `0xFFF1` RX).
+- **Uplink Telemetry Tracking:** The edge bridge explicitly tracks `last_success_upload` timestamp, cumulative upload count, and pending disk spool count, exposing real-time metrics at `GET /api/v1/bridge-status`.
 
 ### 2. Environmental & Performance Fusion
 
@@ -67,10 +68,14 @@ To build a resilient, highly accurate, edge-to-cloud solar monitoring and intell
   - `ABSORPTION_FLOAT_CLIPPED`: Battery SOC $\ge 99\%$ causing controller to back off PV input.
   - `NIGHT`: Sun elevation $< 0^\circ$ or PV Voltage $< 5\text{V}$.
 
-### 3. Serverless Analytical Store
+### 3. Astronomical Solar Precision & Real-Time Daylight Countdown
 
-- **Google Cloud BigQuery:** Telemetry is streamed directly into `solaria-solar.solaria.telemetry` with daily time-partitioning on `timestamp` and clustering on `site` and `sun_classification`.
-- **Google Cloud Run:** Go dashboard microservice providing real-time ring buffer streaming and analytical visualization.
+- **Equation of Time & Solar Declination:** Rather than relying solely on cached weather reports, Solaria implements pure astronomical algorithms (`CalculateSunTimes`) using exact coordinates (`45.2536° N, 78.8978° W`).
+- **Dynamic 1-Second Countdown Engine:**
+  - **Daytime State:** Displays `☀️ DAYLIGHT • Sunset in Xh Ym` with active ticking countdown to sundown.
+  - **Night State:** Displays `🌙 NIGHT • Sunrise in Xh Ym` with active ticking countdown to sunrise.
+  - **Backend Synchronization:** Synchronizes with `GET /api/v1/sun-times` every 30 seconds to guarantee drift-free astronomical accuracy.
+- **Interactive Header Navigation:** Clicking the header sun condition badge directly navigates the user to the Solar Advisor & Diagnostics suite.
 
 ### 4. Distinct Two-Tier Dashboard Architecture
 
@@ -87,7 +92,7 @@ Solaria enforces a strict architectural separation between the local edge hardwa
 |   and link verification.          |   diagnostics, and cottage management.    |
 | • One-Click BLE Connect Button    | • Real-time & Historical Telemetry        |
 | • Bluetooth LE Status Card        | • Oscilloscope sliding window & CSV       |
-| • Cloud Uplink & Spool Status     | • Appliance Power Budget & Runtime        |
+| • Cloud Uplink (Last Upload + CT) | • Appliance Power Budget & Runtime        |
 | • Live Activity Console Log       | • Winterization & Departure Assistant     |
 | • Direct Cloud Dashboard Launcher | • Daily Sunset Digest & Morning Forecast  |
 |                                   | • Tree Shading Advisory Engine            |
@@ -99,19 +104,49 @@ Solaria enforces a strict architectural separation between the local edge hardwa
 
 1. **Local Edge Gateway (`http://localhost:8080` / `http://solaria.local:8080`):**
    - **Target Audience:** Field installer or cottage owner standing near the battery box / charge controller.
-   - **Scope:** Intentionally minimalistic. It contains **only** the Web Bluetooth pairing button (*"⚡ Connect Renogy BT-1"*), BLE connectivity health, cloud uplink/spooling verification, and a live activity console log with a direct launcher button to the Cloud Hub.
+   - **Scope:** Intentionally minimalistic. It contains **only** the Web Bluetooth pairing button (*"⚡ Connect Renogy BT-1"*), BLE connectivity health, cloud uplink/spooling verification with live "Last Successful Upload" timestamp/counter, and a live activity console log with a direct launcher button to the Cloud Hub.
    - **Invariant:** It never duplicates the heavy solar analytical dashboards, charts, or planning assistants.
 
 2. **Central Cloud Analytics Hub (`https://solaria-dashboard-952659886764.us-central1.run.app/`):**
    - **Target Audience:** Cottage owner, electrical engineer, or remote observer monitoring the installation from anywhere in the world.
    - **Scope:** The complete intelligence suite housing all high-level solar analytics, historical BigQuery charts, real-time oscilloscope streaming, appliance power budgeting, tree shading advice, departure certificates, and hardware topology verification tools.
 
+### 5. Seven-Pane Cloud Information Architecture & Dedicated Advisor Suite
+
+The Central Cloud Hub organizes solar intelligence across 7 purpose-built tabs:
+
+1. ⚡ **Live Monitor (`tab-live`):** Real-time gauges, MPPT DC-DC conversion efficiency, Appliance Power Budget & Runtime Estimator, and continuous sliding-window oscilloscope charts.
+2. 📅 **Day View (`tab-day`):** 24-hour hourly generation, atmospheric irradiance, cloud cover overlay, and diurnal curve analysis.
+3. 🗓️ **Week View (`tab-week`):** 7-day rolling yield bar chart, peak watt comparisons, and battery voltage tracking.
+4. 📆 **Month View (`tab-month`):** 30-day cumulative solar energy production and weather correlation.
+5. 📈 **Year View (`tab-year`):** Seasonal generation trends and annual MWh harvest projection.
+6. 🌲 **Solar Advisor & Tools (`tab-advisor`):** Dedicated intelligence suite consolidating:
+   - 🌅 **Daily Sunset Digest & Morning Solar Forecast:** End-of-day harvest summary, absorption duration, evening battery baseline ($2,176\text{ Wh}$ usable), and tomorrow's solar noon window.
+   - 🌲 **Tree Shading Advisory Engine:** Diurnal irradiance curve notch detection (morning east white pine canopy at 105°-120° azimuth vs afternoon hemlock ridge at 245°-260° azimuth), bypass diode drop tracking, and seasonal yield recovery.
+   - 🔌 **Commissioning Wizard & 2S2P Topology Verifier:** Safe 5-step wiring sequence checklist (battery first, solar second) and sub-zero cold-temperature $V_{\text{oc}}$ margin check (48.2V at -25°C vs 100V limit).
+   - 📶 **BT-1 Bluetooth Signal Strength Diagnostics:** BLE RSSI link margin ($> -75\text{ dBm}$), Modbus CRC packet loss tracking, and metal battery box Faraday shielding mitigation via exterior RJ12 antenna mount.
+   - ☁️ **Automated GCP & BigQuery Provisioning Assistant:** 1-click `./setup-gcp.sh` provisioning for day-partitioned datasets and IAM.
+7. ⚙️ **System Specs & Hardware (`tab-specs`):** Controller model selector, battery chemistry profile configurator, lifetime operating statistics, and static hardware ratings.
+
+### 6. Interactive Cottage Appliance Power Budget & Runtime Projection
+
+- **Projection Formula:**
+  $$\text{Continuous Runtime (Hours)} = \frac{\text{Usable Battery Energy Remaining (Wh)}}{\sum P_{\text{appliance}}(\text{Watts})}$$
+- **Battery Usable Energy:** Derived dynamically from current battery SOC % and 170Ah LiFePO4 nominal capacity ($2,176\text{ Wh} \times \text{SOC}$).
+- **Built-in Appliance Load Models:**
+  - 🛰️ Starlink Mini/Standard: $45\text{W}$
+  - 🧊 12V DC Compressor Fridge: $30\text{W}$
+  - 💡 Cabin LED Lighting: $15\text{W}$
+  - 🚿 Pressurized Water Pump: $60\text{W}$
+  - 💻 Laptop / USB-C Hub: $65\text{W}$
+  - ➕ Custom Load Wattage Input ($0 - 1500\text{W}$)
+
 ---
 
 ## Site Profile: Dorset, Ontario Installation
 
 - **Location:** 1296 Wren Lake Drive, Dorset, Ontario, Canada
-- **Coordinates:** `45.186° N, 78.863° W` (Algonquin Highlands)
+- **Coordinates:** `45.2536° N, 78.8978° W` (Algonquin Highlands)
 - **Elevation:** ~350m above sea level
 - **Climate Context:** Sub-boreal northern climate with high summer irradiance (~6.0 peak sun hours/day) and reduced winter insolation (~1.5 peak sun hours/day).
 
