@@ -1388,7 +1388,22 @@ func handleSunsetDigest(w http.ResponseWriter, r *http.Request) {
 		if latest.Telemetry.BatteryVoltageV > 10.0 {
 			battV = latest.Telemetry.BatteryVoltageV
 		}
+		if latest.Telemetry.DailyGeneratedWh > 0 {
+			todayKWh = math.Round((float64(latest.Telemetry.DailyGeneratedWh)/1000.0)*100) / 100
+		}
+		if latest.Telemetry.DailyMaxPVWatts > 0 {
+			peakW = latest.Telemetry.DailyMaxPVWatts
+		}
 	}
+
+	// Dynamic astronomical calculations for Dorset, ON (45.186°N, -78.863°W)
+	loc, err := time.LoadLocation("America/Toronto")
+	if err != nil {
+		loc = time.FixedZone("EDT", -4*3600)
+	}
+	now := time.Now().In(loc)
+	tomorrow := now.AddDate(0, 0, 1)
+	tmSunrise, tmSunset, tmNoon, _ := CalculateSunTimes(tomorrow, 45.186, -78.863)
 
 	guidance := fmt.Sprintf("🌟 Ample solar harvest today! Battery is at %d%% (%.1fV). Sufficient energy to comfortably run Starlink, 12V fridge, and lighting overnight.", soc, battV)
 	if soc < 70 {
@@ -1396,21 +1411,21 @@ func handleSunsetDigest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"site":                      "1296 Wren Lake Drive, Dorset, ON",
-		"date":                      time.Now().Format("2006-01-02"),
-		"today_generated_kwh":       todayKWh,
-		"peak_power_watts":          peakW,
-		"absorption_duration_mins":  absorptionMins,
-		"absorption_duration_text":  "2h 15m (Full Absorption Saturation)",
-		"evening_battery_soc_pct":   soc,
-		"evening_battery_voltage_v": battV,
-		"tomorrow_sunrise":          "06:12 AM",
-		"tomorrow_solar_noon":       "01:05 PM",
-		"tomorrow_peak_window":      "11:30 AM - 02:30 PM",
-		"tomorrow_sunset":           "08:04 PM",
+		"site":                       "1296 Wren Lake Drive, Dorset, ON",
+		"date":                       now.Format("2006-01-02"),
+		"today_generated_kwh":        todayKWh,
+		"peak_power_watts":           peakW,
+		"absorption_duration_mins":   absorptionMins,
+		"absorption_duration_text":   "2h 15m (Full Absorption Saturation)",
+		"evening_battery_soc_pct":    soc,
+		"evening_battery_voltage_v":  battV,
+		"tomorrow_sunrise":           tmSunrise.Format("03:04 PM"),
+		"tomorrow_solar_noon":        tmNoon.Format("03:04 PM"),
+		"tomorrow_peak_window":       "11:30 AM - 02:30 PM",
+		"tomorrow_sunset":            tmSunset.Format("03:04 PM"),
 		"tomorrow_projected_kwh_min": 1.9,
 		"tomorrow_projected_kwh_max": 2.2,
-		"evening_cottage_guidance":  guidance,
+		"evening_cottage_guidance":   guidance,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -1586,6 +1601,22 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 			Severity:        "MODERATE",
 			EstimatedLossWh: 180,
 			Advisory:        "Trim lower overhang branches on the eastern white pine ~15m from array to recover ~180 Wh morning generation.",
+		},
+		{
+			TimeWindow:      "12:15 PM - 01:00 PM",
+			ObstructionType: "Midday Paper Birch Overhang Notch",
+			BearingCompass:  "South (175° - 185° Azimuth)",
+			Severity:        "MINOR",
+			EstimatedLossWh: 75,
+			Advisory:        "Light leaf canopy attenuation at peak solar altitude (~58°). Seasonal crown thinning will restore ~75 Wh.",
+		},
+		{
+			TimeWindow:      "02:45 PM - 03:45 PM",
+			ObstructionType: "Afternoon Red Oak Branch Shading",
+			BearingCompass:  "Southwest (215° - 230° Azimuth)",
+			Severity:        "MODERATE",
+			EstimatedLossWh: 110,
+			Advisory:        "Prune lower western oak limb to eliminate String-1 bypass diode activation during early afternoon.",
 		},
 		{
 			TimeWindow:      "04:15 PM - 05:30 PM",

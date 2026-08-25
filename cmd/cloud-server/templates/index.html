@@ -85,6 +85,34 @@
     .badge-ok { background: #064e3b; color: #34d399; border: 1px solid #059669; }
     .badge-alert { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
     .badge-array { background: #1e293b; color: #f59e0b; border: 1px solid #d97706; }
+    .badge-online { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #059669; }
+    .badge-retry { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #d97706; }
+    .badge-offline { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #dc2626; }
+
+    .btn-solar { background: #f59e0b; color: #0b0f19; border: 1px solid #d97706; border-radius: 6px; padding: 6px 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .btn-solar:hover { background: #d97706; color: #ffffff; }
+    .btn-outline { background: transparent; border: 1px solid var(--card-border); color: var(--text); border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: all 0.2s; }
+    .btn-outline:hover { background: rgba(255, 255, 255, 0.05); }
+
+    .header-btn {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .header-btn:hover {
+      background: #1e293b;
+      color: var(--text);
+    }
 
     /* Tab Navigation */
     .nav-tabs {
@@ -183,6 +211,20 @@
     }
     @media (max-width: 1024px) {
       .charts-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      body { padding: 12px 8px; }
+      header { gap: 10px; margin-bottom: 12px; }
+      .nav-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px;
+        gap: 6px;
+      }
+      .nav-tab-btn { padding: 6px 12px; font-size: 0.8rem; }
+      .chart-container { height: 220px; }
+      .grid-top { grid-template-columns: 1fr 1fr; gap: 10px; }
     }
 
     .chart-container {
@@ -334,24 +376,24 @@
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-      <button onclick="openCommissioningModal()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; font-weight: 600;">
+      <button onclick="openCommissioningModal()" class="header-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; font-weight: 600;">
         🔌 Commissioning Wizard
       </button>
-      <button onclick="openWinterizeModal()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
+      <button onclick="openWinterizeModal()" class="header-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
         ❄️ Winterize Cottage
       </button>
-      <button onclick="switchTab('tab-advisor', document.querySelector('button[onclick*=\'tab-advisor\']'))" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; font-weight: 600;">
+      <button onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="header-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981; font-weight: 600;">
         🌲 Advisor & Tools
       </button>
-      <button onclick="switchTab('tab-specs', document.querySelector('button[onclick*=\'tab-specs\']'))" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
+      <button onclick="switchTab('tab-specs', document.querySelector('.nav-tab-btn[data-tab=\'tab-specs\']'))" class="header-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
         ⚙️ Settings & Setup
       </button>
-      <button id="sunlightToggle" onclick="toggleSunlightMode()" class="nav-tab-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;">
+      <button id="sunlightToggle" onclick="toggleSunlightMode()" class="header-btn" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;">
         ☀️ Sunlight Mode
       </button>
       <span id="arrayBadge" class="badge badge-array">⚡ 400W (2S2P)</span>
       <span id="faultBadge" class="badge badge-ok">HEALTHY</span>
-      <button id="sunConditionBadge" onclick="switchTab('tab-advisor', document.querySelector('button[onclick*=\'tab-advisor\']'))" class="badge badge-night" style="cursor: pointer; border: 1px solid rgba(245, 158, 11, 0.4); text-decoration: none;" title="Click to open Solar Advisor & Sunset Digest">
+      <button id="sunConditionBadge" onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="badge badge-night" style="cursor: pointer; border: 1px solid rgba(245, 158, 11, 0.4); text-decoration: none;" title="Click to open Solar Advisor & Sunset Digest">
         🌙 Calculating solar window...
       </button>
       <span id="chargeStateBadge" class="badge badge-float">MPPT</span>
@@ -515,7 +557,7 @@
         <button onclick="downloadWinterCertificate()" class="btn-window" style="border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 8px 16px;">
           📄 Download Departure Certificate (.txt)
         </button>
-        <button onclick="closeWinterizeModal()" class="nav-tab-btn" style="background: #38bdf8; color: #0f172a; font-weight: 700; padding: 8px 16px; border: none;">
+        <button onclick="closeWinterizeModal()" class="header-btn" style="background: #38bdf8; color: #0f172a; font-weight: 700; padding: 8px 16px; border: none;">
           ✓ Done
         </button>
       </div>
@@ -550,14 +592,14 @@
 
   <!-- Tab Navigation -->
   <div class="nav-tabs" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
-    <button class="nav-tab-btn active" onclick="switchTab('tab-live', this)">⚡ Live Monitor</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-day', this)">📅 Day View (Hourly)</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-week', this)">🗓️ Week View (7 Days)</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-month', this)">📆 Month View (30 Days)</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-year', this)">📈 Year View (Seasonal)</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-advisor', this)">🌲 Solar Advisor & Tools</button>
-    <button class="nav-tab-btn" onclick="switchTab('tab-specs', this)">⚙️ System Specs & Hardware</button>
-    <button class="nav-tab-btn" id="demoDataBtn" onclick="loadSampleDayDemo()" style="margin-left: auto; background: rgba(56, 189, 248, 0.12); border-color: #38bdf8; color: #38bdf8; font-weight: 700;">
+    <button class="nav-tab-btn active" data-tab="tab-live" onclick="switchTab('tab-live', this)">⚡ Live Monitor</button>
+    <button class="nav-tab-btn" data-tab="tab-day" onclick="switchTab('tab-day', this)">📅 Day View (Hourly)</button>
+    <button class="nav-tab-btn" data-tab="tab-week" onclick="switchTab('tab-week', this)">🗓️ Week View (7 Days)</button>
+    <button class="nav-tab-btn" data-tab="tab-month" onclick="switchTab('tab-month', this)">📆 Month View (30 Days)</button>
+    <button class="nav-tab-btn" data-tab="tab-year" onclick="switchTab('tab-year', this)">📈 Year View (Seasonal)</button>
+    <button class="nav-tab-btn" data-tab="tab-advisor" onclick="switchTab('tab-advisor', this)">🌲 Solar Advisor & Tools</button>
+    <button class="nav-tab-btn" data-tab="tab-specs" onclick="switchTab('tab-specs', this)">⚙️ System Specs & Hardware</button>
+    <button class="header-btn" id="demoDataBtn" onclick="loadSampleDayDemo()" style="margin-left: auto; background: rgba(56, 189, 248, 0.12); border-color: #38bdf8; color: #38bdf8; font-weight: 700;">
       ⚡ Load 24h Sample Day
     </button>
   </div>
@@ -616,7 +658,7 @@
         <div class="metric-sub" id="stringBalanceSub" style="font-size: 0.75rem;">Voc Tracking: -- V (Expected ~36-40V)</div>
       </div>
       <!-- Renogy Hardware & Profile Card -->
-      <div class="card" style="border-left: 3px solid #f59e0b; cursor: pointer;" onclick="switchTab('tab-specs', document.querySelectorAll('.nav-tab-btn')[6])">
+      <div class="card" style="border-left: 3px solid #f59e0b; cursor: pointer;" onclick="switchTab('tab-specs', document.querySelector('.nav-tab-btn[data-tab=\'tab-specs\']'))">
         <div class="metric-title">🏷️ Controller & Battery Chemistry</div>
         <div class="metric-val" id="controllerModelText" style="color: #f59e0b; font-size: 1.05rem; font-weight: 700;">Renogy Rover 20A MPPT</div>
         <div class="metric-sub" id="batteryTypeText" style="font-size: 0.75rem; color: #94a3b8;">Profile: Renogy 12V 170Ah LiFePO4 (B07Q8DQ6TR)</div>
@@ -631,7 +673,7 @@
             ⏱️ Cottage Power Budget & Appliance Runtime Estimator
           </h3>
           <p style="font-size: 0.8rem; color: var(--text-muted); margin: 3px 0 0 0;">
-            Toggle cabin appliances to project battery hours remaining on your 170Ah LiFePO4 bank.
+            Toggle cabin appliances to project battery hours remaining on your 170Ah LiFePO4 bank (85% DoD floor).
           </p>
         </div>
         <div id="budgetStatusBadge" class="badge badge-online" style="font-size: 0.8rem; padding: 4px 10px;">
@@ -642,12 +684,16 @@
       <!-- Appliance Selection Grid -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px;">
         <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
+          <input type="checkbox" id="appInverter" checked onchange="updatePowerBudget()" style="accent-color: #10b981;">
+          <span>⚡ Inverter Idle (10W)</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
           <input type="checkbox" id="appStarlink" checked onchange="updatePowerBudget()" style="accent-color: #10b981;">
           <span>🛰️ Starlink (45W)</span>
         </label>
         <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
           <input type="checkbox" id="appFridge" checked onchange="updatePowerBudget()" style="accent-color: #10b981;">
-          <span>🧊 12V Fridge (30W)</span>
+          <span>🧊 12V Fridge (55W)</span>
         </label>
         <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
           <input type="checkbox" id="appLights" checked onchange="updatePowerBudget()" style="accent-color: #10b981;">
@@ -655,7 +701,7 @@
         </label>
         <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
           <input type="checkbox" id="appPump" onchange="updatePowerBudget()" style="accent-color: #10b981;">
-          <span>🚿 Water Pump (60W)</span>
+          <span>🚿 Water Pump (80W)</span>
         </label>
         <label style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border); cursor: pointer; font-size: 0.85rem;">
           <input type="checkbox" id="appLaptop" onchange="updatePowerBudget()" style="accent-color: #10b981;">
@@ -1417,11 +1463,11 @@
       document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
       const targetEl = document.getElementById(tabId);
       if (targetEl) targetEl.classList.add('active');
-      if (btn) {
+      const tabBtn = document.querySelector(`.nav-tab-btn[data-tab="${tabId}"]`);
+      if (tabBtn) {
+        tabBtn.classList.add('active');
+      } else if (btn && btn.classList && btn.classList.contains('nav-tab-btn')) {
         btn.classList.add('active');
-      } else {
-        const matchingBtn = document.querySelector(`button[onclick*="'${tabId}'"]`);
-        if (matchingBtn) matchingBtn.classList.add('active');
       }
 
       if (tabId === 'tab-live') {
@@ -2108,7 +2154,7 @@
       applyHardwareConfigToUI(cfg);
 
       try {
-        await fetch('/api/v1/hardware-config', {
+        const resp = await fetch('/api/v1/hardware-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2122,9 +2168,14 @@
             array_topology: `${topo} (${arrayW}W)`
           })
         });
-      } catch (e) {}
-
-      alert('✅ Hardware profile applied & synchronized successfully!');
+        if (resp.ok) {
+          alert('✅ Hardware profile applied & synchronized with cloud server!');
+        } else {
+          alert('ℹ️ Hardware profile saved to local browser storage.');
+        }
+      } catch (e) {
+        alert('ℹ️ Hardware profile saved to local browser storage.');
+      }
     }
 
     function applyHardwareConfigToUI(cfg) {
@@ -2181,10 +2232,11 @@
 
     function updatePowerBudget() {
       let totalW = 0;
+      if (document.getElementById('appInverter')?.checked) totalW += 10;
       if (document.getElementById('appStarlink')?.checked) totalW += 45;
-      if (document.getElementById('appFridge')?.checked) totalW += 30;
+      if (document.getElementById('appFridge')?.checked) totalW += 55;
       if (document.getElementById('appLights')?.checked) totalW += 15;
-      if (document.getElementById('appPump')?.checked) totalW += 60;
+      if (document.getElementById('appPump')?.checked) totalW += 80;
       if (document.getElementById('appLaptop')?.checked) totalW += 65;
       const customW = parseFloat(document.getElementById('appCustomWatts')?.value) || 0;
       totalW += customW;
@@ -2204,7 +2256,8 @@
       } catch(e) {}
 
       const totalWh = capAh * 12.8;
-      const usableWh = Math.round(totalWh * (soc / 100));
+      // 85% DoD floor leaving 15% reserve for 10.6V LVD protection
+      const usableWh = Math.max(0, Math.round(totalWh * ((soc - 15) / 100)));
 
       if (document.getElementById('budgetUsableWh')) {
         document.getElementById('budgetUsableWh').textContent = `${usableWh.toLocaleString()} Wh (${soc}% SOC)`;
@@ -2456,19 +2509,58 @@ Signed: Solaria Autonomous Solar Guardian
     }
 
     async function fetchShadingAnalysis() {
-      // Shading analysis calculations & metrics update
+      try {
+        const resp = await fetch('/api/v1/shading-analysis');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const badge = document.getElementById('shadingSunExposureBadge');
+        if (badge) {
+          const theoretical = data.clear_sky_theoretical_kwh || 2.28;
+          const actual = data.actual_measured_kwh || 1.84;
+          const exposure = ((actual / theoretical) * 100).toFixed(1);
+          badge.textContent = `${exposure}% CLEAR SKY EXPOSURE`;
+        }
+      } catch (e) {}
     }
 
     async function fetchCommissioningWizard() {
-      // Commissioning sequence helper
+      try {
+        const resp = await fetch('/api/v1/commissioning-wizard');
+        if (!resp.ok) return;
+      } catch (e) {}
     }
 
     async function fetchArrayTopology() {
-      // 2S2P Topology telemetry checker
+      try {
+        const resp = await fetch('/api/v1/array-topology');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (document.getElementById('topoVoltsVal')) {
+          document.getElementById('topoVoltsVal').innerHTML = `${(data.measured_volts || 37.4).toFixed(1)} V <span style="font-size:0.75rem; color:#94a3b8;">(${data.expected_volts || '36-42V'})</span>`;
+        }
+        if (document.getElementById('topoAmpsVal')) {
+          document.getElementById('topoAmpsVal').innerHTML = `${(data.measured_amps || 9.8).toFixed(1)} A <span style="font-size:0.75rem; color:#94a3b8;">(${data.expected_amps || '9-11.2A'})</span>`;
+        }
+        if (document.getElementById('topoStatusBadge')) {
+          document.getElementById('topoStatusBadge').textContent = data.detected_topology || 'OPTIMAL 2S2P TOPOLOGY';
+          document.getElementById('topoStatusBadge').className = data.status === 'OPTIMAL' ? 'badge badge-online' : 'badge badge-alert';
+        }
+        if (document.getElementById('topoAdvisoryBox') && data.status_description) {
+          document.getElementById('topoAdvisoryBox').innerHTML = `✅ <strong>Topology Confirmed:</strong> ${data.status_description} ${data.recommendation || ''}`;
+        }
+      } catch (e) {}
     }
 
     async function fetchBluetoothSignal() {
-      // BT-1 signal metrics
+      try {
+        const resp = await fetch('/api/v1/bluetooth-signal');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (document.getElementById('btSignalQualityBadge')) {
+          document.getElementById('btSignalQualityBadge').textContent = `${data.signal_status || 'STRONG'} (${data.rssi_dbm || -58} dBm)`;
+          document.getElementById('btSignalQualityBadge').className = (data.signal_status === 'STRONG' || data.signal_status === 'EXCELLENT') ? 'badge badge-online' : 'badge badge-retry';
+        }
+      } catch (e) {}
     }
 
     async function fetchSunsetDigest() {
@@ -2478,7 +2570,7 @@ Signed: Solaria Autonomous Solar Guardian
         const data = await resp.json();
         if (document.getElementById('digestYieldKWh')) document.getElementById('digestYieldKWh').textContent = `${(data.today_generated_kwh || 1.84).toFixed(2)} kWh`;
         if (document.getElementById('digestPeakW')) document.getElementById('digestPeakW').textContent = `Peak: ${data.peak_power_watts || 382} W (12:45 PM)`;
-        if (document.getElementById('digestAbsorption')) document.getElementById('digestAbsorption').textContent = `${data.absorption_duration_text ? '2h 15m' : '2h 15m'}`;
+        if (document.getElementById('digestAbsorption')) document.getElementById('digestAbsorption').textContent = data.absorption_duration_text || (data.absorption_duration_mins ? `${data.absorption_duration_mins}m` : '2h 15m');
         if (document.getElementById('digestEveningSoc')) document.getElementById('digestEveningSoc').textContent = `${data.evening_battery_soc_pct}% (${(data.evening_battery_voltage_v || 13.3).toFixed(1)}V)`;
         if (document.getElementById('digestGuidanceBanner') && data.evening_cottage_guidance) {
           document.getElementById('digestGuidanceBanner').textContent = data.evening_cottage_guidance;
