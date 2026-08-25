@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -614,5 +615,104 @@ func BenchmarkRingBuffer_PushAndHistory(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		rb.Push([]SolarRecord{item})
 		_ = rb.GetHistory(60)
+	}
+}
+
+func TestIndexTemplate_RenderAndUXElements(t *testing.T) {
+	tmpl, err := template.ParseFS(templateFS, "templates/index.html")
+	if err != nil {
+		t.Fatalf("Failed to parse index.html template: %v", err)
+	}
+
+	var buf strings.Builder
+	err = tmpl.Execute(&buf, map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("Failed to execute index.html template: %v", err)
+	}
+
+	htmlContent := buf.String()
+
+	// 1. Verify 7 Navigation Panes
+	expectedTabs := []string{
+		`data-tab="tab-live"`,
+		`data-tab="tab-day"`,
+		`data-tab="tab-week"`,
+		`data-tab="tab-month"`,
+		`data-tab="tab-year"`,
+		`data-tab="tab-advisor"`,
+		`data-tab="tab-specs"`,
+	}
+	for _, tab := range expectedTabs {
+		if !strings.Contains(htmlContent, tab) {
+			t.Errorf("Missing expected nav tab: %s", tab)
+		}
+	}
+
+	// 2. Verify Badge and Button CSS classes
+	expectedCSS := []string{
+		".badge-online",
+		".badge-retry",
+		".badge-offline",
+		".btn-solar",
+		".btn-outline",
+		".header-btn",
+		"@media (max-width: 768px)",
+	}
+	for _, css := range expectedCSS {
+		if !strings.Contains(htmlContent, css) {
+			t.Errorf("Missing expected CSS definition: %s", css)
+		}
+	}
+
+	// 3. Verify Appliance Budget Items (including Inverter Idle and 85% DoD floor)
+	expectedAppliances := []string{
+		"appInverter",
+		"appStarlink",
+		"appFridge",
+		"appLights",
+		"appPump",
+		"appLaptop",
+		"85% DoD floor",
+	}
+	for _, app := range expectedAppliances {
+		if !strings.Contains(htmlContent, app) {
+			t.Errorf("Missing expected appliance/budget element: %s", app)
+		}
+	}
+}
+
+func TestHandleShadingAnalysis_FourPatterns(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/shading-analysis", nil)
+	w := httptest.NewRecorder()
+	handleShadingAnalysis(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var res struct {
+		ShadingPatterns []ShadingPattern `json:"shading_patterns"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode shading patterns: %v", err)
+	}
+
+	if len(res.ShadingPatterns) != 4 {
+		t.Fatalf("Expected 4 cottage shading patterns, got %d", len(res.ShadingPatterns))
+	}
+
+	foundBirch := false
+	foundOak := false
+	for _, p := range res.ShadingPatterns {
+		if strings.Contains(p.ObstructionType, "Birch") {
+			foundBirch = true
+		}
+		if strings.Contains(p.ObstructionType, "Oak") {
+			foundOak = true
+		}
+	}
+
+	if !foundBirch || !foundOak {
+		t.Errorf("Expected Birch and Oak shading patterns to be present in Dorset model")
 	}
 }
