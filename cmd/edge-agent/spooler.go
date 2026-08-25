@@ -41,7 +41,10 @@ func (s *Spooler) Append(record SolarRecord) error {
 			// Find newline near the midpoint to preserve valid JSON lines
 			mid := len(data) / 2
 			if idx := bytes.IndexByte(data[mid:], '\n'); idx != -1 {
-				_ = os.WriteFile(s.filePath, data[mid+idx+1:], 0600)
+				tmpPath := s.filePath + ".rotate.tmp"
+				if err := os.WriteFile(tmpPath, data[mid+idx+1:], 0600); err == nil {
+					_ = os.Rename(tmpPath, s.filePath)
+				}
 			}
 		}
 	}
@@ -57,8 +60,10 @@ func (s *Spooler) Append(record SolarRecord) error {
 		return err
 	}
 
-	_, err = f.Write(append(data, '\n'))
-	return err
+	if _, err := f.Write(append(data, '\n')); err != nil {
+		return err
+	}
+	return f.Sync()
 }
 
 func (s *Spooler) ReadBatch(limit int) ([]SolarRecord, error) {
@@ -76,6 +81,7 @@ func (s *Spooler) ReadBatch(limit int) ([]SolarRecord, error) {
 
 	var records []SolarRecord
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() && len(records) < limit {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -87,6 +93,102 @@ func (s *Spooler) ReadBatch(limit int) ([]SolarRecord, error) {
 		}
 	}
 	return records, scanner.Err()
+}
+
+func (s *Spooler) Count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := os.Stat(s.filePath); os.IsNotExist(err) {
+		return 0
+	}
+
+	f, err := os.Open(s.filePath)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func (s *Spooler) Drain(uploader func(record SolarRecord) error) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := os.Stat(s.filePath); os.IsNotExist(err) {
+		return 0, nil
+	}
+
+	f, err := os.Open(s.filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	var validRecords []SolarRecord
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var r SolarRecord
+		if err := json.Unmarshal(line, &r); err == nil {
+			validRecords = append(validRecords, r)
+		} else {
+			// Quarantine corrupted line to dead-letter log
+			qf, qErr := os.OpenFile(s.filePath+".corrupt.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if qErr == nil {
+				_, _ = qf.Write(append(line, '\n'))
+				_ = qf.Close()
+			}
+		}
+	}
+	f.Close()
+
+	if len(validRecords) == 0 {
+		_ = os.Remove(s.filePath)
+		return 0, nil
+	}
+
+	var remaining []SolarRecord
+	drainedCount := 0
+
+	for i, rec := range validRecords {
+		if err := uploader(rec); err != nil {
+			remaining = validRecords[i:]
+			break
+		}
+		drainedCount++
+	}
+
+	if len(remaining) == 0 {
+		_ = os.Remove(s.filePath)
+	} else {
+		tmpPath := s.filePath + ".tmp"
+		tf, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		if err == nil {
+			for _, r := range remaining {
+				d, _ := json.Marshal(r)
+				_, _ = tf.Write(append(d, '\n'))
+			}
+			_ = tf.Sync()
+			tf.Close()
+			_ = os.Rename(tmpPath, s.filePath)
+		}
+	}
+
+	return drainedCount, nil
 }
 
 func (s *Spooler) Clear() error {

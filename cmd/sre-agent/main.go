@@ -83,7 +83,10 @@ func (a *SREAgent) saveIncidents() {
 	_ = os.MkdirAll(filepath.Dir(a.incidentFile), 0750)
 	data, err := json.MarshalIndent(a.incidents, "", "  ")
 	if err == nil {
-		_ = os.WriteFile(a.incidentFile, data, 0600)
+		tmp := a.incidentFile + ".tmp"
+		if wErr := os.WriteFile(tmp, data, 0600); wErr == nil {
+			_ = os.Rename(tmp, a.incidentFile)
+		}
 	}
 }
 
@@ -144,6 +147,9 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 		bridgeReq.Header.Set("Authorization", "Bearer "+a.apiToken)
 	}
 	resp, err := client.Do(bridgeReq)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err == nil && resp.StatusCode == http.StatusOK {
 		bridgeActive = true
 		var bridgeStatus struct {
@@ -164,7 +170,6 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 				})
 			}
 		}
-		_ = resp.Body.Close()
 	} else {
 		a.RecordIncident(Incident{
 			Severity:    "MEDIUM",
@@ -177,8 +182,11 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 
 	// 2. Audit Cloud Server & Live Telemetry Safety Invariants
 	cloudReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, a.cloudURL+"/api/v1/live", nil)
-	resp, err = client.Do(cloudReq)
-	if err == nil && resp.StatusCode == http.StatusOK {
+	cResp, cErr := client.Do(cloudReq)
+	if cResp != nil {
+		defer cResp.Body.Close()
+	}
+	if cErr == nil && cResp.StatusCode == http.StatusOK {
 		cloudActive = true
 		var liveRecord struct {
 			Telemetry struct {
@@ -194,7 +202,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 				DirectRadiationWM2 float64 `json:"direct_radiation_w_m2"`
 			} `json:"weather"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&liveRecord); err == nil {
+		if err := json.NewDecoder(cResp.Body).Decode(&liveRecord); err == nil {
 			// Invariant 1: LiFePO4 Sub-Zero Charge Inhibit
 			if liveRecord.Telemetry.BatteryTempC <= 0 && liveRecord.Telemetry.BatteryCurrentA > 0.1 {
 				lifepo4Pass = false
@@ -219,24 +227,25 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 				})
 			}
 		}
-		_ = resp.Body.Close()
 	}
 
 	// 3. Audit Security Mutation Authorization
 	secReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, a.cloudURL+"/api/v1/hardware-config", nil)
-	resp, err = client.Do(secReq)
-	if err == nil {
-		if resp.StatusCode != http.StatusUnauthorized {
+	sResp, sErr := client.Do(secReq)
+	if sResp != nil {
+		defer sResp.Body.Close()
+	}
+	if sErr == nil {
+		if sResp.StatusCode != http.StatusUnauthorized {
 			securityPass = false
 			a.RecordIncident(Incident{
 				Severity:    "CRITICAL",
 				Category:    "SECURITY",
 				Title:       "Unauthenticated Hardware Mutation Endpoint Exposed",
-				Description: fmt.Sprintf("POST /api/v1/hardware-config returned %d instead of 401 Unauthorized.", resp.StatusCode),
+				Description: fmt.Sprintf("POST /api/v1/hardware-config returned %d instead of 401 Unauthorized.", sResp.StatusCode),
 				Remediation: "Ensure verifyAuth(r) middleware is enforced for all configuration mutations.",
 			})
 		}
-		_ = resp.Body.Close()
 	}
 
 	// Auto-resolve recovered incidents
