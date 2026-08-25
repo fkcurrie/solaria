@@ -327,3 +327,62 @@ func TestHandleBridgeStatus(t *testing.T) {
 		t.Errorf("Expected total_successful_uploads in response")
 	}
 }
+
+func TestTracker_PersistAndRestoreUploadAndFrames(t *testing.T) {
+	tempDir := t.TempDir()
+	originalPath := outageFilePath
+	outageFilePath = tempDir + "/test_outages.json"
+	defer func() { outageFilePath = originalPath }()
+
+	testTime := time.Date(2026, 8, 24, 21, 0, 0, 0, time.UTC)
+	uploadMu.Lock()
+	lastSuccessUpload = testTime
+	totalSuccessUploads = 42
+	uploadMu.Unlock()
+
+	frameMu.Lock()
+	lastFrameTime = testTime
+	totalFramesProcessed = 150
+	frameMu.Unlock()
+
+	testTracker := &OutageTracker{
+		sessionStart: time.Now(),
+		firstStart:   time.Now(),
+		history:      make([]OutageEvent, 0),
+	}
+	testTracker.save()
+
+	// Reset in-memory values
+	uploadMu.Lock()
+	lastSuccessUpload = time.Time{}
+	totalSuccessUploads = 0
+	uploadMu.Unlock()
+
+	frameMu.Lock()
+	lastFrameTime = time.Time{}
+	totalFramesProcessed = 0
+	frameMu.Unlock()
+
+	// Load back
+	newTracker := &OutageTracker{}
+	newTracker.load()
+
+	uploadMu.Lock()
+	loadedUploads := totalSuccessUploads
+	loadedTime := lastSuccessUpload
+	uploadMu.Unlock()
+
+	frameMu.Lock()
+	loadedFrames := totalFramesProcessed
+	frameMu.Unlock()
+
+	if loadedUploads != 42 {
+		t.Errorf("Expected restored totalSuccessUploads 42, got %d", loadedUploads)
+	}
+	if !loadedTime.Equal(testTime) {
+		t.Errorf("Expected restored lastSuccessUpload %v, got %v", testTime, loadedTime)
+	}
+	if loadedFrames != 150 {
+		t.Errorf("Expected restored totalFramesProcessed 150, got %d", loadedFrames)
+	}
+}
