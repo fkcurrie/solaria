@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -516,21 +517,47 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 	// Limit body read to 4MB to prevent memory exhaustion
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
 
-	var batch IngestBatch
-	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("Bad Request: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	if len(batch.Batch) > 0 {
-		ringBuf.Push(batch.Batch)
+	var batch []SolarRecord
+
+	// Format 1: {"batch": [...]}
+	var ib IngestBatch
+	if err := json.Unmarshal(bodyBytes, &ib); err == nil && len(ib.Batch) > 0 {
+		batch = ib.Batch
+	} else {
+		// Format 2: [...] (raw array)
+		var arr []SolarRecord
+		if err := json.Unmarshal(bodyBytes, &arr); err == nil && len(arr) > 0 {
+			batch = arr
+		} else {
+			// Format 3: {...} (single SolarRecord)
+			var single SolarRecord
+			if err := json.Unmarshal(bodyBytes, &single); err == nil && (single.Timestamp != "" || single.Telemetry.PVPowerW > 0 || single.Telemetry.BatteryVoltageV > 0 || single.Site != "") {
+				if single.Timestamp == "" {
+					single.Timestamp = time.Now().UTC().Format(time.RFC3339)
+				}
+				batch = []SolarRecord{single}
+			} else {
+				http.Error(w, "Bad Request: unrecognized telemetry JSON format", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	if len(batch) > 0 {
+		ringBuf.Push(batch)
 
 		// Enqueue to BigQuery worker pool non-blockingly
 		if bqTable != nil {
 			select {
-			case bqBatchQueue <- batch.Batch:
+			case bqBatchQueue <- batch:
 			default:
-				log.Printf("⚠️ BigQuery ingest queue full (%d items); dropping BQ batch", len(batch.Batch))
+				log.Printf("⚠️ BigQuery ingest queue full (%d items); dropping BQ batch", len(batch))
 			}
 		}
 	}
@@ -538,7 +565,7 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":   "ok",
-		"ingested": len(batch.Batch),
+		"ingested": len(batch),
 	})
 }
 
