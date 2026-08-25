@@ -1180,27 +1180,45 @@ func handleSampleDay(w http.ResponseWriter, r *http.Request) {
 }
 
 type HardwareConfig struct {
-	ControllerKey       string `json:"controller_key"`
-	ControllerName      string `json:"controller_name"`
-	ControllerRatedAmps int    `json:"controller_rated_amps"`
-	BatteryKey          string `json:"battery_key"`
-	BatteryName         string `json:"battery_name"`
-	BatteryCapacityAh   int    `json:"battery_capacity_ah"`
-	ArrayCapacityWatts  int    `json:"array_capacity_watts"`
-	ArrayTopology       string `json:"array_topology"`
+	ControllerKey          string  `json:"controller_key"`
+	ControllerName         string  `json:"controller_name"`
+	ControllerRatedAmps    int     `json:"controller_rated_amps"`
+	BatteryKey             string  `json:"battery_key"`
+	BatteryName            string  `json:"battery_name"`
+	BatteryCapacityAh      int     `json:"battery_capacity_ah"`
+	ArrayCapacityWatts     int     `json:"array_capacity_watts"`
+	ArrayTopology          string  `json:"array_topology"`
+	ArrayAzimuthDeg        float64 `json:"array_azimuth_deg"`
+	ArrayDirectionCompass  string  `json:"array_direction_compass"`
+	ArrayTiltDeg           float64 `json:"array_tilt_deg"`
+	ArrayTiltDescription   string  `json:"array_tilt_description"`
+}
+
+type ArrayOrientationConfig struct {
+	DirectionCompass string  `json:"direction_compass"`
+	AzimuthDeg       float64 `json:"azimuth_deg"`
+	TiltDeg          float64 `json:"tilt_deg"`
+	TiltDescription  string  `json:"tilt_description"`
+	SolarNoonOffset  string  `json:"solar_noon_offset"`
+	SeasonalNotes    string  `json:"seasonal_notes"`
+	OptimalTime      string  `json:"optimal_time"`
 }
 
 var (
 	hardwareConfigMu     sync.RWMutex
 	activeHardwareConfig = HardwareConfig{
-		ControllerKey:       "RVR20",
-		ControllerName:      "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
-		ControllerRatedAmps: 20,
-		BatteryKey:          "RENOGY_170_LFP",
-		BatteryName:         "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)",
-		BatteryCapacityAh:   170,
-		ArrayCapacityWatts:  400,
-		ArrayTopology:       "2S2P (4x100W)",
+		ControllerKey:         "RVR20",
+		ControllerName:        "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
+		ControllerRatedAmps:   20,
+		BatteryKey:            "RENOGY_170_LFP",
+		BatteryName:           "Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)",
+		BatteryCapacityAh:     170,
+		ArrayCapacityWatts:    400,
+		ArrayTopology:         "2S2P (4x100W)",
+		ArrayAzimuthDeg:       135.0,
+		ArrayDirectionCompass: "South-East (SE ~ 135°)",
+		ArrayTiltDeg:          45.0,
+		ArrayTiltDescription:  "45° pitch (optimal for 45.186°N latitude year-round and Muskoka snow shedding)",
 	}
 )
 
@@ -1237,6 +1255,18 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 		if newCfg.ArrayCapacityWatts <= 0 {
 			newCfg.ArrayCapacityWatts = 400
 		}
+		if newCfg.ArrayAzimuthDeg <= 0 {
+			newCfg.ArrayAzimuthDeg = 135.0
+		}
+		if newCfg.ArrayDirectionCompass == "" {
+			newCfg.ArrayDirectionCompass = "South-East (SE ~ 135°)"
+		}
+		if newCfg.ArrayTiltDeg <= 0 {
+			newCfg.ArrayTiltDeg = 45.0
+		}
+		if newCfg.ArrayTiltDescription == "" {
+			newCfg.ArrayTiltDescription = "45° pitch (optimal for 45.186°N latitude year-round and Muskoka snow shedding)"
+		}
 
 		hardwareConfigMu.Lock()
 		activeHardwareConfig = newCfg
@@ -1268,6 +1298,71 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := activeHardwareConfig
 	hardwareConfigMu.RUnlock()
 	json.NewEncoder(w).Encode(cfg)
+}
+
+func handleArrayOrientation(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		if !verifyAuth(r) {
+			http.Error(w, "Unauthorized: Valid API Token required to change array orientation", http.StatusUnauthorized)
+			return
+		}
+		var req struct {
+			DirectionCompass string  `json:"direction_compass"`
+			AzimuthDeg       float64 `json:"azimuth_deg"`
+			TiltDeg          float64 `json:"tilt_deg"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid orientation payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		hardwareConfigMu.Lock()
+		if req.AzimuthDeg > 0 {
+			activeHardwareConfig.ArrayAzimuthDeg = req.AzimuthDeg
+		}
+		if req.DirectionCompass != "" {
+			activeHardwareConfig.ArrayDirectionCompass = req.DirectionCompass
+		}
+		if req.TiltDeg > 0 {
+			activeHardwareConfig.ArrayTiltDeg = req.TiltDeg
+		}
+		hardwareConfigMu.Unlock()
+	}
+
+	hardwareConfigMu.RLock()
+	azimuth := activeHardwareConfig.ArrayAzimuthDeg
+	direction := activeHardwareConfig.ArrayDirectionCompass
+	tilt := activeHardwareConfig.ArrayTiltDeg
+	hardwareConfigMu.RUnlock()
+
+	if azimuth <= 0 {
+		azimuth = 135.0
+		direction = "South-East (SE ~ 135°)"
+	}
+	if tilt <= 0 {
+		tilt = 45.0
+	}
+
+	resp := ArrayOrientationConfig{
+		DirectionCompass: direction,
+		AzimuthDeg:       azimuth,
+		TiltDeg:          tilt,
+		TiltDescription:  fmt.Sprintf("%.0f° pitch angle (optimized for 45.186°N latitude in Dorset, ON for high autumn/winter capture and snow-shedding)", tilt),
+		SolarNoonOffset:  "Peak solar collection begins ~1.5h earlier than solar noon (~10:00 AM - 1:30 PM peak window)",
+		SeasonalNotes:    "Facing South-East at 45° captures maximum direct early morning sun over Wren Lake, quickly reheating LiFePO4 cells after cold cottage nights.",
+		OptimalTime:      "10:00 AM - 01:30 PM (Direct Irradiance Window)",
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 // handlePowerBudget calculates runtime hours and cottage advisory based on selected wattage and battery capacity
@@ -1707,13 +1802,19 @@ func handleCommissioningWizard(w http.ResponseWriter, r *http.Request) {
 		},
 		{
 			StepIndex: 4,
-			Title:     "Step 4: Wire 4x100W 2S2P Solar Array & Close DC Breaker",
+			Title:     "Step 4: Solar Array Orientation & Tilt Alignment",
+			Detail:    "Align solar panels facing South-East (135° Azimuth) with a 45° pitch tilt angle. This angle maximizes morning direct solar harvest on Wren Lake and ensures fast autumn/winter snow shedding.",
+			CheckItem: "Array orientation set: South-East (135°) at 45° tilt angle.",
+		},
+		{
+			StepIndex: 5,
+			Title:     "Step 5: Wire 4x100W 2S2P Solar Array & Close DC Breaker",
 			Detail:    "Connect PV panels in 2 Series x 2 Parallel (2S2P). Connect array MC4 output through the 20A DC circuit breaker into Controller PV (+) and PV (-). Close the breaker.",
 			CheckItem: "Controller PV indicator illuminates and Voc reads ~36V to 40V.",
 		},
 		{
-			StepIndex: 5,
-			Title:     "Step 5: Commissioning Telemetry Verification",
+			StepIndex: 6,
+			Title:     "Step 6: Commissioning Telemetry Verification",
 			Detail:    "Verify MPPT bulk charging begins, Bluetooth telemetry streams to Solaria Bridge, and BigQuery data pipeline syncs.",
 			CheckItem: "Live dashboard displays active watts, battery SOC%, and green status indicators.",
 		},
@@ -1722,7 +1823,11 @@ func handleCommissioningWizard(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]interface{}{
 		"wizard_title": "Renogy Rover 20A & 170Ah LiFePO4 First-Time Commissioning Wizard",
 		"site":         "1296 Wren Lake Drive, Dorset, ON",
-		"steps":        steps,
+		"orientation": map[string]interface{}{
+			"direction": "South-East (SE ~ 135°)",
+			"tilt_deg":  45.0,
+		},
+		"steps": steps,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -1944,6 +2049,7 @@ func main() {
 	mux.HandleFunc("/api/v1/sunset-digest", handleSunsetDigest)
 	mux.HandleFunc("/api/v1/sun-times", handleSunTimes)
 	mux.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
+	mux.HandleFunc("/api/v1/array-orientation", handleArrayOrientation)
 	mux.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
 	mux.HandleFunc("/api/v1/array-topology", handleArrayTopology)
 	mux.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)

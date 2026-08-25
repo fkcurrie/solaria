@@ -432,8 +432,34 @@ func TestHandleCommissioningWizard(t *testing.T) {
 	}
 
 	steps, ok := res["steps"].([]interface{})
-	if !ok || len(steps) != 5 {
-		t.Errorf("Expected 5 commissioning steps, got %v", res["steps"])
+	if !ok || len(steps) != 6 {
+		t.Errorf("Expected 6 commissioning steps, got %v", res["steps"])
+	}
+}
+
+func TestHandleArrayOrientation(t *testing.T) {
+	// 1. GET orientation
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/array-orientation", nil)
+	w := httptest.NewRecorder()
+	handleArrayOrientation(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on GET /api/v1/array-orientation, got %d", w.Code)
+	}
+
+	var res ArrayOrientationConfig
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode array orientation response: %v", err)
+	}
+
+	if res.AzimuthDeg != 135.0 {
+		t.Errorf("Expected default Azimuth 135.0, got %v", res.AzimuthDeg)
+	}
+	if res.TiltDeg != 45.0 {
+		t.Errorf("Expected default Tilt 45.0, got %v", res.TiltDeg)
+	}
+	if !strings.Contains(res.DirectionCompass, "South-East") {
+		t.Errorf("Expected South-East direction, got %v", res.DirectionCompass)
 	}
 }
 
