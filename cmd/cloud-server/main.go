@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -314,11 +316,15 @@ func init() {
 			apiToken = hex.EncodeToString(b)
 			log.Printf("⚠️ SOLARIA_API_TOKEN not set; generated ephemeral session token: %s", apiToken)
 		} else {
-			apiToken = "solaria_cottage_dev_token_2026"
+			log.Fatalf("Fatal: Failed to generate secure session token: %v", err)
 		}
 	}
 	if envProj := os.Getenv("GCP_PROJECT"); envProj != "" {
 		gcpProject = envProj
+	}
+	validProjectRegex := regexp.MustCompile(`^[a-z0-9-]+$`)
+	if !validProjectRegex.MatchString(gcpProject) {
+		gcpProject = "solaria-solar"
 	}
 	t, err := template.ParseFS(templateFS, "templates/index.html")
 	if err != nil {
@@ -460,14 +466,24 @@ func bqWorker(workerID int) {
 	}
 }
 
+func constantTimeEqual(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
 func verifyAuth(r *http.Request) bool {
-	if apiKey := r.Header.Get("X-API-Key"); apiKey != "" && apiKey == apiToken {
+	if apiToken == "" {
+		return false
+	}
+	if apiKey := r.Header.Get("X-API-Key"); apiKey != "" && constantTimeEqual(apiKey, apiToken) {
 		return true
 	}
 	auth := r.Header.Get("Authorization")
 	if auth != "" {
 		token := strings.TrimPrefix(auth, "Bearer ")
-		return token == apiToken
+		return constantTimeEqual(token, apiToken)
 	}
 	return false
 }
@@ -1149,6 +1165,10 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
+		if !verifyAuth(r) {
+			http.Error(w, "Unauthorized: Valid API Token required for configuration mutations", http.StatusUnauthorized)
+			return
+		}
 		var newCfg HardwareConfig
 		if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
 			http.Error(w, "Invalid configuration payload: "+err.Error(), http.StatusBadRequest)
@@ -1799,31 +1819,32 @@ func handleGCPOnboarding(w http.ResponseWriter, r *http.Request) {
 func main() {
 	listenPort := srvPort(os.Getenv("PORT"))
 
-	http.HandleFunc("/", handleDashboard)
-	http.HandleFunc("/api/v1/telemetry", handleIngest)
-	http.HandleFunc("/api/v1/live", handleLive)
-	http.HandleFunc("/api/v1/history", handleHistory)
-	http.HandleFunc("/api/v1/stats/day", handleDayStats)
-	http.HandleFunc("/api/v1/stats/week", handleWeekStats)
-	http.HandleFunc("/api/v1/stats/month", handleMonthStats)
-	http.HandleFunc("/api/v1/stats/year", handleYearStats)
-	http.HandleFunc("/api/v1/system-info", handleSystemInfo)
-	http.HandleFunc("/api/v1/hardware-config", handleHardwareConfig)
-	http.HandleFunc("/api/v1/power-budget", handlePowerBudget)
-	http.HandleFunc("/api/v1/winterize-status", handleWinterizeStatus)
-	http.HandleFunc("/api/v1/sunset-digest", handleSunsetDigest)
-	http.HandleFunc("/api/v1/sun-times", handleSunTimes)
-	http.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
-	http.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
-	http.HandleFunc("/api/v1/array-topology", handleArrayTopology)
-	http.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)
-	http.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
-	http.HandleFunc("/api/v1/gcp-onboarding", handleGCPOnboarding)
-	http.HandleFunc("/api/v1/sample-day", handleSampleDay)
-	http.HandleFunc("/api/v1/health", handleHealth)
-	http.HandleFunc("/healthz", handleHealthz)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleDashboard)
+	mux.HandleFunc("/api/v1/telemetry", handleIngest)
+	mux.HandleFunc("/api/v1/live", handleLive)
+	mux.HandleFunc("/api/v1/history", handleHistory)
+	mux.HandleFunc("/api/v1/stats/day", handleDayStats)
+	mux.HandleFunc("/api/v1/stats/week", handleWeekStats)
+	mux.HandleFunc("/api/v1/stats/month", handleMonthStats)
+	mux.HandleFunc("/api/v1/stats/year", handleYearStats)
+	mux.HandleFunc("/api/v1/system-info", handleSystemInfo)
+	mux.HandleFunc("/api/v1/hardware-config", handleHardwareConfig)
+	mux.HandleFunc("/api/v1/power-budget", handlePowerBudget)
+	mux.HandleFunc("/api/v1/winterize-status", handleWinterizeStatus)
+	mux.HandleFunc("/api/v1/sunset-digest", handleSunsetDigest)
+	mux.HandleFunc("/api/v1/sun-times", handleSunTimes)
+	mux.HandleFunc("/api/v1/shading-analysis", handleShadingAnalysis)
+	mux.HandleFunc("/api/v1/commissioning-wizard", handleCommissioningWizard)
+	mux.HandleFunc("/api/v1/array-topology", handleArrayTopology)
+	mux.HandleFunc("/api/v1/bluetooth-signal", handleBluetoothSignal)
+	mux.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
+	mux.HandleFunc("/api/v1/gcp-onboarding", handleGCPOnboarding)
+	mux.HandleFunc("/api/v1/sample-day", handleSampleDay)
+	mux.HandleFunc("/api/v1/health", handleHealth)
+	mux.HandleFunc("/healthz", handleHealthz)
 
-	http.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, err := staticFS.ReadFile("static/manifest.json")
 		if err != nil {
@@ -1833,7 +1854,7 @@ func main() {
 		_, _ = w.Write(b)
 	})
 
-	http.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		w.Header().Set("Service-Worker-Allowed", "/")
 		b, err := staticFS.ReadFile("static/sw.js")
@@ -1844,7 +1865,7 @@ func main() {
 		_, _ = w.Write(b)
 	})
 
-	http.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
 		filePath := strings.TrimPrefix(r.URL.Path, "/")
 		b, err := staticFS.ReadFile("static/" + filePath)
 		if err != nil {
@@ -1867,6 +1888,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", listenPort),
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

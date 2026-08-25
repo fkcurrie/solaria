@@ -206,16 +206,25 @@ func TestHandleHardwareConfig(t *testing.T) {
 		t.Errorf("Expected initial ControllerKey RVR20, got %s", cfg.ControllerKey)
 	}
 
-	// 2. POST update hardware config
+	// 2. POST update hardware config without auth -> 401 Unauthorized
 	newPayload := `{"controller_key":"RVR20","controller_name":"Renogy Rover 20A MPPT (RNG-CTRL-RVR20)","controller_rated_amps":20,"battery_key":"RENOGY_170_LFP","battery_name":"Renogy 12V 170Ah LiFePO4 (RBT170LFP12-BT)","battery_capacity_ah":170,"array_capacity_watts":400,"array_topology":"2S2P (4x100W)"}`
-	reqPost := httptest.NewRequest(http.MethodPost, "/api/v1/hardware-config", strings.NewReader(newPayload))
-	wPost := httptest.NewRecorder()
-	handleHardwareConfig(wPost, reqPost)
-	if wPost.Code != http.StatusOK {
-		t.Fatalf("Expected status 200 on POST /api/v1/hardware-config, got %d", wPost.Code)
+	reqPostUnauth := httptest.NewRequest(http.MethodPost, "/api/v1/hardware-config", strings.NewReader(newPayload))
+	wPostUnauth := httptest.NewRecorder()
+	handleHardwareConfig(wPostUnauth, reqPostUnauth)
+	if wPostUnauth.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected status 401 on unauthenticated POST /api/v1/hardware-config, got %d", wPostUnauth.Code)
 	}
 
-	// 3. Verify updated latest ringBuffer record
+	// 3. POST update hardware config WITH valid API Token -> 200 OK
+	reqPostAuth := httptest.NewRequest(http.MethodPost, "/api/v1/hardware-config", strings.NewReader(newPayload))
+	reqPostAuth.Header.Set("Authorization", "Bearer "+apiToken)
+	wPostAuth := httptest.NewRecorder()
+	handleHardwareConfig(wPostAuth, reqPostAuth)
+	if wPostAuth.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on authenticated POST /api/v1/hardware-config, got %d", wPostAuth.Code)
+	}
+
+	// 4. Verify updated latest ringBuffer record
 	latest := ringBuf.GetLatest()
 	if latest.Telemetry.ControllerModel != "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)" {
 		t.Errorf("Expected updated controller model in ring buffer, got %s", latest.Telemetry.ControllerModel)
