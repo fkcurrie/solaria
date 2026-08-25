@@ -132,13 +132,48 @@ func TestDecodeModbusTelemetry_UnconnectedRTSProbe(t *testing.T) {
 	buf[21] = 0x00
 	buf[22] = 0x48
 
+	// Fault register 0x0121 at data[66:68] (raw[69:71]): bit 13 set (0x2000 = probe disconnected)
+	buf[69] = 0x20
+
 	telem, err := DecodeModbusTelemetry(buf)
 	if err != nil {
 		t.Fatalf("Unexpected error decoding telemetry: %v", err)
 	}
 
 	if telem.SubZeroInhibitWarning {
-		t.Errorf("Expected SubZeroInhibitWarning to be false for unconnected RTS probe (0C with 25C controller)")
+		t.Errorf("Expected SubZeroInhibitWarning to be false for unconnected RTS probe (effective temp = 20C)")
+	}
+}
+
+func TestDecodeModbusTelemetry_FreezingZeroCutoff(t *testing.T) {
+	buf := make([]byte, 73)
+	buf[0] = 0xFF
+	buf[1] = 0x03
+	buf[2] = 0x44
+
+	// Battery Voltage: 13.2V, Current: 5A
+	buf[5] = 0x00
+	buf[6] = 0x84
+	buf[7] = 0x01
+	buf[8] = 0xF4
+
+	// Genuine 0°C battery with connected probe (no fault bits)
+	buf[9] = 5
+	buf[10] = 0 // 0°C freezing
+
+	// PV Voltage: 36.2V, Power: 72W
+	buf[17] = 0x01
+	buf[18] = 0x6A
+	buf[21] = 0x00
+	buf[22] = 0x48
+
+	telem, err := DecodeModbusTelemetry(buf)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !telem.SubZeroInhibitWarning {
+		t.Errorf("Expected SubZeroInhibitWarning to be true at 0°C freezing point")
 	}
 }
 

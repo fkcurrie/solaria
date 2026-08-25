@@ -599,12 +599,12 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		},
 		"battery_bank": map[string]interface{}{
 			"system_voltage":           "12V DC Nominal",
-			"battery_type":             "Deep-Cycle / AGM / Lithium",
+			"battery_type":             "LiFePO4 (Renogy 12V 170Ah Lithium Iron Phosphate)",
 			"boost_voltage_v":          14.4,
-			"float_voltage_v":          13.8,
-			"equalize_voltage_v":       14.6,
+			"float_voltage_v":          13.6,
+			"equalize_voltage_v":       "NONE / Disabled (LiFePO4)",
 			"overvoltage_disconnect_v": 16.0,
-			"low_voltage_disconnect_v": 11.1,
+			"low_voltage_disconnect_v": 10.6,
 		},
 		"lifetime_statistics": map[string]interface{}{
 			"operating_days":                    telem.OperatingDays,
@@ -749,18 +749,26 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If BigQuery had no data (e.g. streaming just began), check ring buffer for today's points
-	if recordsCount == 0 {
+	if recordsCount == 0 && ringBuf != nil {
 		history := ringBuf.GetHistory(1440)
+		hourlySamples := make([]int, 24)
+		hourlyPowerSum := make([]float64, 24)
+		hourlyIrrSum := make([]float64, 24)
+		hourlySOCSum := make([]int, 24)
+		hourlyTempSum := make([]float64, 24)
+		hourlyCloudSum := make([]int, 24)
+
 		for _, item := range history {
 			t, err := time.Parse(time.RFC3339, item.Timestamp)
 			if err == nil && t.In(loc).Format("2006-01-02") == nowLocal.Format("2006-01-02") {
 				h := t.In(loc).Hour()
 				if h >= 0 && h < 24 {
-					genWh[h] = float64(item.Telemetry.DailyGeneratedWh)
-					irradiance[h] = item.Weather.DirectRadiationWM2 + item.Weather.DiffuseRadiationWM2
-					battSOC[h] = item.Telemetry.BatterySOCPct
-					cloudPct[h] = item.Weather.CloudCoverPct
-					tempC[h] = item.Weather.TemperatureC
+					hourlySamples[h]++
+					hourlyPowerSum[h] += float64(item.Telemetry.PVPowerW)
+					hourlyIrrSum[h] += (item.Weather.DirectRadiationWM2 + item.Weather.DiffuseRadiationWM2)
+					hourlySOCSum[h] += item.Telemetry.BatterySOCPct
+					hourlyTempSum[h] += item.Weather.TemperatureC
+					hourlyCloudSum[h] += item.Weather.CloudCoverPct
 
 					icon, cond := classifyWeather(float64(item.Weather.CloudCoverPct), item.Weather.TemperatureC, item.Weather.IsDay, item.Weather.DirectRadiationWM2+item.Weather.DiffuseRadiationWM2, item.SunClassification)
 					weatherIcons[h] = icon
@@ -771,6 +779,18 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 						peakWatts = item.Telemetry.PVPowerW
 					}
 				}
+			}
+		}
+
+		for h := 0; h < 24; h++ {
+			if hourlySamples[h] > 0 {
+				avgP := hourlyPowerSum[h] / float64(hourlySamples[h])
+				genWh[h] = mathRound(avgP*1.0, 1) // 1 hr average power = Wh
+				totalWh += avgP
+				irradiance[h] = mathRound(hourlyIrrSum[h]/float64(hourlySamples[h]), 1)
+				battSOC[h] = hourlySOCSum[h] / hourlySamples[h]
+				cloudPct[h] = hourlyCloudSum[h] / hourlySamples[h]
+				tempC[h] = mathRound(hourlyTempSum[h]/float64(hourlySamples[h]), 1)
 			}
 		}
 	}
@@ -1250,7 +1270,9 @@ func handlePowerBudget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	totalEnergyWh := capAh * 12.8
-	usableWh := totalEnergyWh * (soc / 100.0)
+	// 85% Depth of Discharge floor for LiFePO4 to protect BMS cutoff at 15% SOC
+	usableFraction := math.Max(0, (soc-15.0)/85.0)
+	usableWh := (totalEnergyWh * 0.85) * usableFraction
 	runtimeHours := 0.0
 	if watts > 0 {
 		runtimeHours = math.Round((usableWh/watts)*10) / 10
@@ -1465,10 +1487,26 @@ func handleSunTimes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().In(loc)
-	lat := 45.2536
-	lon := -78.8978
+	lat := 45.186
+	lon := -78.863
 
 	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(now, lat, lon)
+
+	// Solar elevation angle calculation: sin(alpha) = sin(lat)*sin(decl) + cos(lat)*cos(decl)*cos(HRA)
+	dayOfYear := now.YearDay()
+	gamma := (2 * math.Pi / 365.0) * float64(dayOfYear-1)
+	decl := 0.006918 - 0.399912*math.Cos(gamma) + 0.070257*math.Sin(gamma) -
+		0.006758*math.Cos(2*gamma) + 0.000907*math.Sin(2*gamma) -
+		0.002697*math.Cos(3*gamma) + 0.00148*math.Sin(3*gamma)
+	eqtime := 229.18 * (0.000075 + 0.001868*math.Cos(gamma) - 0.032077*math.Sin(gamma) -
+		0.014615*math.Cos(2*gamma) - 0.040849*math.Sin(2*gamma))
+	latRad := lat * math.Pi / 180.0
+	utcMins := float64(now.UTC().Hour()*60+now.UTC().Minute()) + float64(now.UTC().Second())/60.0
+	solarNoonUTCMin := 720.0 - 4.0*lon - eqtime
+	hraDeg := (utcMins - solarNoonUTCMin) / 4.0
+	hraRad := hraDeg * math.Pi / 180.0
+	sinElev := math.Sin(latRad)*math.Sin(decl) + math.Cos(latRad)*math.Cos(decl)*math.Cos(hraRad)
+	elevationDeg := math.Asin(math.Max(-1.0, math.Min(1.0, sinElev))) * 180.0 / math.Pi
 
 	tomorrow := now.AddDate(0, 0, 1)
 	nextSunrise, nextSunset, _, _ := CalculateSunTimes(tomorrow, lat, lon)
@@ -1497,24 +1535,26 @@ func handleSunTimes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"site":               "1296 Wren Lake Drive, Dorset, ON",
-		"latitude":           lat,
-		"longitude":          lon,
-		"timezone":           "America/Toronto",
-		"current_time":       now.Format(time.RFC3339),
-		"current_time_text":  now.Format("03:04:05 PM"),
-		"is_day":             isDay,
-		"today_sunrise":      sunrise.Format(time.RFC3339),
-		"today_sunset":       sunset.Format(time.RFC3339),
-		"today_solar_noon":   solarNoon.Format(time.RFC3339),
-		"today_sunrise_text": sunrise.Format("03:04 PM"),
-		"today_sunset_text":  sunset.Format("03:04 PM"),
-		"tomorrow_sunrise":   nextSunrise.Format(time.RFC3339),
-		"tomorrow_sunset":    nextSunset.Format(time.RFC3339),
-		"next_event":         nextEvent,
-		"next_event_time":    nextEventTime.Format(time.RFC3339),
-		"seconds_remaining":  secondsRemaining,
-		"countdown_text":     formatDurationCountdown(time.Duration(secondsRemaining) * time.Second),
+		"site":                "1296 Wren Lake Drive, Dorset, ON",
+		"latitude":            lat,
+		"longitude":           lon,
+		"timezone":            "America/Toronto",
+		"current_time":        now.Format(time.RFC3339),
+		"current_time_text":   now.Format("03:04:05 PM"),
+		"is_day":              isDay,
+		"solar_elevation_deg": mathRound(elevationDeg, 1),
+		"solar_zenith_deg":    mathRound(90.0-elevationDeg, 1),
+		"today_sunrise":       sunrise.Format(time.RFC3339),
+		"today_sunset":        sunset.Format(time.RFC3339),
+		"today_solar_noon":    solarNoon.Format(time.RFC3339),
+		"today_sunrise_text":  sunrise.Format("03:04 PM"),
+		"today_sunset_text":   sunset.Format("03:04 PM"),
+		"tomorrow_sunrise":    nextSunrise.Format(time.RFC3339),
+		"tomorrow_sunset":     nextSunset.Format(time.RFC3339),
+		"next_event":          nextEvent,
+		"next_event_time":     nextEventTime.Format(time.RFC3339),
+		"seconds_remaining":   secondsRemaining,
+		"countdown_text":      formatDurationCountdown(time.Duration(secondsRemaining) * time.Second),
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -1658,8 +1698,8 @@ func classifyTopology(volts, amps float64) TopologyVerification {
 			StatusDescription: "Array wired in 4S series string. Risk of exceeding Rover 20A 100V max limit during cold sunny winter mornings (-25°C Voc spike).",
 			MeasuredVolts:     volts,
 			MeasuredAmps:      amps,
-			ExpectedVolts:     "36.0V - 42.0V Vmp",
-			ExpectedAmps:      "9.0A - 11.2A Imp",
+			ExpectedVolts:     "72.0V - 84.0V Vmp",
+			ExpectedAmps:      "4.5A - 5.6A Imp",
 			MaxVocColdMargin:  "~96.4V Voc at -25°C (DANGEROUSLY CLOSE TO 100V LIMIT)",
 			Recommendation:    "Rewire array using 2-to-1 MC4 branch connectors into 2S2P to improve safety and partial shading tolerance.",
 		}
@@ -1670,8 +1710,8 @@ func classifyTopology(volts, amps float64) TopologyVerification {
 			StatusDescription: "Array wired in pure parallel. Output voltage (~18-20V) barely exceeds 12V battery charge threshold, resulting in MPPT clipping and high resistive wire heat.",
 			MeasuredVolts:     volts,
 			MeasuredAmps:      amps,
-			ExpectedVolts:     "36.0V - 42.0V Vmp",
-			ExpectedAmps:      "9.0A - 11.2A Imp",
+			ExpectedVolts:     "18.0V - 21.0V Vmp",
+			ExpectedAmps:      "18.0A - 22.4A Imp",
 			MaxVocColdMargin:  "~24.1V Voc",
 			Recommendation:    "Rewire panels in pairs of two in series before paralleling (2S2P).",
 		}
@@ -1696,6 +1736,13 @@ func handleArrayTopology(w http.ResponseWriter, r *http.Request) {
 
 	v := 37.4
 	a := 9.8
+	if ringBuf != nil {
+		latest := ringBuf.GetLatest()
+		if latest.Telemetry.PVVoltageV > 0 {
+			v = latest.Telemetry.PVVoltageV
+			a = latest.Telemetry.PVCurrentA
+		}
+	}
 	resp := classifyTopology(v, a)
 	_ = json.NewEncoder(w).Encode(resp)
 }

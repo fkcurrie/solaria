@@ -262,17 +262,17 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 	coldDerateWarn := false
 	coldDerateMsg := "OK: Thermal conditions optimal for full charging rate"
 
-	// Check if external RTS probe is unconnected: Renogy reports 0°C on register 0x0103 byte 7 when no probe is plugged in.
-	// If controller temperature is warm (> 10°C) and battTemp reads 0°C, estimate battery temp from controller.
+	// Check if external RTS probe is unconnected via Modbus fault register bit 13 (0x2000)
+	probeDisconnected := (faultBits & (1 << 13)) != 0
 	effectiveBattTemp := battTemp
-	if battTemp == 0 && ctrlTemp > 10 {
-		effectiveBattTemp = ctrlTemp - 3
+	if probeDisconnected {
+		effectiveBattTemp = ctrlTemp - 5
 	}
 
-	if effectiveBattTemp < 0 {
+	if effectiveBattTemp <= 0 {
 		subZeroWarn = true
 		if battAmps > 0.1 || pvPower > 5 {
-			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", effectiveBattTemp)
+			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero (<=0°C)! LiFePO4 charging must be strictly inhibited to prevent irreversible lithium dendrite plating.", effectiveBattTemp)
 		} else {
 			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", effectiveBattTemp)
 		}
@@ -281,7 +281,7 @@ func DecodeModbusTelemetry(raw []byte) (*Telemetry, error) {
 		if battAmps > 15.0 {
 			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", effectiveBattTemp, battAmps)
 		} else {
-			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", effectiveBattTemp)
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 1°C-5°C). Charging safely derated.", effectiveBattTemp)
 		}
 	}
 
