@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -394,5 +395,29 @@ func TestTracker_PersistAndRestoreUploadAndFrames(t *testing.T) {
 	}
 	if loadedFrames != 150 {
 		t.Errorf("Expected restored totalFramesProcessed 150, got %d", loadedFrames)
+	}
+}
+
+func TestDiskSpooler_AtomicCountPerformance(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "bridge-spool-perf-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	spooler := NewDiskSpooler(tmpDir)
+	if count := spooler.Count(); count != 0 {
+		t.Errorf("Expected count 0, got %d", count)
+	}
+
+	for i := 0; i < 10; i++ {
+		_ = spooler.Spool(SolarRecord{
+			Timestamp: "2026-08-25T12:00:00Z",
+			Site:      "Dorset",
+		})
+	}
+
+	if count := spooler.Count(); count != 10 {
+		t.Errorf("Expected atomic count 10, got %d", count)
 	}
 }

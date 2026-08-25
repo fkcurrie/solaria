@@ -248,10 +248,12 @@ func (r *RingBuffer) GetHistory(limit int) []SolarRecord {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	n := len(r.records)
-	if limit > n {
+	if limit <= 0 || limit > n {
 		limit = n
 	}
-	return r.records[n-limit:]
+	res := make([]SolarRecord, limit)
+	copy(res, r.records[n-limit:])
+	return res
 }
 
 type CacheEntry struct {
@@ -522,7 +524,6 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	if len(batch.Batch) > 0 {
 		ringBuf.Push(batch.Batch)
-		statsCache.Invalidate("day")
 
 		// Enqueue to BigQuery worker pool non-blockingly
 		if bqTable != nil {
@@ -544,6 +545,7 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 func handleLive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(ringBuf.GetLatest())
 }
 
@@ -556,6 +558,7 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	json.NewEncoder(w).Encode(ringBuf.GetHistory(limit))
 }
 
@@ -969,8 +972,8 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 				AVG(performance_ratio_pct) as avg_pr,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE EXTRACT(MONTH FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(MONTH FROM CURRENT_DATE("America/Toronto"))
-			  AND EXTRACT(YEAR FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(YEAR FROM CURRENT_DATE("America/Toronto"))
+			WHERE timestamp >= TIMESTAMP(DATE_TRUNC(CURRENT_DATE("America/Toronto"), MONTH), "America/Toronto")
+			  AND timestamp < TIMESTAMP(DATE_ADD(DATE_TRUNC(CURRENT_DATE("America/Toronto"), MONTH), INTERVAL 1 MONTH), "America/Toronto")
 			GROUP BY day_num
 			ORDER BY day_num
 		`, gcpProject))
@@ -1054,7 +1057,8 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 				MAX(total_generated_kwh) - MIN(total_generated_kwh) as month_kwh,
 				COUNT(*) as samples
 			FROM `+"`%s.solaria.telemetry`"+`
-			WHERE EXTRACT(YEAR FROM timestamp AT TIME ZONE "America/Toronto") = EXTRACT(YEAR FROM CURRENT_DATE("America/Toronto"))
+			WHERE timestamp >= TIMESTAMP(DATE_TRUNC(CURRENT_DATE("America/Toronto"), YEAR), "America/Toronto")
+			  AND timestamp < TIMESTAMP(DATE_ADD(DATE_TRUNC(CURRENT_DATE("America/Toronto"), YEAR), INTERVAL 1 YEAR), "America/Toronto")
 			GROUP BY month_num
 			ORDER BY month_num
 		`, gcpProject))
@@ -1893,6 +1897,7 @@ func main() {
 
 	mux.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 		b, err := staticFS.ReadFile("static/manifest.json")
 		if err != nil {
 			http.NotFound(w, r)
@@ -1904,6 +1909,7 @@ func main() {
 	mux.HandleFunc("/sw.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		w.Header().Set("Service-Worker-Allowed", "/")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		b, err := staticFS.ReadFile("static/sw.js")
 		if err != nil {
 			http.NotFound(w, r)

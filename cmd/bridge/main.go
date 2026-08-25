@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -141,15 +142,31 @@ func checkControlRateLimit(clientKey string, minInterval time.Duration) bool {
 
 // DiskSpooler provides fault-tolerant disk-backed buffering for telemetry when network is lost.
 type DiskSpooler struct {
-	spoolPath string
-	mu        sync.Mutex
+	spoolPath   string
+	mu          sync.Mutex
+	cachedCount int64
 }
 
 func NewDiskSpooler(dir string) *DiskSpooler {
 	_ = os.MkdirAll(dir, 0750)
-	return &DiskSpooler{
-		spoolPath: filepath.Join(dir, "telemetry_spool.jsonl"),
+	spoolPath := filepath.Join(dir, "telemetry_spool.jsonl")
+	s := &DiskSpooler{
+		spoolPath: spoolPath,
 	}
+	// Initial count on startup
+	if f, err := os.Open(spoolPath); err == nil {
+		count := int64(0)
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+		for scanner.Scan() {
+			if len(bytes.TrimSpace(scanner.Bytes())) > 0 {
+				count++
+			}
+		}
+		f.Close()
+		s.cachedCount = count
+	}
+	return s
 }
 
 const MaxBridgeSpoolBytes int64 = 50 * 1024 * 1024 // 50MB quota
@@ -185,6 +202,7 @@ func (s *DiskSpooler) Spool(record SolarRecord) error {
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return err
 	}
+	atomic.AddInt64(&s.cachedCount, 1)
 	return f.Sync()
 }
 
@@ -192,32 +210,13 @@ func (s *DiskSpooler) Count() int {
 	if s == nil {
 		return 0
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, err := os.Stat(s.spoolPath); os.IsNotExist(err) {
-		return 0
-	}
-	f, err := os.Open(s.spoolPath)
-	if err != nil {
-		return 0
-	}
-	defer f.Close()
-
-	count := 0
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		if len(bytes.TrimSpace(scanner.Bytes())) > 0 {
-			count++
-		}
-	}
-	return count
+	return int(atomic.LoadInt64(&s.cachedCount))
 }
 
 func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error) {
 	s.mu.Lock()
 	if _, err := os.Stat(s.spoolPath); os.IsNotExist(err) {
+		atomic.StoreInt64(&s.cachedCount, 0)
 		s.mu.Unlock()
 		return 0, nil
 	}
@@ -227,6 +226,7 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 		s.mu.Unlock()
 		return 0, err
 	}
+	atomic.StoreInt64(&s.cachedCount, 0)
 	s.mu.Unlock()
 
 	f, err := os.Open(stagingPath)
@@ -294,6 +294,7 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 			tf.Close()
 			_ = os.Rename(tmpPath, s.spoolPath)
 		}
+		atomic.StoreInt64(&s.cachedCount, int64(len(remaining)))
 		s.mu.Unlock()
 	}
 
@@ -801,6 +802,9 @@ func getIDToken() string {
 	out, err := cmd.Output()
 	if err == nil && len(bytes.TrimSpace(out)) > 0 {
 		token := strings.TrimSpace(string(out))
+		mu.Lock()
+		idTokenCache = token
+		idTokenExpires = time.Now().Add(50 * time.Minute)
 		mu.Unlock()
 		return token
 	}
