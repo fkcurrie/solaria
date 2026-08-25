@@ -850,6 +850,7 @@ func uploadToCloud(record SolarRecord) {
 				"total_uploads": succCount,
 				"spool_count":   spoolCount,
 			})
+			tracker.save()
 		}
 
 		// 2. Post to Local Cloud Server (port 8081) if active
@@ -931,6 +932,7 @@ func processFrame(frame []byte) {
 	lastFrameTime = lastFrameProcess
 	totalFramesProcessed++
 	frameMu.Unlock()
+	tracker.save()
 
 	nowStr := time.Now().Format("15:04:05.000")
 
@@ -997,7 +999,7 @@ func processFrame(frame []byte) {
 		telem.DailyGeneratedWh, telem.TotalGeneratedKWh)
 }
 
-const outageFilePath = "logs/outages.json"
+var outageFilePath = "logs/outages.json"
 
 type OutageEvent struct {
 	ID           int    `json:"id"`
@@ -1021,12 +1023,16 @@ type OutageStats struct {
 }
 
 type OutagePersistedState struct {
-	FirstStartedAt   time.Time     `json:"first_started_at"`
-	LastSeenAt       time.Time     `json:"last_seen_at"`
-	OutageCount      int           `json:"outage_count"`
-	TotalDowntimeSec int           `json:"total_downtime_sec"`
-	TotalUptimeSec   int           `json:"total_uptime_sec"`
-	History          []OutageEvent `json:"history"`
+	FirstStartedAt       time.Time     `json:"first_started_at"`
+	LastSeenAt           time.Time     `json:"last_seen_at"`
+	OutageCount          int           `json:"outage_count"`
+	TotalDowntimeSec     int           `json:"total_downtime_sec"`
+	TotalUptimeSec       int           `json:"total_uptime_sec"`
+	LastSuccessfulUpload time.Time     `json:"last_successful_upload,omitempty"`
+	TotalSuccessUploads  int64         `json:"total_successful_uploads,omitempty"`
+	LastBlePacketTime    time.Time     `json:"last_ble_packet_time,omitempty"`
+	TotalBleFrames       int64         `json:"total_ble_frames,omitempty"`
+	History              []OutageEvent `json:"history"`
 }
 
 type OutageTracker struct {
@@ -1072,6 +1078,23 @@ func (t *OutageTracker) load() {
 		t.firstStart = state.FirstStartedAt
 	}
 
+	if !state.LastSuccessfulUpload.IsZero() {
+		uploadMu.Lock()
+		lastSuccessUpload = state.LastSuccessfulUpload
+		totalSuccessUploads = state.TotalSuccessUploads
+		uploadMu.Unlock()
+	}
+	if !state.LastBlePacketTime.IsZero() {
+		frameMu.Lock()
+		lastFrameTime = state.LastBlePacketTime
+		totalFramesProcessed = state.TotalBleFrames
+		frameMu.Unlock()
+	} else if !state.LastSeenAt.IsZero() {
+		frameMu.Lock()
+		lastFrameTime = state.LastSeenAt
+		frameMu.Unlock()
+	}
+
 	// If there was an active outage when previous process exited, close it
 	if len(t.history) > 0 && t.history[0].Status == "ACTIVE" {
 		now := time.Now()
@@ -1100,13 +1123,28 @@ func (t *OutageTracker) save() {
 	if t.inOutage {
 		downSec += int(now.Sub(t.outageStart).Seconds())
 	}
+
+	uploadMu.Lock()
+	lSucc := lastSuccessUpload
+	totSucc := totalSuccessUploads
+	uploadMu.Unlock()
+
+	frameMu.Lock()
+	lFrame := lastFrameTime
+	totFrames := totalFramesProcessed
+	frameMu.Unlock()
+
 	state := OutagePersistedState{
-		FirstStartedAt:   t.firstStart,
-		LastSeenAt:       now,
-		OutageCount:      t.outageCount,
-		TotalDowntimeSec: downSec,
-		TotalUptimeSec:   uptimeSec,
-		History:          t.history,
+		FirstStartedAt:       t.firstStart,
+		LastSeenAt:           now,
+		OutageCount:          t.outageCount,
+		TotalDowntimeSec:     downSec,
+		TotalUptimeSec:       uptimeSec,
+		LastSuccessfulUpload: lSucc,
+		TotalSuccessUploads:  totSucc,
+		LastBlePacketTime:    lFrame,
+		TotalBleFrames:       totFrames,
+		History:              t.history,
 	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err == nil {
