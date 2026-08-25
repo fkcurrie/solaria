@@ -615,17 +615,17 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 	coldDerateWarn := false
 	coldDerateMsg := "OK: Thermal conditions optimal for full charging rate"
 
-	// Check if external RTS probe is unconnected: Renogy reports 0°C on register 0x0103 byte 7 when no probe is plugged in.
-	// If controller temperature is warm (> 10°C) and battTemp reads 0°C, estimate battery temp from controller.
+	// Check if external RTS probe is unconnected via Modbus fault register bit 13 (0x2000)
+	probeDisconnected := (faultBits & (1 << 13)) != 0
 	effectiveBattTemp := battTemp
-	if battTemp == 0 && ctrlTemp > 10 {
-		effectiveBattTemp = ctrlTemp - 3
+	if probeDisconnected {
+		effectiveBattTemp = ctrlTemp - 5
 	}
 
-	if effectiveBattTemp < 0 {
+	if effectiveBattTemp <= 0 {
 		subZeroWarn = true
 		if battA > 0.1 || pvW > 5 {
-			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero! LiFePO4 charging must be inhibited to prevent irreversible lithium dendrite plating.", effectiveBattTemp)
+			subZeroMsg = fmt.Sprintf("CRITICAL: Battery temperature %d°C is sub-zero (<=0°C)! LiFePO4 charging must be strictly inhibited to prevent irreversible lithium dendrite plating.", effectiveBattTemp)
 		} else {
 			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", effectiveBattTemp)
 		}
@@ -634,7 +634,7 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		if battA > 15.0 {
 			coldDerateMsg = fmt.Sprintf("ADVISORY: Low battery temperature (%d°C). High charge current (%.1fA) should be derated (< 0.1C / ~17A on 170Ah LiFePO4 bank) to prevent localized lithium plating.", effectiveBattTemp, battA)
 		} else {
-			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 0°C-5°C). Charging safely derated.", effectiveBattTemp)
+			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 1°C-5°C). Charging safely derated.", effectiveBattTemp)
 		}
 	}
 
@@ -957,7 +957,21 @@ func processFrame(frame []byte) {
 	wx := fetchWeather()
 	sunState := classifySunCondition(telem, wx)
 
-	expectedPower := (wx.DirectRadiationWM2 / 1000.0) * arrayRatedWatts
+	totalIrradiance := wx.DirectRadiationWM2 + wx.DiffuseRadiationWM2
+	ambTemp := 25.0
+	if wx.TemperatureC != nil {
+		ambTemp = *wx.TemperatureC
+	}
+	// NOCT cell temperature estimation: T_cell = T_amb + ((NOCT-20)/800)*G
+	cellTemp := ambTemp + ((45.0-20.0)/800.0)*totalIrradiance
+	// Monocrystalline silicon temp coefficient: -0.4%/°C above 25°C STC
+	tempFactor := 1.0 - (0.004 * (cellTemp - 25.0))
+	if tempFactor < 0.70 {
+		tempFactor = 0.70
+	} else if tempFactor > 1.15 {
+		tempFactor = 1.15
+	}
+	expectedPower := (totalIrradiance / 1000.0) * arrayRatedWatts * tempFactor
 	prPct := 0.0
 	if expectedPower > 5.0 {
 		prPct = math.Round((float64(telem.PVPowerW)/expectedPower)*1000) / 10
@@ -1680,7 +1694,10 @@ func buildMockRTUFrame(pvWatts int, pvV float64, battV float64, battA float64, s
 	} else if battV >= 14.1 {
 		chgCode = 0x04 // Boost/Absorption
 	}
-	data[67] = chgCode
+	data[65] = chgCode
+	// 0x0121: Fault Register (0x0000 = No faults)
+	data[66] = 0x00
+	data[67] = 0x00
 
 	// Modbus CRC-16
 	crcLow, crcHigh := calcCRC16(raw[:71])

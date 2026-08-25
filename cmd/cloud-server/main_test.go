@@ -354,14 +354,14 @@ func TestHandleSunTimes(t *testing.T) {
 }
 
 func TestCalculateSunTimes(t *testing.T) {
-	// Dorset ON (45.2536 N, -78.8978 W) at solar noon in August
+	// Dorset ON (45.186 N, -78.863 W) at solar noon in August
 	loc, _ := time.LoadLocation("America/Toronto")
 	if loc == nil {
 		loc = time.FixedZone("EDT", -4*3600)
 	}
 	// 2026-08-24 13:00:00 EDT (17:00 UTC) -> should be daytime
 	testDateDay := time.Date(2026, 8, 24, 13, 0, 0, 0, loc)
-	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(testDateDay, 45.2536, -78.8978)
+	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(testDateDay, 45.186, -78.863)
 
 	if !isDay {
 		t.Errorf("Expected 13:00 EDT to be daytime, got isDay=false (sunrise=%v, sunset=%v)", sunrise, sunset)
@@ -378,7 +378,7 @@ func TestCalculateSunTimes(t *testing.T) {
 
 	// 2026-08-24 02:00:00 EDT -> should be night
 	testDateNight := time.Date(2026, 8, 24, 2, 0, 0, 0, loc)
-	_, _, _, isDayNight := CalculateSunTimes(testDateNight, 45.2536, -78.8978)
+	_, _, _, isDayNight := CalculateSunTimes(testDateNight, 45.186, -78.863)
 	if isDayNight {
 		t.Errorf("Expected 02:00 EDT to be night, got isDay=true")
 	}
@@ -521,6 +521,61 @@ func TestHandleGCPOnboarding(t *testing.T) {
 
 	if res["setup_script"] != "./setup-gcp.sh" {
 		t.Errorf("Expected ./setup-gcp.sh, got %v", res["setup_script"])
+	}
+}
+
+func TestHandleSystemInfo_LiFePO4Parameters(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/system-info", nil)
+	w := httptest.NewRecorder()
+	handleSystemInfo(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode system info: %v", err)
+	}
+
+	batt, ok := res["battery_bank"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Missing battery_bank map in response")
+	}
+
+	if batt["float_voltage_v"] != 13.6 {
+		t.Errorf("Expected LiFePO4 float voltage 13.6V, got %v", batt["float_voltage_v"])
+	}
+	if batt["boost_voltage_v"] != 14.4 {
+		t.Errorf("Expected LiFePO4 boost voltage 14.4V, got %v", batt["boost_voltage_v"])
+	}
+	if batt["low_voltage_disconnect_v"] != 10.6 {
+		t.Errorf("Expected LiFePO4 LVD 10.6V, got %v", batt["low_voltage_disconnect_v"])
+	}
+	if batt["equalize_voltage_v"] != "NONE / Disabled (LiFePO4)" {
+		t.Errorf("Expected LiFePO4 equalization disabled, got %v", batt["equalize_voltage_v"])
+	}
+}
+
+func TestHandleSunTimes_SolarElevation(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sun-times", nil)
+	w := httptest.NewRecorder()
+	handleSunTimes(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Fatalf("Failed to decode sun times: %v", err)
+	}
+
+	if res["latitude"] != 45.186 || res["longitude"] != -78.863 {
+		t.Errorf("Expected Dorset coordinates 45.186, -78.863, got %v, %v", res["latitude"], res["longitude"])
+	}
+	if res["solar_elevation_deg"] == nil || res["solar_zenith_deg"] == nil {
+		t.Errorf("Expected solar_elevation_deg and solar_zenith_deg in response")
 	}
 }
 

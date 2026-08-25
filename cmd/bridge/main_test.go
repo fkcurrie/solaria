@@ -244,14 +244,22 @@ func TestDecodeTelemetry_ColdDeratingAndStringImbalance(t *testing.T) {
 	frameSubZero := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, -2)
 	telemSubZero, _ := decodeTelemetry(frameSubZero)
 	if !telemSubZero.SubZeroInhibitWarning {
-		t.Errorf("Expected SubZeroInhibitWarning to be true at -2C")
+		t.Errorf("Expected SubZeroInhibitWarning to be true at -2°C")
 	}
 
-	// Frame with Unconnected RTS probe (battTemp=0, ctrlTemp=25C) -> should not trigger sub-zero inhibit
+	// Frame with Battery Temp = 0C (Genuine freezing point -> Sub-zero inhibit MUST trigger)
+	frameFreezing := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, 0)
+	telemFreezing, _ := decodeTelemetry(frameFreezing)
+	if !telemFreezing.SubZeroInhibitWarning {
+		t.Errorf("Expected SubZeroInhibitWarning to be true at 0°C freezing point")
+	}
+
+	// Frame with Unconnected RTS probe (bit 13 = 0x2000 in fault register at raw[69:71]) with 25°C controller temp
 	frameNoProbe := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, 0)
+	frameNoProbe[69] = 0x20 // Bit 13 (0x2000 in uint16 big endian)
 	telemNoProbe, _ := decodeTelemetry(frameNoProbe)
 	if telemNoProbe.SubZeroInhibitWarning {
-		t.Errorf("Expected SubZeroInhibitWarning to be false when battTemp is 0 with 25C controller temp (unconnected RTS probe)")
+		t.Errorf("Expected SubZeroInhibitWarning to be false when probe disconnected with 25°C controller temp (effective temp = 20°C)")
 	}
 
 	// Frame with String Imbalance: PV Volts = 18.0V (single string/bypass) while power is 120W
