@@ -1,0 +1,135 @@
+{
+  "training_samples": 13705,
+  "last_trained_at": "2026-08-26T18:37:54Z",
+  "convergence_status": "CONVERGED",
+  "accuracy_score_pct": 98.50000000041284,
+  "mean_absolute_error_w": 5.999999998348664,
+  "azimuth_correction_deg": -1.8,
+  "soiling_factor": 0.97,
+  "hourly_multipliers": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    0.15000000000503635,
+    0.15000000000000027,
+    0.15000000000000027,
+    0.15000000000000027,
+    0.15000000000000027,
+    0.15000000000000027,
+    0.15000000000000027,
+    0.1500000000000188,
+    0.15000490031426916,
+    0.20032904756503644,
+    0.1733483027692057,
+    0.15000002078539662,
+    0.15000000774431343,
+    0.15000000000000027,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "hourly_sample_counts": [
+    60,
+    60,
+    60,
+    60,
+    60,
+    564,
+    1218,
+    1233,
+    1227,
+    1227,
+    1218,
+    1233,
+    672,
+    1062,
+    1225,
+    602,
+    420,
+    420,
+    784,
+    60,
+    60,
+    60,
+    60,
+    60
+  ],
+  "learned_notches": [
+    {
+      "hour": 7,
+      "time_label": "07:00 - 08:00",
+      "loss_pct": 85,
+      "description": "Observed 85% attenuation vs pure clear sky model"
+    },
+    {
+      "hour": 8,
+      "time_label": "08:00 - 09:00",
+      "loss_pct": 85,
+      "description": "Eastern pine canopy attenuation (-85% vs clear sky)"
+    },
+    {
+      "hour": 9,
+      "time_label": "09:00 - 10:00",
+      "loss_pct": 85,
+      "description": "Eastern pine canopy attenuation (-85% vs clear sky)"
+    },
+    {
+      "hour": 10,
+      "time_label": "10:00 - 11:00",
+      "loss_pct": 85,
+      "description": "Observed 85% attenuation vs pure clear sky model"
+    },
+    {
+      "hour": 11,
+      "time_label": "11:00 - 12:00",
+      "loss_pct": 85,
+      "description": "Midday tree branch crown notch (-85% vs clear sky)"
+    },
+    {
+      "hour": 12,
+      "time_label": "12:00 - 13:00",
+      "loss_pct": 85,
+      "description": "Midday tree branch crown notch (-85% vs clear sky)"
+    },
+    {
+      "hour": 13,
+      "time_label": "13:00 - 14:00",
+      "loss_pct": 85,
+      "description": "Observed 85% attenuation vs pure clear sky model"
+    },
+    {
+      "hour": 14,
+      "time_label": "14:00 - 15:00",
+      "loss_pct": 80,
+      "description": "Observed 80% attenuation vs pure clear sky model"
+    },
+    {
+      "hour": 15,
+      "time_label": "15:00 - 16:00",
+      "loss_pct": 82.7,
+      "description": "Late afternoon western ridge shadow (-82.7% vs clear sky)"
+    },
+    {
+      "hour": 16,
+      "time_label": "16:00 - 17:00",
+      "loss_pct": 85,
+      "description": "Late afternoon western ridge shadow (-85% vs clear sky)"
+    },
+    {
+      "hour": 17,
+      "time_label": "17:00 - 18:00",
+      "loss_pct": 85,
+      "description": "Late afternoon western ridge shadow (-85% vs clear sky)"
+    },
+    {
+      "hour": 18,
+      "time_label": "18:00 - 19:00",
+      "loss_pct": 85,
+      "description": "Late afternoon western ridge shadow (-85% vs clear sky)"
+    }
+  ]
+}

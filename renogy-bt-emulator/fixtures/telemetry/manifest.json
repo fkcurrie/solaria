@@ -1,0 +1,51 @@
+{
+  "dataset_version": "1.0.0",
+  "generated_at": "2026-08-26T18:38:00Z",
+  "source_system": "Project Solaria Cottage Solar Hub",
+  "hardware_profile": {
+    "solar_array": "400W (4x 100W Renogy Compact Monocrystalline, 2S2P String Topology)",
+    "charge_controller": "Renogy Rover 20A MPPT (RNG-CTRL-RVR20)",
+    "battery_bank": "12V 170Ah Smart LiFePO4 Battery with Integrated BMS (RBT170LFP12-BT)",
+    "bluetooth_module": "Renogy BT-1 RS-232 BLE Adapter (GATT 0xFFD0/0xFFF0)",
+    "location": {
+      "latitude": 45.186,
+      "longitude": -78.863,
+      "timezone": "America/Toronto"
+    }
+  },
+  "traces": [
+    {
+      "id": "trace-2026-08-23",
+      "filename": "solar_telemetry_2026-08-23.csv",
+      "records": 1463,
+      "sample_interval_sec": 10,
+      "description": "Late day solar generation curve tapering into evening nocturnal standby and 15W idle cottage load.",
+      "primary_phenomena": ["sunset_taper", "night_discharge", "inverter_standby"]
+    },
+    {
+      "id": "trace-2026-08-24",
+      "filename": "solar_telemetry_2026-08-24.csv",
+      "records": 13262,
+      "sample_interval_sec": 10,
+      "description": "Full 24-hour diurnal cycle showing dawn awakening, MPPT Bulk ramp, Absorption voltage regulation, Float maintenance, and nocturnal battery retention.",
+      "primary_phenomena": ["full_diurnal_cycle", "mppt_bulk_boost_float", "lifepo4_absorption", "100_percent_soc_maintenance"]
+    },
+    {
+      "id": "trace-2026-08-25",
+      "filename": "solar_telemetry_2026-08-25.csv",
+      "records": 6623,
+      "sample_interval_sec": 10,
+      "description": "Midday high solar irradiance with tree canopy shading occlusion notches and Rover controller thermal derating.",
+      "primary_phenomena": ["tree_shading_occlusion", "thermal_derating", "cloud_transients"]
+    },
+    {
+      "id": "trace-2026-08-26",
+      "filename": "solar_telemetry_2026-08-26.csv",
+      "records": 2477,
+      "sample_interval_sec": 10,
+      "description": "High sun generation trace capturing transient 2S2P series string imbalance / bypass diode drop event at 17:36 UTC (21.9V under 676 W/m²).",
+      "primary_phenomena": ["string_imbalance_anomaly", "bypass_diode_drop", "high_irradiance_peak"]
+    }
+  ],
+  "model_learned_parameters": "solar_model_learned.json"
+}
