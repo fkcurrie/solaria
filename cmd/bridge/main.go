@@ -137,7 +137,7 @@ var (
 	siteLon         = -78.863
 	siteName        = "1296 Wren Lake Drive, Dorset, ON"
 	arrayRatedWatts       = 400.0
-	cloudEndpoint         = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
+	cloudEndpoint         = "http://localhost:8081/api/v1/telemetry"
 	fallbackCloudEndpoint = "http://localhost:8081/api/v1/ingest"
 	cloudToken            = ""
 	bridgeToken           = ""
@@ -174,11 +174,18 @@ func isAllowedOrigin(r *http.Request) bool {
 		return false
 	}
 	host := u.Hostname()
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "solaria.local" {
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "solaria.local" || strings.HasSuffix(host, ".local") {
 		return true
 	}
-	// Exact production cloud dashboard origin
-	if host == "solaria-dashboard-952659886764.us-central1.run.app" {
+	// Check if matches configured cloud endpoint hostname
+	if cloudEndpoint != "" {
+		if cu, err := url.Parse(cloudEndpoint); err == nil && cu.Hostname() != "" {
+			if host == cu.Hostname() {
+				return true
+			}
+		}
+	}
+	if strings.HasSuffix(host, ".run.app") {
 		return true
 	}
 	// Check private LAN IP ranges (192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12)

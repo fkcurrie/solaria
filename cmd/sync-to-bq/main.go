@@ -48,8 +48,14 @@ type IngestBatch struct {
 }
 
 func main() {
-	targetURL := flag.String("url", "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/ingest", "Target Cloud Run ingestion URL")
-	token := flag.String("token", "solaria_cottage_secret_token_2026", "Bearer auth token")
+	defaultURL := os.Getenv("SOLARIA_CLOUD_ENDPOINT")
+	if defaultURL == "" {
+		defaultURL = "http://localhost:8081/api/v1/ingest"
+	} else if !strings.HasSuffix(defaultURL, "/api/v1/ingest") {
+		defaultURL = strings.TrimSuffix(defaultURL, "/api/v1/telemetry") + "/api/v1/ingest"
+	}
+	targetURL := flag.String("url", defaultURL, "Target Cloud Run ingestion URL")
+	token := flag.String("token", os.Getenv("SOLARIA_API_TOKEN"), "Bearer auth token")
 	logPattern := flag.String("logs", "logs/*.csv", "Glob pattern for local telemetry CSV logs")
 	batchSize := flag.Int("batch", 100, "Ingestion batch size")
 	flag.Parse()

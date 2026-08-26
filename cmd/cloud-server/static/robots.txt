@@ -6,4 +6,4 @@ Allow: /sw.js
 Allow: /assets/
 Disallow: /api/v1/
 
-Sitemap: https://solaria-dashboard-952659886764.us-central1.run.app/sitemap.xml
+Sitemap: /sitemap.xml

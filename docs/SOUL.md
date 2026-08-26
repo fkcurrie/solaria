@@ -107,9 +107,10 @@ Solaria enforces a strict architectural separation between the local edge hardwa
    - **Scope:** Intentionally minimalistic. It contains **only** the Web Bluetooth pairing button (*"⚡ Connect Renogy BT-1"*), BLE connectivity health, cloud uplink/spooling verification with live "Last Successful Upload" timestamp/counter, and a live activity console log with a direct launcher button to the Cloud Hub.
    - **Invariant:** It never duplicates the heavy solar analytical dashboards, charts, or planning assistants.
 
-2. **Central Cloud Analytics Hub (`https://solaria-dashboard-952659886764.us-central1.run.app/`):**
+2. **Central Cloud Analytics Hub (`https://<your-cloudrun-service>.run.app` or configurable `$SOLARIA_CLOUD_ENDPOINT`):**
    - **Target Audience:** Cottage owner, electrical engineer, or remote observer monitoring the installation from anywhere in the world.
    - **Scope:** The complete intelligence suite housing all high-level solar analytics, historical BigQuery charts, real-time oscilloscope streaming, appliance power budgeting, tree shading advice, departure certificates, and hardware topology verification tools.
+   - **Privacy & Security Invariant:** The live production Cloud Run deployment URL (`https://solaria-dashboard-<project-number>.us-central1.run.app`) must **NEVER** appear in any public repository files, public documentation, or web pages. All public documentation, install scripts, and repo code must strictly use parameterized environment variables (`$SOLARIA_CLOUD_ENDPOINT`) or placeholder examples (`https://your-cloudrun-instance.run.app`).
 
 ### 5. Seven-Pane Cloud Information Architecture & Dedicated Advisor Suite
 

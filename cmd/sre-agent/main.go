@@ -79,7 +79,11 @@ type SREAgent struct {
 
 func NewSREAgent(bridgeURL, cloudURL, cloudRunURL, incidentFile, token string, autoHeal bool) *SREAgent {
 	if cloudRunURL == "" {
-		cloudRunURL = "https://solaria-dashboard-952659886764.us-central1.run.app"
+		if env := os.Getenv("SOLARIA_CLOUD_ENDPOINT"); env != "" {
+			cloudRunURL = env
+		} else {
+			cloudRunURL = cloudURL
+		}
 	}
 	agent := &SREAgent{
 		incidentFile: incidentFile,
@@ -189,7 +193,7 @@ func (a *SREAgent) AutoHealBridge() {
 	}
 	log.Println("🛠️ [AUTO-HEAL] Solaria Bridge daemon is offline or silent. Initiating autonomous restart...")
 	cmd := exec.Command("./bin/solaria-bridge")
-	cloudRunEP := "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
+	cloudRunEP := a.cloudURL + "/api/v1/telemetry"
 	if a.cloudRunURL != "" {
 		cloudRunEP = a.cloudRunURL + "/api/v1/telemetry"
 	}
@@ -270,7 +274,7 @@ func (a *SREAgent) AutoHealCloudRunSync() {
 		body, _ := io.ReadAll(resp.Body)
 		if len(body) > 0 {
 			payload := fmt.Sprintf(`{"batch":[%s]}`, string(body))
-			cloudRunEP := "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
+			cloudRunEP := a.cloudURL + "/api/v1/telemetry"
 			if a.cloudRunURL != "" {
 				cloudRunEP = a.cloudRunURL + "/api/v1/telemetry"
 			}
@@ -667,7 +671,7 @@ func main() {
 		port        = flag.Int("port", 8082, "SRE Agent HTTP server port")
 		bridgeURL   = flag.String("bridge-url", "http://localhost:8080", "Bridge daemon URL")
 		cloudURL    = flag.String("cloud-url", "http://localhost:8081", "Cloud server URL")
-		cloudRunURL = flag.String("cloudrun-url", "https://solaria-dashboard-952659886764.us-central1.run.app", "Cloud Run deployed service URL")
+		cloudRunURL = flag.String("cloudrun-url", os.Getenv("SOLARIA_CLOUD_ENDPOINT"), "Cloud Run deployed service URL (defaults to SOLARIA_CLOUD_ENDPOINT env or cloud-url)")
 		interval    = flag.Duration("interval", 5*time.Second, "Monitoring interval in daemon mode")
 	)
 	flag.Parse()

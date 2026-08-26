@@ -206,7 +206,7 @@ if [ "$AGENT_MODE" = true ]; then
     "gcp_project": "${GCP_PROJECT:-solaria-solar}",
     "dataset": "${BIGQUERY_DATASET:-solaria}",
     "table": "${BIGQUERY_TABLE:-telemetry}",
-    "cloud_endpoint": "${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+    "cloud_endpoint": "${SOLARIA_CLOUD_ENDPOINT:-https://solaria.example.com/api/v1/telemetry}"
   },
   "suggested_actions": [
     {"command": "./setup.sh --start-bridge", "description": "Run local Go bridge & dashboard on http://localhost:8080"},
@@ -276,7 +276,7 @@ if [ "$NON_INTERACTIVE" = true ]; then
     BIGQUERY_DATASET="${BIGQUERY_DATASET:-solaria}"
     BIGQUERY_TABLE="${BIGQUERY_TABLE:-telemetry}"
     SOLARIA_API_TOKEN="${SOLARIA_API_TOKEN:-solaria_cottage_secret_token_2026}"
-    SOLARIA_CLOUD_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+    SOLARIA_CLOUD_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria.example.com/api/v1/telemetry}"
 else
     echo -e "  Storage Destination Options:"
     echo -e "    1) Local node only (CSV logs on Raspberry Pi/Linux, no cloud)"
@@ -323,7 +323,7 @@ else
         read -rp "  API Ingestion Token [$DEFAULT_TOKEN]: " INPUT_TOKEN
         SOLARIA_API_TOKEN="${INPUT_TOKEN:-$DEFAULT_TOKEN}"
 
-        DEFAULT_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+        DEFAULT_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria.example.com/api/v1/telemetry}"
         read -rp "  Cloud Endpoint [$DEFAULT_ENDPOINT]: " INPUT_ENDPOINT
         SOLARIA_CLOUD_ENDPOINT="${INPUT_ENDPOINT:-$DEFAULT_ENDPOINT}"
     else
@@ -331,7 +331,7 @@ else
         BIGQUERY_DATASET="${BIGQUERY_DATASET:-solaria}"
         BIGQUERY_TABLE="${BIGQUERY_TABLE:-telemetry}"
         SOLARIA_API_TOKEN="${SOLARIA_API_TOKEN:-solaria_cottage_secret_token_2026}"
-        SOLARIA_CLOUD_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry}"
+        SOLARIA_CLOUD_ENDPOINT="${SOLARIA_CLOUD_ENDPOINT:-https://solaria.example.com/api/v1/telemetry}"
     fi
 fi
 

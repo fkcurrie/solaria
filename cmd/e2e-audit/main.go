@@ -36,7 +36,11 @@ type E2EReport struct {
 func main() {
 	bridgeURL := flag.String("bridge-url", "http://localhost:8080", "Base URL for local Solaria bridge daemon")
 	cloudURL := flag.String("cloud-url", "http://localhost:8081", "Base URL for local Solaria Cloud server")
-	cloudRunURL := flag.String("cloudrun-url", "https://solaria-dashboard-952659886764.us-central1.run.app", "Base URL for Solaria Cloud Run service")
+	defaultCloudRun := os.Getenv("SOLARIA_CLOUD_ENDPOINT")
+	if defaultCloudRun == "" {
+		defaultCloudRun = "http://localhost:8081"
+	}
+	cloudRunURL := flag.String("cloudrun-url", defaultCloudRun, "Base URL for Solaria Cloud Run service")
 	token := flag.String("token", os.Getenv("SOLARIA_API_TOKEN"), "API Token for authenticated endpoints")
 	outputJSON := flag.Bool("json", false, "Output results in JSON format")
 	flag.Parse()

@@ -98,8 +98,8 @@ Open any web browser on your phone, tablet, or laptop connected to cottage Wi-Fi
 - **100% Offline-Capable**: Even if your satellite or LTE router loses signal for 3 weeks, you can still view live power flow, battery state of charge, and solar harvest on the local cottage network.
 
 ### Away from the Cottage (Cloud Dashboard)
-When internet is active, all telemetry streams to Google Cloud Run and Google BigQuery:
-👉 **`https://solaria-dashboard-952659886764.us-central1.run.app`**
+When internet is active, all telemetry streams to your Google Cloud Run service:
+👉 **`https://<your-cloud-run-service-url>`** (configured via `SOLARIA_CLOUD_ENDPOINT`)
 
 ---
 
