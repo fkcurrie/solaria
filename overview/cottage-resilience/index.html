@@ -632,10 +632,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pine-vs-hemlock-tree-shading" class="md-nav__link">
+  <a href="#diurnal-tree-shading-analysis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🌲 Pine vs. Hemlock Tree Shading
+        🌲 Diurnal Tree Shading Analysis
       
     </span>
   </a>
@@ -1689,10 +1689,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pine-vs-hemlock-tree-shading" class="md-nav__link">
+  <a href="#diurnal-tree-shading-analysis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🌲 Pine vs. Hemlock Tree Shading
+        🌲 Diurnal Tree Shading Analysis
       
     </span>
   </a>
@@ -1743,11 +1743,11 @@ Charging lithium iron phosphate (LiFePO4) cells below <span class="arithmatex">\
 - The <code>solaria-bridge</code> and <code>solaria-sre-agent</code> continuously monitor internal battery temperature via Modbus registers.
 - When <span class="arithmatex">\(T_{\text{battery}} \le 0^\circ\text{C}\)</span>, the system flags <code>subzero_inhibit = true</code> and triggers high-visibility alerts on the dashboard.</p>
 <hr />
-<h2 id="pine-vs-hemlock-tree-shading">🌲 Pine vs. Hemlock Tree Shading<a class="headerlink" href="#pine-vs-hemlock-tree-shading" title="Permanent link">&para;</a></h2>
-<p>Remote installations are often surrounded by tall coniferous and deciduous trees:
-- <strong>Morning Pine Shading (East):</strong> Dense white pines block direct morning sun between 08:00 and 10:30, keeping array voltage low until the sun climbs above <span class="arithmatex">\(25^\circ\)</span> elevation.
+<h2 id="diurnal-tree-shading-analysis">🌲 Diurnal Tree Shading Analysis<a class="headerlink" href="#diurnal-tree-shading-analysis" title="Permanent link">&para;</a></h2>
+<p>Remote installations are often surrounded by tall trees and surrounding forest canopy:
+- <strong>Morning Tree Shading (East):</strong> Dense eastern tree canopy can block direct morning sun between 08:00 and 10:30, keeping array voltage low until the sun climbs above <span class="arithmatex">\(25^\circ\)</span> elevation.
 - <strong>Solar Noon Peak (South):</strong> Direct uninhibited irradiance between 11:30 and 14:00 where harvest reaches 340W–385W (85–96% of rated STC).
-- <strong>Afternoon Hemlock Shading (West):</strong> Late-afternoon shadows create characteristic "notches" in the diurnal power curve.</p>
+- <strong>Afternoon Tree Shading (West):</strong> Late-afternoon tree and ridge shadows create characteristic "notches" in the diurnal power curve.</p>
 <p>Solaria's built-in <strong>Tree Shading Diagnostic Analyzer</strong> calculates exactly how much daily energy (kWh) is lost to specific tree profiles and provides guidance on canopy trimming.</p>
 <hr />
 <h2 id="offline-zero-data-loss-architecture">📡 Offline Zero-Data-Loss Architecture<a class="headerlink" href="#offline-zero-data-loss-architecture" title="Permanent link">&para;</a></h2>
