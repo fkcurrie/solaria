@@ -38,6 +38,7 @@ MANIFEST
 *.dylib
 *.test
 *.out
+/site/
 
 # Environments
 .env

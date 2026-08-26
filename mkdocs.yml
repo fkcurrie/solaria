@@ -1,0 +1,107 @@
+site_name: Solaria
+site_description: Autonomous Off-Grid Solar & LiFePO4 Energy Intelligence Platform for Renogy Rover MPPT & Cloud Run
+site_author: Frank Currie
+site_url: https://fkcurrie.github.io/solaria/
+repo_name: fkcurrie/solaria
+repo_url: https://github.com/fkcurrie/solaria
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: amber
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: amber
+      accent: orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.keys
+  - pymdownx.smartsymbols
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.arithmatex:
+      generic: true
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Overview:
+      - Introduction: index.md
+      - System Architecture: overview/architecture.md
+      - Hardware Bill of Materials: overview/hardware-bom.md
+      - Cottage Resilience & Off-Grid FAQ: overview/cottage-resilience.md
+  - Installation & Setup:
+      - 1-Click Bootstrap Quickstart: install/quickstart.md
+      - Safe 4-Step Wiring Guide: install/wiring-guide.md
+      - Headless SD Card Setup: install/sd-card-setup.md
+      - Multi-Distro Compatibility: install/distro-compatibility.md
+  - Core Physics & Safety:
+      - LiFePO4 Chemistry & Sub-Zero Safety: physics/battery-lifepo4.md
+      - 2S2P Solar Array & String Topology: physics/solar-topology.md
+      - Atmospheric Irradiance & NOAA Sun Math: physics/atmospheric-physics.md
+      - Tree Shading Diagnostics: physics/tree-shading.md
+  - Software & Architecture:
+      - Renogy BLE Modbus RTU Protocol: software/modbus-protocol.md
+      - Edge BLE Bridge Daemon: software/bridge-daemon.md
+      - Cloud Analytics Server: software/cloud-server.md
+      - BigQuery Data Lake Schema: software/bigquery-schema.md
+      - Mobile Responsive Dashboard (PWA): software/dashboard-pwa.md
+  - Autonomous SRE & Self-Healing:
+      - SRE Supervisor Daemon: sre/autonomous-supervisor.md
+      - 3-Tier Hardware Bluetooth Watchdog: sre/bluetooth-watchdog.md
+      - Disaster Recovery & Zero-Data Loss: sre/disaster-recovery.md
+  - Operations & Cottage Guide:
+      - Appliance Power Budget & Runtime: operations/power-budget.md
+      - Winterization & Departure Checklist: operations/winterization.md
+      - Troubleshooting & Log Streaming: operations/troubleshooting.md
+  - Developer & CI/CD:
+      - Multi-Arch CI Matrix & QEMU: developer/ci-workflows.md
+      - End-to-End Test Suite & E2E Audit: developer/testing.md
+      - Contributing & License: developer/contributing.md

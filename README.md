@@ -1,10 +1,34 @@
 # Solaria: Solar Energy Intelligence & Cloud Analytics
 
 <p align="center">
-  <img src="assets/solaria-logo.png" alt="Solaria Solar Energy Intelligence & Analytics" width="220" />
+  <img src="cmd/cloud-server/static/assets/solaria-logo.svg" alt="Solaria Solar Energy Intelligence & Analytics" width="180" />
 </p>
 
-Solaria streams telemetry from Renogy solar charge controllers (Rover, Wanderer, Adventurer) via Bluetooth Low Energy (BT-1 / BT-2) to local disk logs and optional Google BigQuery analytics, correlating solar harvest against local atmospheric weather data in real time.
+<p align="center">
+  <strong>Autonomous Off-Grid Solar & LiFePO4 Energy Intelligence Platform for Renogy Rover MPPT & Google Cloud Run.</strong>
+</p>
+
+<p align="center">
+  <a href="https://fkcurrie.github.io/solaria/"><img src="https://img.shields.io/badge/docs-Material_MkDocs-amber.svg?logo=materialformkdocs" alt="Documentation Site"></a>
+  <a href="https://github.com/fkcurrie/solaria/actions/workflows/ci.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/fkcurrie/solaria/actions/workflows/bootstrap-ci.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/bootstrap-ci.yml/badge.svg" alt="Multi-Distro Matrix"></a>
+  <a href="https://github.com/fkcurrie/solaria/actions/workflows/docs.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/docs.yml/badge.svg" alt="Docs CI"></a>
+  <img src="https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go" alt="Go Version">
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
+  <img src="https://img.shields.io/badge/Platform-Raspberry_Pi_%7C_Linux_%7C_Cloud_Run-green" alt="Platform">
+</p>
+
+---
+
+## 📖 Complete Documentation & Guides
+
+Comprehensive architecture diagrams, wiring schematics, LiFePO4 safety guidelines, and API references are available on our official documentation site:
+
+👉 **[https://fkcurrie.github.io/solaria/](https://fkcurrie.github.io/solaria/)**
+
+---
+
+## ⚡ Overview
 
 ```text
 [Renogy Controller] ──(BT-1 BLE)──> [Go Bridge / Edge Agent] ──(Local Logs: CSV/JSON)
