@@ -4,11 +4,11 @@ import "testing"
 
 func TestClassifySunCondition(t *testing.T) {
 	tests := []struct {
-		name        string
-		telem       *Telemetry
-		weather     WeatherMetrics
-		ratedW      float64
-		expected    SunCondition
+		name     string
+		telem    *Telemetry
+		weather  WeatherMetrics
+		ratedW   float64
+		expected SunCondition
 	}{
 		{
 			name: "Night condition",

@@ -34,21 +34,6 @@ go run ./cmd/bridge
 
 Open `http://localhost:8080` in Chrome to pair with the Renogy BT-1 module.
 
-### Offline Development & Simulation Mode (No BT-1 Required)
-
-If developing away from the cottage or without BT-1 hardware, start the bridge with the `--mock` flag to simulate live 400W 2S2P solar telemetry and diurnal cycles:
-
-```bash
-# Start bridge in simulation mode with live WebSocket telemetry broadcast
-go run ./cmd/bridge --mock
-
-# Replay realistic 24-hour solar dataset to Cloud Server or local ingest
-go run ./cmd/replay --file testdata/sample_day.json --endpoint http://localhost:8081/api/v1/telemetry
-
-# Generate custom 24-hour test fixtures
-go run ./cmd/generate-data
-```
-
 ---
 
 ## AI Agent Integration
@@ -90,7 +75,7 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 
 ---
 
-## Documentation
+## Documentation & Roadmap
 
 * [System Architecture](docs/architecture.md) — BLE GATT services, data pipeline, and Modbus frame format.
 * [Solar Hardware Specifications](docs/solar-specifications.md) — 400W 2S2P electrical wiring, Rover 20A MPPT limits, and battery profiles.
@@ -98,6 +83,9 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 * [BigQuery Telemetry Schema](docs/bigquery-schema.md) — 34-column schema reference and analytical SQL queries.
 * [Deployment Guide](docs/deployment.md) — Local edge setup, storage configuration, and Cloud Run deployment.
 * [Resilience & Troubleshooting](docs/troubleshooting-resilience.md) — Watchdog mechanics, outage tracking, and recovery procedures.
+* [Core Soul & Multi-Persona Governance](docs/SOUL.md) — Architectural invariants and multi-persona review system.
+* [Google Principal UX Review & 15 Issues](docs/ux-redesign/README.md) — [EPIC-002](docs/ux-redesign/EPIC-002-Google-Principal-UX-Review-and-Design-Systems.md) and 15 design issues.
+* [Renogy BT-1 / BT-2 BLE Emulator](renogy-bt-emulator/README.md) — Standalone pure Go physical BLE hardware emulator ([EPIC-001](renogy-bt-emulator/EPIC-001-Renogy-BT1-BT2-Hardware-Emulator.md)).
 
 ---
 

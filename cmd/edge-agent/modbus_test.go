@@ -176,4 +176,3 @@ func TestDecodeModbusTelemetry_FreezingZeroCutoff(t *testing.T) {
 		t.Errorf("Expected SubZeroInhibitWarning to be true at 0°C freezing point")
 	}
 }
-

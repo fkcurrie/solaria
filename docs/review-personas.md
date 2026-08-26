@@ -6,7 +6,7 @@ When conducting pull request reviews, refactors, architecture designs, or code q
 
 ---
 
-## 5-Persona Review Matrix Summary
+## 6-Persona Review Matrix Summary
 
 ```text
 +-----------------------------------------------------------------------------------------+
@@ -18,7 +18,8 @@ When conducting pull request reviews, refactors, architecture designs, or code q
 | 2  | Perf Architect    | Performance & Scale   | Min CPU/Memory/BigQuery query costs    |
 | 3  | SRE Specialist    | Edge Resilience & SRE | Zero lost watt-hours during outages    |
 | 4  | Solar Engineer    | PV & Battery Physics  | LiFePO4 safety & MPPT tracking acc     |
-| 5  | Cottage Owner     | Field UX & Usability  | Plain-English actionable clarity       |
+| 5  | Cottage Owner     | Cottage Usability     | Plain-English actionable clarity       |
+| 6  | Google UX Lead    | Design Systems/UX     | < 3s Glanceability & WCAG AA score     |
 +----+-------------------+-----------------------+----------------------------------------+
 ```
 
@@ -98,3 +99,21 @@ Ensures that non-technical users monitoring their cottage from a smartphone or t
 - **Glanceable Status:** Are essential metrics (Battery SOC %, Solar Generation Watts, System Health) visible at a glance with distinct color coding?
 - **Mobile & Dock Friendly:** Is the layout fully responsive on mobile screens with touch-friendly buttons and high-contrast text in direct sunlight?
 - **One-Click Pairing:** Is the Bluetooth connection workflow simple, with clear visual prompts and helpful troubleshooting guidance?
+
+---
+
+## Persona 6: Google Principal UX & Design Systems Architect (Data Visualization & Cognitive Load Specialist)
+
+### UX & Cognitive Domain & Mindset
+
+Applies Google's core design philosophy (*"Focus on the user and all else will follow"*), Material Design 3 (M3) design tokens, and rigorous information architecture to reduce cognitive load, minimize time-to-situational-awareness (< 3 seconds), and ensure 100% WCAG 2.1 AA/AAA accessibility across dark and direct-sunlight cottage environments.
+
+### UX Review Checklist
+
+- **The 3-Second Situational Awareness Test:** Can a user glance at the dashboard on a wall-mounted tablet or phone and instantly comprehend solar generation, battery state of charge, and daylight countdown without reading dense tables?
+- **Progressive Disclosure:** Are primary summary KPIs visually dominant, while deep engineering telemetry (MPPT buck conversion, string impedance, Modbus bitfields) is progressively disclosed on demand?
+- **Zero-Jitter Tabular Typography:** Do live streaming telemetry values enforce `font-variant-numeric: tabular-nums` to prevent horizontal layout jank and visual vibration as numbers fluctuate?
+- **Semantic Color Harmony & WCAG AA:** Does the color palette enforce strict physical domain associations (Solar Amber `#F59E0B`, LiFePO4 Emerald `#10B981`, Atmospheric Azure `#38BDF8`, Critical Coral `#EF4444`) with minimum 4.5:1 text-to-background contrast ratios?
+- **Mobile Ergonomics (Fitts's Law):** Are interactive buttons, toggles, and tabs sized to minimum 48px touch targets, with essential controls positioned within easy one-handed thumb reach?
+- **Contextual Microcopy & ELI5 Tooltips:** Are complex technical solar metrics (e.g., *Performance Ratio PR%*, *Voc Headroom*, *Sub-Zero Inhibit*) accompanied by plain-English info popovers for non-technical family members?
+- **Actionable State Recovery:** When hardware or network outages occur, does the interface provide 1-2-3 actionable remediation steps instead of raw system error dumps?

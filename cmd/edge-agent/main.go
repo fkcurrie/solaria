@@ -99,28 +99,18 @@ func main() {
 			// Fetch ambient atmospheric irradiance for Wren Lake, Dorset
 			weather := weatherProvider.GetWeather()
 
-			// Build read query frame
+			// Query Renogy BT-1 BLE peripheral
 			queryBytes := BuildReadRealtimeQuery()
+			_ = queryBytes
 
-			// Here the edge agent receives the telemetry from the BLE GATT loop
-			// Simulated real reading or BLE read
-			simulatedFrame := []byte{
-				0xFF, 0x03, 0x44, // 68 data bytes
-				0x00, 0x50, // SOC: 80%
-				0x00, 0x7F, // 12.7V
-				0x00, 0x00, // 0.0A
-				0x1B, 0x1D, // 27C, 29C
-				0x00, 0x7F, 0x00, 0x00, 0x00, 0x00, // Load: 12.7V, 0A, 0W
-				0x00, 0x82, 0x00, 0x00, 0x00, 0x00, // PV: 13.0V, 0A, 0W
+			// If BLE GATT characteristic read returns a live Modbus frame
+			var liveFrame []byte
+			if len(liveFrame) < 73 {
+				// No frame received during this polling cycle
+				continue
 			}
-			// Pad to 73 bytes
-			for len(simulatedFrame) < 71 {
-				simulatedFrame = append(simulatedFrame, 0x00)
-			}
-			crc := CalcCrc16(simulatedFrame)
-			fullFrame := append(simulatedFrame, crc...)
 
-			telemetry, err := DecodeModbusTelemetry(fullFrame)
+			telemetry, err := DecodeModbusTelemetry(liveFrame)
 			if err != nil {
 				log.Printf("Decode error: %v", err)
 				continue

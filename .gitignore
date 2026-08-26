@@ -49,10 +49,15 @@ env.bak/
 venv.bak/
 
 # Logs and local buffers
+logs/
 logs/*.csv
 logs/*.log
 logs/*.json
 *.log
+cmd/bridge/logs/
+cmd/cloud-server/data/
+data/
+spool/
 spool.jsonl
 *.sqlite
 *.sqlite3

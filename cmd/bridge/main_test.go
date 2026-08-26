@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -552,5 +554,191 @@ func TestUploadBatchRecords(t *testing.T) {
 	}
 	if !strings.HasPrefix(receivedAuthHeader, "Bearer ") {
 		t.Errorf("Expected Authorization starting with 'Bearer ', got %q", receivedAuthHeader)
+	}
+}
+
+func TestDiagnosticLogBuffer_Bridge(t *testing.T) {
+	buf := NewDiagnosticLogBuffer(5)
+
+	buf.Log("INFO", "CONTROLLER_MODBUS", "Modbus frame received", "MODBUS_OK", nil)
+	buf.Log("WARN", "BATTERY_SAFETY", "Low battery voltage warning", "ERR_LOW_VOLTAGE", map[string]interface{}{"voltage": 11.2})
+	buf.Log("ERROR", "CLOUD_UPLOADER", "Upload failed: HTTP 500", "ERR_HTTP_500", nil)
+
+	stats := buf.GetStats()
+	if stats["total_logged"].(int) != 3 {
+		t.Errorf("Expected total_logged 3, got %v", stats["total_logged"])
+	}
+	if stats["error_count"].(int64) != 1 {
+		t.Errorf("Expected error_count 1, got %v", stats["error_count"])
+	}
+	if stats["warn_count"].(int64) != 1 {
+		t.Errorf("Expected warn_count 1, got %v", stats["warn_count"])
+	}
+
+	// Filter by level
+	errorLogs := buf.GetLogs("ERROR", "", "", 10)
+	if len(errorLogs) != 1 || errorLogs[0].ErrorCode != "ERR_HTTP_500" {
+		t.Errorf("Expected 1 error log with code ERR_HTTP_500, got %v", errorLogs)
+	}
+
+	// Filter by subsystem
+	modbusLogs := buf.GetLogs("", "CONTROLLER_MODBUS", "", 10)
+	if len(modbusLogs) != 1 || modbusLogs[0].Subsystem != "CONTROLLER_MODBUS" {
+		t.Errorf("Expected 1 modbus log, got %v", modbusLogs)
+	}
+
+	// Search filter
+	searchLogs := buf.GetLogs("", "", "voltage", 10)
+	if len(searchLogs) != 1 || searchLogs[0].ErrorCode != "ERR_LOW_VOLTAGE" {
+		t.Errorf("Expected 1 search matched log, got %v", searchLogs)
+	}
+
+	// Ring buffer rollover
+	for i := 0; i < 10; i++ {
+		buf.Log("DEBUG", "TEST", fmt.Sprintf("Message %d", i), "", nil)
+	}
+	allLogs := buf.GetLogs("", "", "", 50)
+	if len(allLogs) > 5 {
+		t.Errorf("Expected buffer size capped at 5, got %d", len(allLogs))
+	}
+}
+
+func TestHandleLogs_Bridge(t *testing.T) {
+	bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", "CRC failure test", "ERR_TEST_CRC", nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/logs?level=ERROR&search=CRC", nil)
+	w := httptest.NewRecorder()
+	handleLogs(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Status string     `json:"status"`
+		Count  int        `json:"count"`
+		Logs   []LogEntry `json:"logs"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp.Status != "ok" || resp.Count == 0 {
+		t.Errorf("Expected status ok and non-zero count, got %+v", resp)
+	}
+}
+
+func TestHandleDiagnostics_Bridge(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
+	w := httptest.NewRecorder()
+	handleDiagnostics(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode diagnostics: %v", err)
+	}
+	if resp["service"] != "solaria-bridge" {
+		t.Errorf("Expected service 'solaria-bridge', got %v", resp["service"])
+	}
+	if resp["health"] == nil || resp["runtime"] == nil {
+		t.Errorf("Expected health and runtime keys in diagnostics, got %+v", resp)
+	}
+}
+
+func buildMockRTUFrame(pvWatts int, pvV float64, battV float64, battA float64, soc int, ctrlTemp int, battTemp int) []byte {
+	raw := make([]byte, 73)
+	raw[0] = 0xFF
+	raw[1] = 0x03
+	raw[2] = 0x44 // 68 bytes payload
+
+	data := raw[3:71]
+
+	// 0x0100: SOC
+	binary.BigEndian.PutUint16(data[0:2], uint16(soc))
+	// 0x0101: Battery Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[2:4], uint16(battV*10))
+	// 0x0102: Charging Current (0.01A)
+	if battA > 0 {
+		binary.BigEndian.PutUint16(data[4:6], uint16(battA*100))
+	} else {
+		binary.BigEndian.PutUint16(data[4:6], 0)
+	}
+	// 0x0103: Controller Temp & Battery Temp
+	data[6] = byte(int8(ctrlTemp))
+	data[7] = byte(int8(battTemp))
+
+	// 0x0104: Load Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[8:10], uint16(battV*10))
+	// 0x0105: Load Current (0.01A)
+	loadW := 15
+	if battA < 0 {
+		loadW = int(-battA * battV)
+	}
+	loadA := float64(loadW) / battV
+	binary.BigEndian.PutUint16(data[10:12], uint16(loadA*100))
+	// 0x0106: Load Power
+	binary.BigEndian.PutUint16(data[12:14], uint16(loadW))
+
+	// 0x0107: PV Voltage (0.1V)
+	binary.BigEndian.PutUint16(data[14:16], uint16(pvV*10))
+	// 0x0108: PV Current (0.01A)
+	var pvA float64
+	if pvV > 0 {
+		pvA = float64(pvWatts) / pvV
+	}
+	binary.BigEndian.PutUint16(data[16:18], uint16(pvA*100))
+	// 0x0109: PV Power
+	binary.BigEndian.PutUint16(data[18:20], uint16(pvWatts))
+
+	// 0x010B: Daily Min Battery Voltage (12.8V)
+	binary.BigEndian.PutUint16(data[22:24], 128)
+	// 0x010C: Daily Max Battery Voltage (14.2V)
+	binary.BigEndian.PutUint16(data[24:26], 142)
+	// 0x010D: Daily Max Charging Current (20.0A)
+	binary.BigEndian.PutUint16(data[26:28], 2000)
+	// 0x010F: Daily Max PV Power (385W)
+	binary.BigEndian.PutUint16(data[30:32], 385)
+	// 0x0113: Daily Generated Wh (1450 Wh)
+	binary.BigEndian.PutUint16(data[38:40], 1450)
+	// 0x0114: Daily Consumed Wh (380 Wh)
+	binary.BigEndian.PutUint16(data[40:42], 380)
+	// 0x0115: Operating Days (128)
+	binary.BigEndian.PutUint16(data[42:44], 128)
+	// 0x011C: Total Generated kWh (412 kWh)
+	binary.BigEndian.PutUint32(data[56:60], 412)
+
+	// 0x0120: Charging State
+	chgCode := byte(0x02) // MPPT
+	if pvWatts < 5 {
+		chgCode = 0x00 // Deactivated
+	} else if battV >= 14.1 {
+		chgCode = 0x04 // Boost/Absorption
+	}
+	data[65] = chgCode
+	// 0x0121: Fault Register (0x0000 = No faults)
+	data[66] = 0x00
+	data[67] = 0x00
+
+	// Modbus CRC-16
+	crcLow, crcHigh := calcCRC16(raw[:71])
+	raw[71] = crcLow
+	raw[72] = crcHigh
+
+	return raw
+}
+
+func TestSolarRecord_ProcessingAndOutageFields(t *testing.T) {
+	frame := buildMockRTUFrame(300, 36.5, 13.5, 20.0, 80, 25, 20)
+	processFrame(frame)
+
+	lastTelemetryMu.RLock()
+	telem := lastSeenTelem
+	lastTelemetryMu.RUnlock()
+
+	if telem.PVPowerW != 300 {
+		t.Errorf("Expected PVPowerW 300, got %d", telem.PVPowerW)
 	}
 }

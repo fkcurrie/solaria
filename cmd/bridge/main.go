@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
-	"encoding/binary"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +20,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,6 +31,104 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Diagnostic Logging Structs & Subsystems
+type LogEntry struct {
+	Timestamp string                 `json:"timestamp"`
+	Level     string                 `json:"level"`     // DEBUG, INFO, WARN, ERROR, FATAL
+	Subsystem string                 `json:"subsystem"` // CONTROLLER_MODBUS, BLE_RADIO, DISK_SPOOLER, CLOUD_UPLOADER, WEATHER_CLIENT, HTTP_API, CONTROL_ENGINE, BATTERY_SAFETY
+	Message   string                 `json:"message"`
+	ErrorCode string                 `json:"error_code,omitempty"`
+	Details   map[string]interface{} `json:"details,omitempty"`
+}
+
+type DiagnosticLogBuffer struct {
+	mu         sync.RWMutex
+	entries    []LogEntry
+	maxEntries int
+	errorCount int64
+	warnCount  int64
+	infoCount  int64
+}
+
+func NewDiagnosticLogBuffer(max int) *DiagnosticLogBuffer {
+	return &DiagnosticLogBuffer{
+		entries:    make([]LogEntry, 0, max),
+		maxEntries: max,
+	}
+}
+
+func (b *DiagnosticLogBuffer) Log(level, subsystem, message, errCode string, details map[string]interface{}) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	switch level {
+	case "ERROR", "FATAL":
+		b.errorCount++
+	case "WARN":
+		b.warnCount++
+	case "INFO":
+		b.infoCount++
+	}
+
+	entry := LogEntry{
+		Timestamp: time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00"),
+		Level:     level,
+		Subsystem: subsystem,
+		Message:   message,
+		ErrorCode: errCode,
+		Details:   details,
+	}
+
+	b.entries = append(b.entries, entry)
+	if len(b.entries) > b.maxEntries {
+		b.entries = b.entries[len(b.entries)-b.maxEntries:]
+	}
+}
+
+func (b *DiagnosticLogBuffer) GetLogs(level, subsystem, search string, limit int) []LogEntry {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	var filtered []LogEntry
+	level = strings.ToUpper(strings.TrimSpace(level))
+	subsystem = strings.ToUpper(strings.TrimSpace(subsystem))
+	search = strings.ToLower(strings.TrimSpace(search))
+
+	for i := len(b.entries) - 1; i >= 0; i-- {
+		e := b.entries[i]
+		if level != "" && level != "ALL" && e.Level != level {
+			continue
+		}
+		if subsystem != "" && subsystem != "ALL" && !strings.EqualFold(e.Subsystem, subsystem) {
+			continue
+		}
+		if search != "" {
+			match := strings.Contains(strings.ToLower(e.Message), search) ||
+				strings.Contains(strings.ToLower(e.ErrorCode), search) ||
+				strings.Contains(strings.ToLower(e.Subsystem), search)
+			if !match {
+				continue
+			}
+		}
+		filtered = append(filtered, e)
+		if limit > 0 && len(filtered) >= limit {
+			break
+		}
+	}
+	return filtered
+}
+
+func (b *DiagnosticLogBuffer) GetStats() map[string]interface{} {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return map[string]interface{}{
+		"total_logged": len(b.entries),
+		"error_count":  b.errorCount,
+		"warn_count":   b.warnCount,
+		"info_count":   b.infoCount,
+	}
+}
+
 // Global Configuration & Defaults
 var (
 	httpPort        = 8080
@@ -38,13 +136,14 @@ var (
 	siteLat         = 45.186
 	siteLon         = -78.863
 	siteName        = "1296 Wren Lake Drive, Dorset, ON"
-	arrayRatedWatts = 400.0
-	cloudEndpoint   = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
-	cloudToken      = ""
-	bridgeToken     = ""
-	storageMode     = "both" // "local", "bigquery" / "cloud", "both"
-	siteTZ          = "America/Toronto"
-	siteLoc         = time.Local
+	arrayRatedWatts       = 400.0
+	cloudEndpoint         = "https://solaria-dashboard-952659886764.us-central1.run.app/api/v1/telemetry"
+	fallbackCloudEndpoint = "http://localhost:8081/api/v1/ingest"
+	cloudToken            = ""
+	bridgeToken           = ""
+	storageMode           = "both" // "local", "bigquery" / "cloud", "both"
+	siteTZ                = "America/Toronto"
+	siteLoc               = time.Local
 
 	mu             sync.Mutex
 	rxBuffer       []byte
@@ -53,7 +152,8 @@ var (
 	idTokenCache   string
 	idTokenExpires time.Time
 
-	diskSpooler *DiskSpooler
+	diskSpooler  *DiskSpooler
+	bridgeLogger = NewDiagnosticLogBuffer(1000)
 
 	// Rate limiter for control actions
 	controlRateMu    sync.Mutex
@@ -459,6 +559,12 @@ type SolarRecord struct {
 	Telemetry         Telemetry          `json:"telemetry"`
 	Weather           WeatherMetrics     `json:"weather"`
 	SunClassification string             `json:"sun_classification"`
+	IsMock            bool               `json:"is_mock"`
+	DataSource        string             `json:"data_source"` // "HARDWARE_BLE", "BRIDGE_HEARTBEAT", "OFFLINE_OUTAGE"
+	BLEConnected      bool               `json:"ble_connected"`
+	OutageStatus      string             `json:"outage_status"` // "NOMINAL", "BLE_DISCONNECTED", "STREAM_SILENT"
+	OutageDurationSec int                `json:"outage_duration_sec,omitempty"`
+	OutageReason      string             `json:"outage_reason,omitempty"`
 }
 
 func loadEnv() {
@@ -503,6 +609,9 @@ func loadEnv() {
 	}
 	if val := os.Getenv("SOLARIA_CLOUD_ENDPOINT"); val != "" {
 		cloudEndpoint = val
+	}
+	if val := os.Getenv("SOLARIA_FALLBACK_ENDPOINT"); val != "" {
+		fallbackCloudEndpoint = val
 	}
 	if val := os.Getenv("SOLARIA_API_TOKEN"); val != "" {
 		cloudToken = val
@@ -555,6 +664,7 @@ func fetchWeather() WeatherMetrics {
 
 	resp, err := client.Do(req)
 	if err != nil {
+		bridgeLogger.Log("WARN", "WEATHER_CLIENT", fmt.Sprintf("Open-Meteo API query failed: %v (using cached/fallback weather)", err), "ERR_WEATHER_FETCH_FAIL", map[string]interface{}{"url": url})
 		return cachedWeather
 	}
 	defer resp.Body.Close()
@@ -585,7 +695,18 @@ func fetchWeather() WeatherMetrics {
 				IsDay:               omResp.Current.IsDay == 1,
 			}
 			lastWxFetch = time.Now()
+			tempVal := 0.0
+			if cachedWeather.TemperatureC != nil {
+				tempVal = *cachedWeather.TemperatureC
+			}
+			cloudVal := 0
+			if cachedWeather.CloudCoverPct != nil {
+				cloudVal = *cachedWeather.CloudCoverPct
+			}
+			bridgeLogger.Log("DEBUG", "WEATHER_CLIENT", fmt.Sprintf("Weather synced from Open-Meteo: %.1f°C, %d%% clouds, %.0f W/m² direct, %.0f W/m² diffuse", tempVal, cloudVal, cachedWeather.DirectRadiationWM2, cachedWeather.DiffuseRadiationWM2), "WEATHER_SYNC_OK", nil)
 		}
+	} else {
+		bridgeLogger.Log("WARN", "WEATHER_CLIENT", fmt.Sprintf("Open-Meteo API returned HTTP %d", resp.StatusCode), "ERR_WEATHER_HTTP_STATUS", map[string]interface{}{"status_code": resp.StatusCode})
 	}
 	return cachedWeather
 }
@@ -620,10 +741,36 @@ func classifySunCondition(telem Telemetry, wx WeatherMetrics) string {
 
 func decodeTelemetry(raw []byte) (Telemetry, error) {
 	if len(raw) < 35 || raw[1] != 0x03 {
+		bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", "Malformed Modbus frame structure or unexpected function code", "ERR_MODBUS_INVALID_FRAME", map[string]interface{}{
+			"frame_len": len(raw),
+			"raw_hex":   hex.EncodeToString(raw),
+		})
 		return Telemetry{}, fmt.Errorf("invalid frame length: %d", len(raw))
 	}
+
+	// Verify Modbus CRC-16 Checksum if present
+	if len(raw) >= 5 {
+		actualLow, actualHigh := raw[len(raw)-2], raw[len(raw)-1]
+		if actualLow != 0 || actualHigh != 0 {
+			crcLow, crcHigh := calcCRC16(raw[:len(raw)-2])
+			if crcLow != actualLow || crcHigh != actualHigh {
+				bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", "Modbus CRC16 checksum mismatch detected on incoming frame", "ERR_MODBUS_CRC_MISMATCH", map[string]interface{}{
+					"frame_len":    len(raw),
+					"raw_hex":      hex.EncodeToString(raw),
+					"expected_crc": fmt.Sprintf("0x%02X%02X", crcLow, crcHigh),
+					"actual_crc":   fmt.Sprintf("0x%02X%02X", actualLow, actualHigh),
+				})
+				return Telemetry{}, fmt.Errorf("modbus CRC mismatch: expected 0x%02X%02X got 0x%02X%02X", crcLow, crcHigh, actualLow, actualHigh)
+			}
+		}
+	}
+
 	data := raw[3 : len(raw)-2]
 	if len(data) < 20 {
+		bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", "Insufficient Modbus register payload in frame", "ERR_MODBUS_SHORT_PAYLOAD", map[string]interface{}{
+			"payload_len": len(data),
+			"raw_hex":     hex.EncodeToString(raw),
+		})
 		return Telemetry{}, fmt.Errorf("insufficient register payload: %d", len(data))
 	}
 
@@ -767,6 +914,11 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		} else {
 			subZeroMsg = fmt.Sprintf("WARNING: Battery temperature is %d°C (Sub-Zero). LiFePO4 charge currently inhibited.", effectiveBattTemp)
 		}
+		bridgeLogger.Log("WARN", "BATTERY_SAFETY", subZeroMsg, "ERR_SUBZERO_INHIBIT", map[string]interface{}{
+			"battery_temp_c": effectiveBattTemp,
+			"battery_amps":   battA,
+			"pv_watts":       pvW,
+		})
 	} else if effectiveBattTemp <= 5 {
 		coldDerateWarn = true
 		if battA > 15.0 {
@@ -774,6 +926,28 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		} else {
 			coldDerateMsg = fmt.Sprintf("ADVISORY: Battery temperature is %d°C (Low Temp Transition Zone 1°C-5°C). Charging safely derated.", effectiveBattTemp)
 		}
+		bridgeLogger.Log("WARN", "BATTERY_SAFETY", coldDerateMsg, "ERR_COLD_DERATE", map[string]interface{}{
+			"battery_temp_c": effectiveBattTemp,
+			"battery_amps":   battA,
+		})
+	}
+
+	if faultBits != 0 {
+		bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", fmt.Sprintf("Controller hardware fault active: %s (Bits: 0x%04X)", faultFlags, faultBits), "ERR_HARDWARE_FAULT", map[string]interface{}{
+			"fault_bits":  fmt.Sprintf("0x%04X", faultBits),
+			"fault_flags": faultFlags,
+		})
+	}
+
+	if battV < 11.0 && battV > 0 {
+		bridgeLogger.Log("WARN", "BATTERY_SAFETY", fmt.Sprintf("Low battery voltage detected: %.1fV (LVD approaching at 10.6V)", battV), "ERR_LOW_BATTERY_VOLTAGE", map[string]interface{}{
+			"battery_voltage_v": battV,
+			"battery_soc_pct":   battSOC,
+		})
+	} else if battV > 15.0 {
+		bridgeLogger.Log("WARN", "BATTERY_SAFETY", fmt.Sprintf("High battery voltage detected: %.1fV (OVD threshold at 16.0V)", battV), "ERR_HIGH_BATTERY_VOLTAGE", map[string]interface{}{
+			"battery_voltage_v": battV,
+		})
 	}
 
 	// 3. 2S2P String Balance & PV Fault Diagnostics
@@ -782,6 +956,10 @@ func decodeTelemetry(raw []byte) (Telemetry, error) {
 		stringStatus = "NIGHT_OR_INACTIVE"
 	} else if pvV >= 10.0 && pvV < 26.0 {
 		stringStatus = "POTENTIAL_SERIES_DIODE_BYPASS_OR_SINGLE_PANEL_FAULT"
+		bridgeLogger.Log("WARN", "ARRAY_TOPOLOGY", fmt.Sprintf("Array voltage %.1fV is lower than nominal 2S Vmp (36-40V); possible bypass diode or single panel shading", pvV), "ERR_STRING_VOLTAGE_LOW", map[string]interface{}{
+			"pv_voltage_v": pvV,
+			"pv_watts":     pvW,
+		})
 	} else if pvV >= 26.0 && pvW > 0 {
 		stringStatus = "NOMINAL_2S2P_ACTIVE"
 	} else if pvV >= 26.0 && pvW == 0 {
@@ -884,31 +1062,25 @@ func logToCSV(telem Telemetry) {
 }
 
 func getIDToken() string {
-	mu.Lock()
-	if idTokenCache != "" && time.Now().Before(idTokenExpires) {
-		token := idTokenCache
-		mu.Unlock()
-		return token
+	if val := os.Getenv("SOLARIA_IDENTITY_TOKEN"); val != "" {
+		return val
 	}
-	mu.Unlock()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "gcloud", "auth", "print-identity-token")
-	out, err := cmd.Output()
-	if err == nil && len(bytes.TrimSpace(out)) > 0 {
-		token := strings.TrimSpace(string(out))
-		mu.Lock()
-		idTokenCache = token
-		idTokenExpires = time.Now().Add(50 * time.Minute)
-		mu.Unlock()
-		return token
+	if cloudToken != "" {
+		return cloudToken
 	}
-	return cloudToken
+	return ""
 }
 
 var (
+	cloudHTTPClient = &http.Client{
+		Timeout: 8 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        20,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 5 * time.Second,
+		},
+	}
 	uploadMu            sync.Mutex
 	lastCloudUpload     time.Time
 	lastSuccessUpload   time.Time
@@ -926,63 +1098,153 @@ func getCloudUploadStats() (time.Time, int64, int) {
 }
 
 func uploadSingleRecord(record SolarRecord) error {
-	if cloudEndpoint == "" {
+	endpoints := make([]string, 0, 2)
+	if cloudEndpoint != "" {
+		endpoints = append(endpoints, cloudEndpoint)
+	}
+	if fallbackCloudEndpoint != "" && fallbackCloudEndpoint != cloudEndpoint {
+		endpoints = append(endpoints, fallbackCloudEndpoint)
+	}
+	if len(endpoints) == 0 {
 		return nil
 	}
+
 	payload, err := json.Marshal(map[string]interface{}{
 		"batch": []SolarRecord{record},
 	})
 	if err != nil {
+		bridgeLogger.Log("ERROR", "CLOUD_UPLOADER", fmt.Sprintf("Failed to marshal single record: %v", err), "ERR_UPLOAD_MARSHAL", nil)
 		return err
 	}
-	client := &http.Client{Timeout: 6 * time.Second}
-	req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	token := getIDToken()
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-API-Key", cloudToken)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	token := getIDToken()
+	var uploadErrors []string
+	successCount := 0
+
+	for _, ep := range endpoints {
+		start := time.Now()
+		req, err := http.NewRequest("POST", ep, bytes.NewBuffer(payload))
+		if err != nil {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: %v", ep, err))
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("X-API-Key", token)
+		} else if cloudToken != "" {
+			req.Header.Set("Authorization", "Bearer "+cloudToken)
+			req.Header.Set("X-API-Key", cloudToken)
+		}
+
+		resp, err := cloudHTTPClient.Do(req)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: %v", ep, err))
+			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Upload to %s failed after %dms: %v", ep, latency, err), "ERR_CLOUD_POST", map[string]interface{}{
+				"endpoint": ep,
+				"error":    err.Error(),
+			})
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: HTTP %d", ep, resp.StatusCode))
+			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Upload to %s returned HTTP %d", ep, resp.StatusCode), "ERR_CLOUD_HTTP", map[string]interface{}{
+				"status_code": resp.StatusCode,
+				"endpoint":    ep,
+			})
+			continue
+		}
+
+		successCount++
+		bridgeLogger.Log("DEBUG", "CLOUD_UPLOADER", fmt.Sprintf("Cloud upload to %s succeeded in %dms (HTTP 200)", ep, latency), "CLOUD_UPLOAD_OK", map[string]interface{}{
+			"endpoint":   ep,
+			"latency_ms": latency,
+		})
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("cloud returned HTTP %d", resp.StatusCode)
+
+	if successCount == 0 && len(uploadErrors) > 0 {
+		return fmt.Errorf("all upload endpoints failed: %s", strings.Join(uploadErrors, "; "))
 	}
 	return nil
 }
 
 func uploadBatchRecords(records []SolarRecord) error {
-	if cloudEndpoint == "" || len(records) == 0 {
+	if len(records) == 0 {
 		return nil
 	}
+	endpoints := make([]string, 0, 2)
+	if cloudEndpoint != "" {
+		endpoints = append(endpoints, cloudEndpoint)
+	}
+	if fallbackCloudEndpoint != "" && fallbackCloudEndpoint != cloudEndpoint {
+		endpoints = append(endpoints, fallbackCloudEndpoint)
+	}
+	if len(endpoints) == 0 {
+		return nil
+	}
+
 	payload, err := json.Marshal(map[string]interface{}{
 		"batch": records,
 	})
 	if err != nil {
+		bridgeLogger.Log("ERROR", "CLOUD_UPLOADER", fmt.Sprintf("Failed to marshal batch of %d records: %v", len(records), err), "ERR_BATCH_MARSHAL", nil)
 		return err
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("POST", cloudEndpoint, bytes.NewBuffer(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	token := getIDToken()
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-API-Key", cloudToken)
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	token := getIDToken()
+	var uploadErrors []string
+	successCount := 0
+
+	for _, ep := range endpoints {
+		start := time.Now()
+		req, err := http.NewRequest("POST", ep, bytes.NewBuffer(payload))
+		if err != nil {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: %v", ep, err))
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("X-API-Key", token)
+		} else if cloudToken != "" {
+			req.Header.Set("Authorization", "Bearer "+cloudToken)
+			req.Header.Set("X-API-Key", cloudToken)
+		}
+
+		resp, err := cloudHTTPClient.Do(req)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: %v", ep, err))
+			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Batch upload to %s failed after %dms: %v", ep, latency, err), "ERR_BATCH_POST", map[string]interface{}{
+				"count":    len(records),
+				"endpoint": ep,
+				"error":    err.Error(),
+			})
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: HTTP %d", ep, resp.StatusCode))
+			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Batch upload to %s returned HTTP %d", ep, resp.StatusCode), "ERR_BATCH_HTTP", map[string]interface{}{
+				"count":       len(records),
+				"status_code": resp.StatusCode,
+				"endpoint":    ep,
+			})
+			continue
+		}
+
+		successCount++
+		bridgeLogger.Log("INFO", "CLOUD_UPLOADER", fmt.Sprintf("Batch upload of %d records succeeded to %s in %dms (HTTP 200)", len(records), ep, latency), "CLOUD_BATCH_OK", map[string]interface{}{
+			"count":      len(records),
+			"endpoint":   ep,
+			"latency_ms": latency,
+		})
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("cloud returned HTTP %d", resp.StatusCode)
+
+	if successCount == 0 && len(uploadErrors) > 0 {
+		return fmt.Errorf("all batch upload endpoints failed: %s", strings.Join(uploadErrors, "; "))
 	}
 	return nil
 }
@@ -1005,13 +1267,12 @@ func uploadToCloud(record SolarRecord) {
 	uploadMu.Unlock()
 
 	go func() {
-		// 1. Post to Production Cloud Endpoint
 		if err := uploadSingleRecord(record); err != nil {
 			spoolCount := 0
 			if diskSpooler != nil {
 				_ = diskSpooler.Spool(record)
 				spoolCount = diskSpooler.Count()
-				fmt.Printf("[\033[33mSPOOL\033[0m] Cloud offline (%v). Telemetry safely spooled to disk (Queue: %d).\n", err, spoolCount)
+				fmt.Printf("[\033[33mSPOOL\033[0m] Cloud upload error (%v). Telemetry safely spooled to disk (Queue: %d).\n", err, spoolCount)
 			}
 			broadcastControlMsg(map[string]interface{}{
 				"type":        "cloud_upload",
@@ -1041,23 +1302,6 @@ func uploadToCloud(record SolarRecord) {
 				"spool_count":   spoolCount,
 			})
 			tracker.save()
-		}
-
-		// 2. Post to Local Cloud Server (port 8081) if active
-		payload, err := json.Marshal(map[string]interface{}{
-			"batch": []SolarRecord{record},
-		})
-		if err == nil {
-			localReq, err := http.NewRequest("POST", "http://localhost:8081/api/v1/telemetry", bytes.NewBuffer(payload))
-			if err == nil {
-				localReq.Header.Set("Content-Type", "application/json")
-				localReq.Header.Set("Authorization", "Bearer "+cloudToken)
-				localReq.Header.Set("X-API-Key", cloudToken)
-				client := &http.Client{Timeout: 3 * time.Second}
-				if resp, err := client.Do(localReq); err == nil {
-					resp.Body.Close()
-				}
-			}
 		}
 	}()
 }
@@ -1136,7 +1380,10 @@ func startHeartbeatWorker(ctx context.Context) {
 				}
 
 				wx := fetchWeather()
-				sunState := classifySunCondition(telem, wx)
+
+				frameMu.Lock()
+				elapsedSinceFrame := time.Since(lastFrameTime)
+				frameMu.Unlock()
 
 				hbRecord := SolarRecord{
 					Timestamp: time.Now().UTC().Format(time.RFC3339),
@@ -1147,7 +1394,13 @@ func startHeartbeatWorker(ctx context.Context) {
 					},
 					Telemetry:         telem,
 					Weather:           wx,
-					SunClassification: sunState,
+					SunClassification: "STANDBY_OFFLINE",
+					IsMock:            false,
+					DataSource:        "BRIDGE_HEARTBEAT",
+					BLEConnected:      false,
+					OutageStatus:      "BLE_DISCONNECTED",
+					OutageDurationSec: int(elapsedSinceFrame.Seconds()),
+					OutageReason:      "Renogy BT-1 Bluetooth LE hardware disconnected or silent (> 30s)",
 				}
 
 				uploadToCloud(hbRecord)
@@ -1172,22 +1425,27 @@ func processFrame(frame []byte) {
 	}
 
 	frameMu.Lock()
-	if time.Since(lastFrameProcess) < 8*time.Second {
-		frameMu.Unlock()
-		return
-	}
+	lastFrameTime = time.Now()
 	lastFrameProcess = time.Now()
-	lastFrameTime = lastFrameProcess
 	totalFramesProcessed++
 	frameMu.Unlock()
 	tracker.save()
 
-	nowStr := time.Now().Format("15:04:05.000")
-
+	// 1. Decode Raw Modbus Registers
 	telem, err := decodeTelemetry(frame)
 	if err != nil {
+		bridgeLogger.Log("ERROR", "CONTROLLER_MODBUS", fmt.Sprintf("Failed to decode Modbus frame: %v", err), "ERR_MODBUS_DECODE", map[string]interface{}{
+			"frame_len": len(frame),
+		})
 		return
 	}
+
+	bridgeLogger.Log("INFO", "CONTROLLER_MODBUS", fmt.Sprintf("Modbus telemetry decoded: %dW PV (%.1fV @ %.2fA), %d%% SOC (%.1fV), State: %s", telem.PVPowerW, telem.PVVoltageV, telem.PVCurrentA, telem.BatterySOCPct, telem.BatteryVoltageV, telem.ChargingState), "MODBUS_FRAME_OK", map[string]interface{}{
+		"pv_w":      telem.PVPowerW,
+		"soc":       telem.BatterySOCPct,
+		"batt_v":    telem.BatteryVoltageV,
+		"chg_state": telem.ChargingState,
+	})
 
 	wx := fetchWeather()
 	sunState := classifySunCondition(telem, wx)
@@ -1213,6 +1471,15 @@ func processFrame(frame []byte) {
 	}
 	telem.PerformanceRatioPct = prPct
 
+	// Passive Diagnostic Hazard Check: Reverse-Order Wiring (PV > 18V without Battery < 9V)
+	if telem.PVVoltageV > 18.0 && telem.BatteryVoltageV < 9.0 {
+		fmt.Printf("\n[\033[1;31m⚠️ HAZARD_REVERSE_WIRING\033[0m] High PV voltage (%.1fV) detected while battery voltage (%.1fV) is missing or disconnected! Ensure battery is connected before PV.\n",
+			telem.PVVoltageV, telem.BatteryVoltageV)
+		bridgeLogger.Log("ERROR", "BATTERY_SAFETY",
+			fmt.Sprintf("HAZARD_REVERSE_WIRING: PV voltage %.1fV active while battery is %.1fV. Ensure battery is connected before solar array to protect MPPT buck converter.", telem.PVVoltageV, telem.BatteryVoltageV),
+			"ERR_HAZARD_REVERSE_WIRING", map[string]interface{}{"pv_voltage": telem.PVVoltageV, "batt_voltage": telem.BatteryVoltageV})
+	}
+
 	lastTelemetryMu.Lock()
 	lastSeenTelem = telem
 	lastTelemetryMu.Unlock()
@@ -1227,6 +1494,10 @@ func processFrame(frame []byte) {
 		Telemetry:         telem,
 		Weather:           wx,
 		SunClassification: sunState,
+		IsMock:            false,
+		DataSource:        "HARDWARE_BLE",
+		BLEConnected:      true,
+		OutageStatus:      "NOMINAL",
 	}
 
 	if storageMode != "cloud" && storageMode != "bigquery" {
@@ -1250,6 +1521,7 @@ func processFrame(frame []byte) {
 		cloudStr = strconv.Itoa(*wx.CloudCoverPct)
 	}
 
+	nowStr := time.Now().Format("15:04:05.000")
 	fmt.Printf("\n[\033[1;33m%s ☀️ RENOGY LIVE TELEMETRY | %s\033[0m]\n", nowStr, sunState)
 	fmt.Printf("  ├─ Array (400W 2S2P): \033[1;33m%d W\033[0m (%.1fV @ %.2fA) | Util: %.1f%% | Peak: %dW\n",
 		telem.PVPowerW, telem.PVVoltageV, telem.PVCurrentA, telem.ArrayUtilizationPct, telem.DailyMaxPVWatts)
@@ -1596,14 +1868,14 @@ func broadcastControlMsg(msg map[string]interface{}) {
 	}
 }
 
-func checkAndHealBluetoothSubsystem() {
+func checkAndHealBluetoothSubsystem(silenceDuration time.Duration) {
 	now := time.Now()
-	if time.Since(lastHealthCheck) < 20*time.Second {
+	if time.Since(lastHealthCheck) < 15*time.Second {
 		return
 	}
 	lastHealthCheck = now
 
-	// 1. Check systemctl status for bluetooth daemon
+	// Tier 1 (Soft): Check systemctl status for bluetooth daemon
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 
@@ -1613,24 +1885,36 @@ func checkAndHealBluetoothSubsystem() {
 
 	if err != nil || status != "active" {
 		fmt.Printf("\n[\033[1;31mWATCHDOG ALERT\033[0m] Bluetooth daemon is %s. Attempting auto-recovery...\n", status)
-		// Attempt restart
 		restartCmd := exec.Command("sudo", "systemctl", "restart", "bluetooth")
 		if rErr := restartCmd.Run(); rErr != nil {
-			// Try non-sudo systemctl start if sudo not configured
 			_ = exec.Command("systemctl", "start", "bluetooth").Run()
 		}
 		time.Sleep(1 * time.Second)
 	}
 
-	// 2. Ensure bluetooth power is ON
 	_ = exec.Command("bluetoothctl", "power", "on").Run()
+
+	// Tier 2 (Radio Unblock): If silent > 60s, unblock rfkill
+	if silenceDuration > 60*time.Second {
+		fmt.Printf("[\033[1;33mWATCHDOG TIER-2\033[0m] Executing rfkill unblock bluetooth (Silence: %.0fs)...\n", silenceDuration.Seconds())
+		_ = exec.Command("rfkill", "unblock", "bluetooth").Run()
+	}
+
+	// Tier 3 (Hardware Subsystem Reset): If silent > 180s, reset HCI adapter
+	if silenceDuration > 180*time.Second {
+		fmt.Printf("[\033[1;31mWATCHDOG TIER-3\033[0m] Executing hciconfig hci0 reset (Silence: %.0fs)...\n", silenceDuration.Seconds())
+		_ = exec.Command("hciconfig", "hci0", "reset").Run()
+		_ = exec.Command("bluetoothctl", "power", "off").Run()
+		time.Sleep(500 * time.Millisecond)
+		_ = exec.Command("bluetoothctl", "power", "on").Run()
+	}
 }
 
 func startBluetoothWatchdog(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous Bluetooth, Outage Logger & Watchdog active.\n")
+	fmt.Printf("[\033[1;32mSUPERVISOR\033[0m] Autonomous Bluetooth, Outage Logger & 3-Tier Hardware Watchdog active.\n")
 
 	watchdogAttempt := 0
 	var nextReconnectAttempt time.Time
@@ -1678,8 +1962,8 @@ func startBluetoothWatchdog(ctx context.Context) {
 				fmt.Printf("[\033[1;33mWATCHDOG\033[0m] Telemetry silent for %.0fs (Clients connected: %d). Verifying host BLE health...\n",
 					elapsed.Seconds(), clientCount)
 
-				// Self-heal Linux bluetooth subsystem
-				checkAndHealBluetoothSubsystem()
+				// Self-heal Linux bluetooth subsystem with 3-tier escalation
+				checkAndHealBluetoothSubsystem(elapsed)
 
 				now := time.Now()
 				if clientCount > 0 && (nextReconnectAttempt.IsZero() || now.After(nextReconnectAttempt)) {
@@ -1883,156 +2167,13 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func buildMockRTUFrame(pvWatts int, pvV float64, battV float64, battA float64, soc int, ctrlTemp int, battTemp int) []byte {
-	raw := make([]byte, 73)
-	raw[0] = 0xFF
-	raw[1] = 0x03
-	raw[2] = 0x44 // 68 bytes payload
-
-	data := raw[3:71]
-
-	// 0x0100: SOC
-	binary.BigEndian.PutUint16(data[0:2], uint16(soc))
-	// 0x0101: Battery Voltage (0.1V)
-	binary.BigEndian.PutUint16(data[2:4], uint16(battV*10))
-	// 0x0102: Charging Current (0.01A)
-	if battA > 0 {
-		binary.BigEndian.PutUint16(data[4:6], uint16(battA*100))
-	} else {
-		binary.BigEndian.PutUint16(data[4:6], 0)
-	}
-	// 0x0103: Controller Temp & Battery Temp
-	data[6] = byte(int8(ctrlTemp))
-	data[7] = byte(int8(battTemp))
-
-	// 0x0104: Load Voltage (0.1V)
-	binary.BigEndian.PutUint16(data[8:10], uint16(battV*10))
-	// 0x0105: Load Current (0.01A)
-	loadW := 15
-	if battA < 0 {
-		loadW = int(-battA * battV)
-	}
-	loadA := float64(loadW) / battV
-	binary.BigEndian.PutUint16(data[10:12], uint16(loadA*100))
-	// 0x0106: Load Power
-	binary.BigEndian.PutUint16(data[12:14], uint16(loadW))
-
-	// 0x0107: PV Voltage (0.1V)
-	binary.BigEndian.PutUint16(data[14:16], uint16(pvV*10))
-	// 0x0108: PV Current (0.01A)
-	var pvA float64
-	if pvV > 0 {
-		pvA = float64(pvWatts) / pvV
-	}
-	binary.BigEndian.PutUint16(data[16:18], uint16(pvA*100))
-	// 0x0109: PV Power
-	binary.BigEndian.PutUint16(data[18:20], uint16(pvWatts))
-
-	// 0x010B: Daily Min Battery Voltage (12.8V)
-	binary.BigEndian.PutUint16(data[22:24], 128)
-	// 0x010C: Daily Max Battery Voltage (14.2V)
-	binary.BigEndian.PutUint16(data[24:26], 142)
-	// 0x010D: Daily Max Charging Current (20.0A)
-	binary.BigEndian.PutUint16(data[26:28], 2000)
-	// 0x010F: Daily Max PV Power (385W)
-	binary.BigEndian.PutUint16(data[30:32], 385)
-	// 0x0113: Daily Generated Wh (1450 Wh)
-	binary.BigEndian.PutUint16(data[38:40], 1450)
-	// 0x0114: Daily Consumed Wh (380 Wh)
-	binary.BigEndian.PutUint16(data[40:42], 380)
-	// 0x0115: Operating Days (128)
-	binary.BigEndian.PutUint16(data[42:44], 128)
-	// 0x011C: Total Generated kWh (412 kWh)
-	binary.BigEndian.PutUint32(data[56:60], 412)
-
-	// 0x0120: Charging State
-	chgCode := byte(0x02) // MPPT
-	if pvWatts < 5 {
-		chgCode = 0x00 // Deactivated
-	} else if battV >= 14.1 {
-		chgCode = 0x04 // Boost/Absorption
-	}
-	data[65] = chgCode
-	// 0x0121: Fault Register (0x0000 = No faults)
-	data[66] = 0x00
-	data[67] = 0x00
-
-	// Modbus CRC-16
-	crcLow, crcHigh := calcCRC16(raw[:71])
-	raw[71] = crcLow
-	raw[72] = crcHigh
-
-	return raw
-}
-
-func startMockSimulator(ctx context.Context) {
-	fmt.Println("\n[\033[1;36mMOCK SIMULATOR\033[0m] Initializing offline Renogy Rover 400W 2S2P simulation engine...")
-	fmt.Println("[\033[1;36mMOCK SIMULATOR\033[0m] Generating live Modbus RTU telemetry frames (2s interval). No BT-1 required.")
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	type SimItem struct {
-		PVPowerW        int     `json:"pv_power_w"`
-		PVVoltageV      float64 `json:"pv_voltage_v"`
-		PVCurrentA      float64 `json:"pv_current_a"`
-		BatterySOCPct   int     `json:"battery_soc_pct"`
-		BatteryVoltageV float64 `json:"battery_voltage_v"`
-		BatteryCurrentA float64 `json:"battery_current_a"`
-		ControllerTempC int     `json:"controller_temp_c"`
-		BatteryTempC    int     `json:"battery_temp_c"`
-	}
-
-	var items []SimItem
-	sampleCandidates := []string{"testdata/sample_day.json", "../testdata/sample_day.json", "../../testdata/sample_day.json", "cmd/cloud-server/testdata/sample_day.json", "/home/fcurrie/Projects/solar-testing/testdata/sample_day.json"}
-	for _, p := range sampleCandidates {
-		if data, err := os.ReadFile(p); err == nil {
-			_ = json.Unmarshal(data, &items)
-			if len(items) > 0 {
-				break
-			}
-		}
-	}
-
-	simIdx := 720 // Start at solar midday
-	if len(items) == 0 {
-		// Fallback sample
-		items = append(items, SimItem{
-			PVPowerW:        348,
-			PVVoltageV:      37.2,
-			PVCurrentA:      9.35,
-			BatterySOCPct:   92,
-			BatteryVoltageV: 13.9,
-			BatteryCurrentA: 24.8,
-			ControllerTempC: 31,
-			BatteryTempC:    22,
-		})
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			cur := items[simIdx%len(items)]
-			simIdx = (simIdx + 1) % len(items)
-
-			frame := buildMockRTUFrame(cur.PVPowerW, cur.PVVoltageV, cur.BatteryVoltageV, cur.BatteryCurrentA, cur.BatterySOCPct, cur.ControllerTempC, cur.BatteryTempC)
-			processFrame(frame)
-		}
-	}
-}
-
 func main() {
-	mockFlag := flag.Bool("mock", false, "Run in offline simulation mode generating realistic 400W 2S2P Renogy Rover telemetry")
 	flag.Parse()
 
 	loadEnv()
 	initBridgeAuth()
 	diskSpooler = NewDiskSpooler("spool")
 	tracker.load()
-
-	isMock := *mockFlag || os.Getenv("MOCK_MODE") == "true" || os.Getenv("SOLARIA_MOCK") == "true"
 
 	banner := `===========================================================================
 SOLARIA: RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
@@ -2043,7 +2184,6 @@ SOLARIA: RENOGY BT-1 / BT-2 SOLAR & BLE GOLANG GATEWAY
   • Automatic Stream Chunk Reassembly & CRC16 Engine
   • Disk Spooling & Resilience Engine: ACTIVE (spool/telemetry_spool.jsonl)
   • Bridge Session Security: ACTIVE (Token: %s...)
-  • Simulation Mode: %v
 ---------------------------------------------------------------------------
 Open Dashboard: http://localhost:%d in Chrome on your device
 ===========================================================================`
@@ -2052,7 +2192,7 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 	if len(maskedToken) > 8 {
 		maskedToken = maskedToken[:8]
 	}
-	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, maskedToken, isMock, httpPort)
+	fmt.Printf(banner+"\n", siteName, siteLat, siteLon, maskedToken, httpPort)
 
 	// 1. Start WebSocket Server on 8765
 	wsMux := http.NewServeMux()
@@ -2078,6 +2218,8 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 	httpMux.HandleFunc("/api/v1/bridge-status", handleBridgeStatus)
 	httpMux.HandleFunc("/api/v1/reload", handleReload)
 	httpMux.HandleFunc("/api/v1/network-discovery", handleNetworkDiscovery)
+	httpMux.HandleFunc("/api/v1/logs", handleLogs)
+	httpMux.HandleFunc("/api/v1/diagnostics", handleDiagnostics)
 	fs := http.FileServer(http.Dir("static"))
 	httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -2102,18 +2244,13 @@ Open Dashboard: http://localhost:%d in Chrome on your device
 		}
 	}()
 
-	// 3. Start Watchdog or Mock Simulation, Spool Drainer, and Heartbeat Keepalive
+	// 3. Start Bluetooth LE Watchdog, Spool Drainer, and Heartbeat Keepalive
 	watchdogCtx, watchdogCancel := context.WithCancel(context.Background())
 	defer watchdogCancel()
 
 	go startSpoolDrainer(watchdogCtx)
 	go startHeartbeatWorker(watchdogCtx)
-
-	if isMock {
-		go startMockSimulator(watchdogCtx)
-	} else {
-		go startBluetoothWatchdog(watchdogCtx)
-	}
+	go startBluetoothWatchdog(watchdogCtx)
 
 	// Listen for terminate and hot-reload signals
 	sigChan := make(chan os.Signal, 2)
@@ -2211,7 +2348,7 @@ func handleBridgeStatus(w http.ResponseWriter, r *http.Request) {
 	stats, hist := tracker.GetStats()
 
 	resp := map[string]interface{}{
-		"site":                     siteName,
+		"site": siteName,
 		"location": map[string]interface{}{
 			"latitude":  siteLat,
 			"longitude": siteLon,
@@ -2274,3 +2411,115 @@ func handleReload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func handleLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	level := r.URL.Query().Get("level")
+	subsystem := r.URL.Query().Get("subsystem")
+	search := r.URL.Query().Get("search")
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if val, err := strconv.Atoi(l); err == nil && val > 0 && val <= 1000 {
+			limit = val
+		}
+	}
+
+	logs := bridgeLogger.GetLogs(level, subsystem, search, limit)
+	stats := bridgeLogger.GetStats()
+
+	resp := map[string]interface{}{
+		"status":    "ok",
+		"service":   "solaria-bridge",
+		"stats":     stats,
+		"count":     len(logs),
+		"logs":      logs,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func handleDiagnostics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	lastSucc, totalSucc, spoolCount := getCloudUploadStats()
+	frameMu.Lock()
+	elapsedFrame := time.Since(lastFrameTime).Seconds()
+	totalFrames := totalFramesProcessed
+	frameMu.Unlock()
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	recentErrors := bridgeLogger.GetLogs("ERROR", "", "", 20)
+	stats, hist := tracker.GetStats()
+
+	var lastSuccStr string
+	if !lastSucc.IsZero() {
+		lastSuccStr = lastSucc.Format(time.RFC3339)
+	}
+
+	diag := map[string]interface{}{
+		"service":        "solaria-bridge",
+		"version":        "2.0-rover-400w",
+		"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		"uptime_seconds": int(time.Since(tracker.sessionStart).Seconds()),
+		"health": map[string]interface{}{
+			"overall": func() string {
+				if spoolCount > 100 || (elapsedFrame > 120 && totalFrames > 0) {
+					return "DEGRADED"
+				}
+				return "HEALTHY"
+			}(),
+			"modbus_link": func() string {
+				if elapsedFrame > 60 && totalFrames > 0 {
+					return "SILENT"
+				}
+				return "NOMINAL"
+			}(),
+			"cloud_uplink": func() string {
+				if time.Since(lastSucc) > 60*time.Second && totalSucc > 0 {
+					return "DEGRADED"
+				}
+				return "NOMINAL"
+			}(),
+			"spooler": func() string {
+				if spoolCount > 0 {
+					return fmt.Sprintf("BUFFERING (%d queued)", spoolCount)
+				}
+				return "NOMINAL (0 queued)"
+			}(),
+		},
+		"modbus": map[string]interface{}{
+			"total_frames_decoded":   totalFrames,
+			"last_frame_seconds_ago": int(elapsedFrame),
+			"last_frame_timestamp":   lastFrameTime.Format(time.RFC3339),
+		},
+		"cloud_uploader": map[string]interface{}{
+			"endpoint":                cloudEndpoint,
+			"total_uploads":           totalSucc,
+			"last_upload_seconds_ago": int(time.Since(lastSucc).Seconds()),
+			"last_upload_timestamp":   lastSuccStr,
+		},
+		"spooler": map[string]interface{}{
+			"spool_count": spoolCount,
+			"spool_file":  "spool/telemetry_spool.jsonl",
+		},
+		"outages": map[string]interface{}{
+			"stats":   stats,
+			"history": hist,
+		},
+		"runtime": map[string]interface{}{
+			"alloc_mb":       float64(m.Alloc) / 1024 / 1024,
+			"total_alloc_mb": float64(m.TotalAlloc) / 1024 / 1024,
+			"sys_mb":         float64(m.Sys) / 1024 / 1024,
+			"num_gc":         m.NumGC,
+			"goroutines":     runtime.NumGoroutine(),
+		},
+		"log_stats":     bridgeLogger.GetStats(),
+		"recent_errors": recentErrors,
+	}
+
+	_ = json.NewEncoder(w).Encode(diag)
+}

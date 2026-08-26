@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestSREAgent_RunAudit_Healthy(t *testing.T) {
@@ -28,6 +29,7 @@ func TestSREAgent_RunAudit_Healthy(t *testing.T) {
 		if r.URL.Path == "/api/v1/live" {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
 				"telemetry": map[string]interface{}{
 					"pv_power_w":        350,
 					"pv_voltage_v":      36.2,
@@ -51,7 +53,7 @@ func TestSREAgent_RunAudit_Healthy(t *testing.T) {
 	}))
 	defer cloudServer.Close()
 
-	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, incidentFile, "test_token")
+	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, cloudServer.URL, incidentFile, "test_token", false)
 	status := agent.RunAudit(context.Background())
 
 	if status.OverallHealth != "HEALTHY" {
@@ -108,10 +110,11 @@ func TestSREAgent_RunAudit_SubZeroViolation(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		http.NotFound(w, r)
 	}))
 	defer cloudServer.Close()
 
-	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, incidentFile, "test_token")
+	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, cloudServer.URL, incidentFile, "test_token", false)
 	status := agent.RunAudit(context.Background())
 
 	if status.OverallHealth != "UNHEALTHY" {
@@ -157,10 +160,11 @@ func TestSREAgent_RunAudit_DiodeFault(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		http.NotFound(w, r)
 	}))
 	defer cloudServer.Close()
 
-	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, incidentFile, "test_token")
+	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, cloudServer.URL, incidentFile, "test_token", false)
 	status := agent.RunAudit(context.Background())
 
 	if status.StringTopologyPass {
@@ -191,6 +195,7 @@ func TestSREAgent_AutoResolveIncidents(t *testing.T) {
 		if r.URL.Path == "/api/v1/live" {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
 				"telemetry": map[string]interface{}{
 					"pv_power_w":        350,
 					"pv_voltage_v":      36.0,
@@ -206,10 +211,11 @@ func TestSREAgent_AutoResolveIncidents(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+		http.NotFound(w, r)
 	}))
 	defer cloudServer.Close()
 
-	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, incidentFile, "test_token")
+	agent := NewSREAgent(bridgeServer.URL, cloudServer.URL, cloudServer.URL, incidentFile, "test_token", false)
 
 	// 1. Audit while bridge is down -> records unresolved incident
 	status1 := agent.RunAudit(context.Background())
@@ -228,5 +234,23 @@ func TestSREAgent_AutoResolveIncidents(t *testing.T) {
 	}
 	if !agent.GetIncidents()[0].Resolved {
 		t.Fatalf("Expected incident to be marked resolved: true after recovery")
+	}
+}
+
+func TestSREAgent_AutoHealsRecording(t *testing.T) {
+	tempDir := t.TempDir()
+	incidentFile := tempDir + "/test_incidents.json"
+	agent := NewSREAgent("http://invalid:9999", "http://invalid:9999", "http://invalid:9999", incidentFile, "test_token", false)
+	agent.recordAutoHeal(AutoHealAction{
+		Timestamp: time.Now(),
+		Action:    "RESTART_BRIDGE",
+		Target:    "solaria-bridge",
+		Reason:    "Bridge offline test",
+		Success:   true,
+		Message:   "Test auto heal executed",
+	})
+	heals := agent.GetAutoHeals()
+	if len(heals) != 1 || heals[0].Action != "RESTART_BRIDGE" {
+		t.Fatalf("Expected 1 recorded auto-heal action, got %v", heals)
 	}
 }

@@ -154,11 +154,11 @@ The Central Cloud Hub organizes solar intelligence across 7 purpose-built tabs:
 
 ## Application & System Review Personas
 
-When conducting pull request reviews, refactors, architecture designs, or code quality audits, Solaria adopts the perspectives of 5 specialized review personas. Each persona targets a specific dimension of the system:
+When conducting pull request reviews, refactors, architecture designs, or code quality audits, Solaria adopts the perspectives of 6 specialized review personas. Each persona targets a specific dimension of the system:
 
 ```text
 +-------------------------------------------------------------------------------+
-|                        SOLARIA 5-PERSONA REVIEW MATRIX                        |
+|                        SOLARIA 6-PERSONA REVIEW MATRIX                        |
 +-------------------+--------------------+--------------------------------------+
 | Persona           | Core Domain        | Primary Quality Metric               |
 +-------------------+--------------------+--------------------------------------+
@@ -166,7 +166,8 @@ When conducting pull request reviews, refactors, architecture designs, or code q
 | 2. Optimization   | Performance/Scale  | Min CPU/Memory/BigQuery query costs  |
 | 3. Reliability    | SRE & Resilience   | Zero lost watt-hours during outages  |
 | 4. Solar Engineer | PV/Battery Physics | LiFePO4 safety & MPPT accuracy       |
-| 5. Novice Owner   | UX & Usability     | Plain-English actionable clarity     |
+| 5. Novice Owner   | Cottage Usability  | Plain-English actionable clarity     |
+| 6. Google UX Lead | Design Systems/UX  | < 3s Glanceability & WCAG AA score   |
 +-------------------+--------------------+--------------------------------------+
 ```
 
@@ -216,6 +217,16 @@ When conducting pull request reviews, refactors, architecture designs, or code q
   - Are primary metrics (Battery SOC %, Solar Watts, Status) immediately readable at a glance in direct sunlight?
   - Is the UI responsive across desktop, tablet, and mobile orientations?
   - Is there a clear, single-click BLE connect workflow with transparent troubleshooting tips when Bluetooth is un-paired?
+
+### 6. Google Principal UX & Design Systems Architect (Data Visualization & Cognitive Load Specialist)
+
+- **Role:** Establishes world-class visual hierarchy, glanceability (< 3s situational awareness), progressive disclosure, accessible color theory (WCAG 2.1 AA/AAA), and ergonomic mobile interaction patterns based on Material Design 3 and Google user experience principles.
+- **Key Review Questions:**
+  - **The 3-Second Glanceability Rule:** Can a user glance at the dashboard on a wall-mounted tablet or phone and instantly comprehend solar harvest, battery reserve, and daylight countdown without reading dense tables?
+  - **Progressive Disclosure:** Are primary KPIs visually dominant, while deep engineering diagnostics (MPPT buck curves, Modbus bitfields, BigQuery SQL) are progressively disclosed on demand?
+  - **Zero-Jitter Tabular Typography:** Do live telemetry metrics use monospace/tabular numeric font features (`tabular-nums`) to prevent horizontal layout jank as digits fluctuate?
+  - **Chromatic Semantic Harmony:** Does the color system enforce consistent physical domain associations (Solar Amber `#F59E0B`, LiFePO4 Emerald `#10B981`, Atmospheric Azure `#38BDF8`, Critical Coral `#EF4444`) without visual competition?
+  - **Sunlight & Mobile Ergonomics:** Does the interface maintain high contrast in direct cottage sunlight, provide minimum 48px touch targets, and position essential controls within thumb reach?
 
 ---
 

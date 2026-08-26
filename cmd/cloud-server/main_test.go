@@ -658,19 +658,22 @@ func TestIndexTemplate_RenderAndUXElements(t *testing.T) {
 
 	htmlContent := buf.String()
 
-	// 1. Verify 7 Navigation Panes
-	expectedTabs := []string{
-		`data-tab="tab-live"`,
-		`data-tab="tab-day"`,
-		`data-tab="tab-week"`,
-		`data-tab="tab-month"`,
-		`data-tab="tab-year"`,
-		`data-tab="tab-advisor"`,
-		`data-tab="tab-specs"`,
+	// 1. Verify Tab Content Panes (All 10 Desktop/Mobile Tab Panes)
+	expectedPanes := []string{
+		`id="tab-live"`,
+		`id="tab-day"`,
+		`id="tab-week"`,
+		`id="tab-month"`,
+		`id="tab-year"`,
+		`id="tab-advisor"`,
+		`id="tab-specs"`,
+		`id="tab-diagnostics"`,
+		`id="tab-forecast"`,
+		`id="tab-more"`,
 	}
-	for _, tab := range expectedTabs {
-		if !strings.Contains(htmlContent, tab) {
-			t.Errorf("Missing expected nav tab: %s", tab)
+	for _, pane := range expectedPanes {
+		if !strings.Contains(htmlContent, pane) {
+			t.Errorf("Missing expected tab pane: %s", pane)
 		}
 	}
 
@@ -740,5 +743,393 @@ func TestHandleShadingAnalysis_FourPatterns(t *testing.T) {
 
 	if !foundBirch || !foundOak {
 		t.Errorf("Expected Birch and Oak shading patterns to be present in Dorset model")
+	}
+}
+
+func TestDiagnosticLogBuffer_Cloud(t *testing.T) {
+	buf := NewDiagnosticLogBuffer(10)
+
+	buf.Log("INFO", "INGEST_PIPELINE", "Ingested 1 record", "INGEST_OK", nil)
+	buf.Log("WARN", "AUTH_GATEWAY", "Unauthorized access attempt", "ERR_AUTH_FAIL", map[string]interface{}{"ip": "1.2.3.4"})
+	buf.Log("ERROR", "BIGQUERY_STREAMER", "Streaming insert timeout", "ERR_BQ_TIMEOUT", nil)
+
+	stats := buf.GetStats()
+	if stats["total_logged"].(int) != 3 {
+		t.Errorf("Expected total_logged 3, got %v", stats["total_logged"])
+	}
+	if stats["error_count"].(int64) != 1 {
+		t.Errorf("Expected error_count 1, got %v", stats["error_count"])
+	}
+	if stats["warn_count"].(int64) != 1 {
+		t.Errorf("Expected warn_count 1, got %v", stats["warn_count"])
+	}
+
+	// Subsystem filter
+	ingestLogs := buf.GetLogs("", "INGEST_PIPELINE", "", 10)
+	if len(ingestLogs) != 1 || ingestLogs[0].ErrorCode != "INGEST_OK" {
+		t.Errorf("Expected 1 INGEST_PIPELINE log, got %v", ingestLogs)
+	}
+
+	// Search filter
+	searchLogs := buf.GetLogs("", "", "timeout", 10)
+	if len(searchLogs) != 1 || searchLogs[0].ErrorCode != "ERR_BQ_TIMEOUT" {
+		t.Errorf("Expected 1 search match, got %v", searchLogs)
+	}
+}
+
+func TestHandleLogs_Cloud(t *testing.T) {
+	cloudLogger.Log("INFO", "INGEST_PIPELINE", "Unit test ingest log", "TEST_INGEST", nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/logs?limit=50", nil)
+	w := httptest.NewRecorder()
+	handleLogs(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp struct {
+		Status string     `json:"status"`
+		Count  int        `json:"count"`
+		Logs   []LogEntry `json:"logs"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp.Status != "ok" || resp.Count == 0 {
+		t.Errorf("Expected status ok and count > 0, got %+v", resp)
+	}
+}
+
+func TestHandleDiagnostics_Cloud(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
+	w := httptest.NewRecorder()
+	handleDiagnostics(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode diagnostics: %v", err)
+	}
+	if resp["service"] != "solaria-cloud-server" {
+		t.Errorf("Expected solaria-cloud-server, got %v", resp["service"])
+	}
+	if resp["health"] == nil || resp["runtime"] == nil {
+		t.Errorf("Expected health and runtime keys, got %+v", resp)
+	}
+}
+
+func TestHandleDiagnosticBundle_Cloud(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostic-bundle?download=true", nil)
+	w := httptest.NewRecorder()
+	handleDiagnosticBundle(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	disp := w.Header().Get("Content-Disposition")
+	if !strings.Contains(disp, "attachment; filename=\"solaria-diagnostics-") {
+		t.Errorf("Expected attachment Content-Disposition header, got %s", disp)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode diagnostic bundle: %v", err)
+	}
+	if resp["cloud_server"] == nil || resp["edge_bridge"] == nil {
+		t.Errorf("Expected cloud_server and edge_bridge keys in bundle, got %+v", resp)
+	}
+}
+
+func TestHandleLive_StaleAndOutageDetection(t *testing.T) {
+	rb := NewRingBuffer(10)
+	// Push a stale record from 2 minutes ago
+	staleTime := time.Now().UTC().Add(-2 * time.Minute).Format(time.RFC3339)
+	rb.Push([]SolarRecord{
+		{
+			Timestamp: staleTime,
+			Telemetry: Telemetry{
+				PVPowerW:        250,
+				PVVoltageV:      36.0,
+				PVCurrentA:      6.9,
+				BatteryVoltageV: 13.5,
+				ChargingState:   "MPPT_BULK",
+			},
+			BLEConnected: true,
+			OutageStatus: "NOMINAL",
+		},
+	})
+
+	// Temporarily swap global ringBuf
+	oldBuf := ringBuf
+	ringBuf = rb
+	defer func() { ringBuf = oldBuf }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/live", nil)
+	w := httptest.NewRecorder()
+	handleLive(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var rec SolarRecord
+	if err := json.NewDecoder(w.Body).Decode(&rec); err != nil {
+		t.Fatalf("Failed to decode live record: %v", err)
+	}
+
+	if rec.BLEConnected != false {
+		t.Errorf("Expected BLEConnected to be false for stale record, got %v", rec.BLEConnected)
+	}
+	if rec.OutageStatus != "STREAM_STALE" {
+		t.Errorf("Expected OutageStatus 'STREAM_STALE', got %s", rec.OutageStatus)
+	}
+	if rec.Telemetry.PVPowerW != 0 {
+		t.Errorf("Expected PVPowerW zeroed out (0), got %d", rec.Telemetry.PVPowerW)
+	}
+	if rec.Telemetry.ChargingState != "OFFLINE" {
+		t.Errorf("Expected ChargingState 'OFFLINE', got %s", rec.Telemetry.ChargingState)
+	}
+}
+
+func TestHandleBatteryControllerDiagnostics(t *testing.T) {
+	rb := NewRingBuffer(10)
+	nowTime := time.Now().UTC().Format(time.RFC3339)
+	rb.Push([]SolarRecord{
+		{
+			Timestamp: nowTime,
+			Telemetry: Telemetry{
+				PVPowerW:        320,
+				PVVoltageV:      36.5,
+				PVCurrentA:      8.76,
+				BatteryVoltageV: 13.5,
+				BatteryCurrentA: 23.5,
+				BatterySOCPct:   85,
+				ControllerTempC: 32,
+				BatteryTempC:    22,
+				ChargingState:   "MPPT Charging",
+				OperatingDays:   45,
+			},
+			Weather: WeatherMetrics{
+				IsDay:                true,
+				DirectRadiationWM2:   450.0,
+				DiffuseRadiationWM2:  80.0,
+			},
+			BLEConnected: true,
+			OutageStatus: "NOMINAL",
+		},
+	})
+
+	oldBuf := ringBuf
+	ringBuf = rb
+	defer func() { ringBuf = oldBuf }()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/battery-controller-diagnostics", nil)
+	w := httptest.NewRecorder()
+	handleBatteryControllerDiagnostics(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var rep BatteryControllerDiagnosticReport
+	if err := json.NewDecoder(w.Body).Decode(&rep); err != nil {
+		t.Fatalf("Failed to decode diagnostic report: %v", err)
+	}
+
+	if rep.HardwareProfile["charge_controller"] == nil || rep.HardwareProfile["battery_bank"] == nil {
+		t.Errorf("Expected hardware profile fields, got %+v", rep.HardwareProfile)
+	}
+
+	if rep.BatteryHealth["voltage_zone"] == nil {
+		t.Errorf("Expected voltage_zone in battery health, got %+v", rep.BatteryHealth)
+	}
+
+	if len(rep.ActiveAnomalies) == 0 {
+		t.Errorf("Expected active anomaly categories in report")
+	}
+
+	if rep.NighttimeAnalysis["phantom_power_detected"] == nil {
+		t.Errorf("Expected phantom_power_detected field in nighttime analysis")
+	}
+}
+
+func TestHandlePeakGenerationForecast(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/peak-generation-forecast", nil)
+	w := httptest.NewRecorder()
+	handlePeakGenerationForecast(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	var resp PeakForecastResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode peak forecast response: %v", err)
+	}
+
+	if resp.ArrayCapacityW != 400 {
+		t.Errorf("Expected ArrayCapacityW 400, got %d", resp.ArrayCapacityW)
+	}
+
+	if resp.ArrayTiltDeg != 45.0 {
+		t.Errorf("Expected ArrayTiltDeg 45.0, got %f", resp.ArrayTiltDeg)
+	}
+
+	if resp.ArrayAzimuthDeg != 135.0 {
+		t.Errorf("Expected ArrayAzimuthDeg 135.0, got %f", resp.ArrayAzimuthDeg)
+	}
+
+	if len(resp.HourlyCurve) != 24 {
+		t.Errorf("Expected 24 hourly curve points, got %d", len(resp.HourlyCurve))
+	}
+
+	if len(resp.MonthlyForecast) != 12 {
+		t.Errorf("Expected 12 monthly forecast entries, got %d", len(resp.MonthlyForecast))
+	}
+
+	if resp.SolsticeAnalysis["summer_solstice"] == nil || resp.SolsticeAnalysis["winter_solstice"] == nil {
+		t.Errorf("Expected summer and winter solstice analysis, got %+v", resp.SolsticeAnalysis)
+	}
+
+	if len(resp.ApplianceGuidance) == 0 {
+		t.Errorf("Expected appliance guidance entries")
+	}
+
+	if resp.LearnedModel["accuracy_score_pct"] == nil {
+		t.Errorf("Expected accuracy_score_pct in LearnedModel, got %+v", resp.LearnedModel)
+	}
+}
+
+func TestSolarModelLearner(t *testing.T) {
+	learner := NewSolarModelLearner("")
+
+	// 1. Test theoretical solar calculation
+	loc, _ := time.LoadLocation("America/Toronto")
+	if loc == nil {
+		loc = time.FixedZone("EDT", -4*3600)
+	}
+	middayTime := time.Date(2026, 8, 25, 11, 30, 0, 0, loc)
+	theoMidday := computeTheoreticalWatts(middayTime, 45.186, -78.863, 45.0, 135.0, 400.0)
+	if theoMidday < 200 || theoMidday > 400 {
+		t.Errorf("Expected midday theoretical watts between 200W and 400W, got %d", theoMidday)
+	}
+
+	nightTime := time.Date(2026, 8, 25, 1, 0, 0, 0, loc)
+	theoNight := computeTheoreticalWatts(nightTime, 45.186, -78.863, 45.0, 135.0, 400.0)
+	if theoNight != 0 {
+		t.Errorf("Expected nighttime theoretical watts 0, got %d", theoNight)
+	}
+
+	// 2. Test EMA training update
+	// Train with actual = 80% of theoretical (e.g. tree shade)
+	rec := SolarRecord{
+		Timestamp: middayTime.Format(time.RFC3339),
+		Telemetry: Telemetry{
+			PVPowerW: int(float64(theoMidday) * 0.8),
+		},
+	}
+	learner.TrainRecord(rec)
+
+	hour := middayTime.Hour()
+	if learner.HourlyMultipliers[hour] >= 1.0 {
+		t.Errorf("Expected hourly multiplier for hour %d to decrease after lower actuals, got %f", hour, learner.HourlyMultipliers[hour])
+	}
+
+	// 3. Test batch training
+	var batch []SolarRecord
+	for h := 8; h <= 17; h++ {
+		tSample := time.Date(2026, 8, 25, h, 15, 0, 0, loc)
+		theo := computeTheoreticalWatts(tSample, 45.186, -78.863, 45.0, 135.0, 400.0)
+		batch = append(batch, SolarRecord{
+			Timestamp: tSample.Format(time.RFC3339),
+			Telemetry: Telemetry{
+				PVPowerW: int(float64(theo) * 0.95),
+			},
+		})
+	}
+	learner.TrainBatch(batch)
+
+	summary := learner.GetSummary()
+	if summary["training_samples"].(int64) == 0 {
+		t.Errorf("Expected non-zero training samples")
+	}
+	if summary["accuracy_score_pct"].(float64) < 80.0 {
+		t.Errorf("Expected high accuracy score, got %v", summary["accuracy_score_pct"])
+	}
+
+	// 4. Test Persistence Save/Load
+	tempFile := t.TempDir() + "/solar_learned_test.json"
+	learner.filePath = tempFile
+	if err := learner.Save(); err != nil {
+		t.Fatalf("Failed to save learned model: %v", err)
+	}
+
+	learner2 := NewSolarModelLearner(tempFile)
+	if learner2.TrainingSamples != learner.TrainingSamples {
+		t.Errorf("Expected loaded model to have %d samples, got %d", learner.TrainingSamples, learner2.TrainingSamples)
+	}
+}
+
+func TestHandleModelRetrain(t *testing.T) {
+	rb := NewRingBuffer(10)
+	nowTime := time.Now().UTC().Format(time.RFC3339)
+	rb.Push([]SolarRecord{
+		{
+			Timestamp: nowTime,
+			Telemetry: Telemetry{
+				PVPowerW:        340,
+				PVVoltageV:      36.8,
+				PVCurrentA:      9.2,
+				BatteryVoltageV: 13.6,
+			},
+		},
+	})
+
+	oldBuf := ringBuf
+	ringBuf = rb
+	defer func() { ringBuf = oldBuf }()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/model-retrain", nil)
+	w := httptest.NewRecorder()
+	handleModelRetrain(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on /api/v1/model-retrain, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode model-retrain response: %v", err)
+	}
+
+	if resp["status"] != "success" {
+		t.Errorf("Expected status success, got %v", resp["status"])
+	}
+	if resp["samples_trained"].(float64) != 2 {
+		t.Errorf("Expected 2 samples trained (initial + pushed), got %v", resp["samples_trained"])
+	}
+}
+
+func TestHandleE2EAudit(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/e2e-audit", nil)
+	w := httptest.NewRecorder()
+	handleE2EAudit(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 on /api/v1/e2e-audit, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode e2e-audit response: %v", err)
+	}
+
+	if resp["total_probes"].(float64) < 3 {
+		t.Errorf("Expected at least 3 probes in scorecard, got %v", resp["total_probes"])
 	}
 }
