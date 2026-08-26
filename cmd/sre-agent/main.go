@@ -197,6 +197,7 @@ func (a *SREAgent) AutoHealBridge() {
 	if a.cloudRunURL != "" {
 		cloudRunEP = a.cloudRunURL + "/api/v1/telemetry"
 	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = append(os.Environ(),
 		"PORT=8080",
 		"SOLARIA_CLOUD_ENDPOINT="+cloudRunEP,
@@ -244,9 +245,9 @@ func (a *SREAgent) AutoHealBluetoothSubsystem() {
 
 	a.recordAutoHeal(AutoHealAction{
 		Timestamp: time.Now(),
-		Action:    "RESET_BLUETOOTH_RADIO",
-		Target:    "hci0",
-		Reason:    "Bluetooth stream silent and potential kernel radio hang",
+		Action:    "RESET_BLE",
+		Target:    "linux-bluetooth-hci0",
+		Reason:    "Telemetry stalled >180s indicating potential radio freeze",
 		Success:   true,
 		Message:   "Executed rfkill unblock and hciconfig hci0 reset",
 	})
@@ -307,6 +308,7 @@ func (a *SREAgent) AutoHealCloudServer() {
 	}
 	log.Println("🛠️ [AUTO-HEAL] Solaria Cloud Server (port 8081) is offline. Initiating autonomous restart...")
 	cmd := exec.Command("./bin/solaria-cloud-server")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = append(os.Environ(),
 		"PORT=8081",
 		"SOLARIA_API_TOKEN="+a.apiToken,

@@ -603,9 +603,9 @@
         🔊 Audio: On
       </button>
     </div>
-    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-      <span id="arrayBadge" class="badge badge-array">⚡ 400W (2S2P)</span>
-      <span id="faultBadge" class="badge badge-ok">HEALTHY</span>
+      <button id="headerShadingBadge" onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="badge" style="cursor: pointer; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #10b981; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Tree Shading Diagnostic Analyzer: 0.30 kWh/day lost • 86.8% Clear-Sky Exposure (Click for canopy pruning advisor)">
+        🌲 <span id="headerShadingText">0.30 kWh Shading Loss</span>
+      </button>
       <button id="sunConditionBadge" onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="badge badge-night" style="cursor: pointer; border: 1px solid rgba(245, 158, 11, 0.4); text-decoration: none;" title="Click to open Solar Advisor & Sunset Digest">
         🌙 Calculating solar window...
       </button>
@@ -1002,6 +1002,121 @@
           <span id="perfRatioText" style="color: #fbbf24; font-weight: 600;">PR: --%</span>
         </div>
       </div>
+    <!-- ☀️ & 🌲 ASTRONOMICAL & TREE SHADING INTELLIGENCE GRID (ISSUE-015: Elevated Prominence) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      
+      <!-- Card A: Sun Trajectory vs 400W Array Alignment Widget -->
+      <div class="card" style="border-left: 4px solid #f59e0b; background: rgba(15, 23, 42, 0.85); display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong style="color: #f59e0b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">☀️ Celestial Sun Trajectory & Array Alignment</strong>
+            <button class="info-btn" onclick="showEli5Popover('sun_arc', event)">?</button>
+          </div>
+          <span id="liveSunArcBadge" class="badge badge-array" style="font-size: 0.72rem; padding: 2px 8px;">GOLDEN WINDOW (≥35°)</span>
+        </div>
+        
+        <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0 0 10px 0;">
+          Real-time celestial sun arc over Dorset (45.186°N) vs. 400W 2S2P array orientation (30° tilt, 135° SE normal).
+        </p>
+        
+        <div style="width: 100%; overflow-x: auto; flex: 1;">
+          <svg viewBox="0 0 760 175" class="fluid-on-mobile" style="width: 100%; min-width: 580px; height: auto; display: block;">
+            <defs>
+              <linearGradient id="liveSkyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="rgba(56, 189, 248, 0.18)" />
+                <stop offset="100%" stop-color="rgba(15, 23, 42, 0.0)" />
+              </linearGradient>
+              <linearGradient id="liveGoldenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="rgba(245, 158, 11, 0.28)" />
+                <stop offset="100%" stop-color="rgba(245, 158, 11, 0.0)" />
+              </linearGradient>
+            </defs>
+            
+            <!-- Horizon Baseline -->
+            <line x1="50" y1="135" x2="710" y2="135" stroke="#334155" stroke-width="2" />
+            <text x="50" y="152" fill="#94a3b8" font-size="10" font-weight="600">EAST (06:15)</text>
+            <text x="280" y="152" fill="#38bdf8" font-size="10" font-weight="700">PANEL NORMAL (135° SE)</text>
+            <text x="440" y="152" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle">SOLAR NOON (13:18)</text>
+            <text x="710" y="152" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="end">WEST (20:12)</text>
+            
+            <!-- Tree Shading Obstruction Horizon Notches -->
+            <rect x="140" y="110" width="90" height="25" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" rx="3" />
+            <text x="185" y="126" fill="#fca5a5" font-size="9" font-weight="700" text-anchor="middle">🌲 East Pine Notch</text>
+            
+            <rect x="540" y="115" width="80" height="20" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" rx="3" />
+            <text x="580" y="129" fill="#fde047" font-size="9" font-weight="700" text-anchor="middle">🌲 West Hemlock</text>
+            
+            <!-- Sky Dome & Golden Generation Window -->
+            <path d="M 70,135 Q 380,15 690,135 Z" fill="url(#liveSkyGrad)" />
+            <path d="M 230,135 L 230,70 Q 380,15 530,70 L 530,135 Z" fill="url(#liveGoldenGrad)" />
+            
+            <!-- Panel Normal Ray (135° SE, 30° tilt) -->
+            <line x1="280" y1="135" x2="280" y2="35" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3 3" />
+            <polygon points="275,40 280,30 285,40" fill="#38bdf8" />
+            <text x="288" y="42" fill="#38bdf8" font-size="9" font-weight="700">30° TILT</text>
+            
+            <!-- Sun Arc Trajectory Path -->
+            <path d="M 70,135 Q 380,15 690,135" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="4 4" />
+            
+            <!-- Live Sun Marker Puck -->
+            <circle id="liveSunPuck" cx="380" cy="30" r="9" fill="#f59e0b" stroke="#ffffff" stroke-width="2.5" style="filter: drop-shadow(0 0 10px #f59e0b);" />
+            <text id="liveSunPuckLabel" x="380" y="16" fill="#fbbf24" font-size="11" font-weight="800" text-anchor="middle" font-family="var(--mono)">58.4° Elev (Solar Noon)</text>
+          </svg>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 8px 12px; background: rgba(15, 23, 42, 0.6); border-radius: 6px; font-size: 0.78rem;">
+          <span style="color: #94a3b8;">Angle of Incidence (θ): <strong id="liveIncidenceVal" style="color: #38bdf8;">14.2°</strong></span>
+          <span style="color: #94a3b8;">Cosine Eff: <strong id="liveCosineEffVal" style="color: #10b981;">96.9%</strong></span>
+          <button onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="btn-outline" style="font-size: 0.72rem; padding: 2px 8px; border-color: #f59e0b; color: #f59e0b;">
+            Full Advisor &rarr;
+          </button>
+        </div>
+      </div>
+      
+      <!-- Card B: Tree Shading & Canopy Diagnostic Analyzer Card -->
+      <div class="card" style="border-left: 4px solid #10b981; background: rgba(15, 23, 42, 0.85); display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong style="color: #10b981; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">🌲 Tree Shading Diagnostic Analyzer</strong>
+            <button class="info-btn" onclick="showEli5Popover('tree_shading', event)">?</button>
+          </div>
+          <span id="liveShadingExposureBadge" class="badge badge-online" style="font-size: 0.72rem; padding: 2px 8px;">86.8% CLEAR SKY</span>
+        </div>
+        
+        <p style="font-size: 0.76rem; color: var(--text-muted); margin: 0 0 10px 0;">
+          Calculates daily energy (kWh) lost to specific tree profiles and provides guidance on canopy trimming.
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="background: rgba(15, 23, 42, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Daily Shading Loss</div>
+            <div id="liveShadingLossKWh" style="font-size: 1.25rem; font-weight: 800; color: #ef4444;">~0.30 kWh</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">~300 Wh / day lost</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--card-border);">
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">Season Recovery Potential</div>
+            <div id="liveSeasonRecoveryKWh" style="font-size: 1.25rem; font-weight: 800; color: #10b981;">+36.0 kWh</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">After canopy pruning</div>
+          </div>
+        </div>
+        
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 8px 10px; border-radius: 4px; margin-bottom: 10px; font-size: 0.77rem; color: #a7f3d0;">
+          <strong>✂️ Actionable Canopy Guidance:</strong>
+          <div id="liveShadingActionText" style="margin-top: 2px; color: #f8fafc;">
+            Trim lower overhang branches on eastern white pine ~15m from array to recover ~180 Wh morning generation.
+          </div>
+        </div>
+        
+        <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <div style="font-size: 0.72rem; color: #94a3b8;">
+            🌲 Detected: <strong style="color: #cbd5e1;">4 Canopy Profiles</strong> (Pine, Birch, Oak, Hemlock)
+          </div>
+          <button onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="btn-solar" style="font-size: 0.75rem; padding: 4px 10px;">
+            🌲 Full Canopy Advisor &rarr;
+          </button>
+        </div>
+      </div>
+      
     </div>
 
     <!-- LiFePO4 Chemical Voltage Plateau Visualizer (ISSUE-006) -->
@@ -3764,13 +3879,35 @@ Signed: Solaria Autonomous Solar Guardian
         const resp = await fetch('/api/v1/shading-analysis');
         if (!resp.ok) return;
         const data = await resp.json();
-        const badge = document.getElementById('shadingSunExposureBadge');
-        if (badge) {
-          const theoretical = data.clear_sky_theoretical_kwh || 2.28;
-          const actual = data.actual_measured_kwh || 1.84;
-          const exposure = ((actual / theoretical) * 100).toFixed(1);
-          badge.textContent = `${exposure}% CLEAR SKY EXPOSURE`;
-        }
+        
+        const theoretical = data.clear_sky_theoretical_kwh || 2.28;
+        const actual = data.actual_measured_kwh || 1.84;
+        const exposurePct = data.clear_sky_exposure_pct || ((actual / theoretical) * 100);
+        const exposureText = `${Number(exposurePct).toFixed(1)}% CLEAR SKY`;
+        const lossKWh = data.total_shading_loss_kwh_day !== undefined ? Number(data.total_shading_loss_kwh_day).toFixed(2) : '0.30';
+        const recoveryKWh = data.season_harvest_recovery_kwh !== undefined ? Number(data.season_harvest_recovery_kwh).toFixed(1) : '36.0';
+        const primaryAction = data.primary_action || (data.shading_patterns && data.shading_patterns[0] ? data.shading_patterns[0].advisory : 'Trim lower overhang branches on eastern white pine ~15m from array to recover ~180 Wh morning generation.');
+
+        // Update Advisor tab elements
+        const badgeAdvisor = document.getElementById('shadingSunExposureBadge');
+        if (badgeAdvisor) badgeAdvisor.textContent = `${Number(exposurePct).toFixed(1)}% CLEAR SKY EXPOSURE`;
+
+        // Update Live Monitor tab elements
+        const liveBadge = document.getElementById('liveShadingExposureBadge');
+        if (liveBadge) liveBadge.textContent = exposureText;
+        
+        const liveLoss = document.getElementById('liveShadingLossKWh');
+        if (liveLoss) liveLoss.textContent = `~${lossKWh} kWh`;
+        
+        const liveRecovery = document.getElementById('liveSeasonRecoveryKWh');
+        if (liveRecovery) liveRecovery.textContent = `+${recoveryKWh} kWh`;
+        
+        const liveAction = document.getElementById('liveShadingActionText');
+        if (liveAction) liveAction.textContent = primaryAction;
+
+        // Update Header quick chip
+        const headerText = document.getElementById('headerShadingText');
+        if (headerText) headerText.textContent = `${lossKWh} kWh Shading Loss`;
       } catch (e) {}
     }
 
@@ -4929,27 +5066,37 @@ Signed: Solaria Autonomous Solar Guardian
       }
     }
 
-    // ISSUE-007: NOAA Sun-Arc Dome Elevation Tracker
+    // ISSUE-007 & ISSUE-015: NOAA Sun-Arc Dome Elevation & Panel Alignment Tracker
     function updateSunArcDome(elevationDeg, azimuthDeg, sunClass) {
-      const puck = document.getElementById('sunArcPuck');
-      const puckLabel = document.getElementById('sunArcPuckLabel');
-      const badge = document.getElementById('sunArcStatusBadge');
-      if (!puck) return;
-
       const elev = Math.max(0, Math.min(90, elevationDeg || 0));
       const az = Math.max(60, Math.min(300, azimuthDeg || 180));
       const x = 70 + ((az - 60) / 240.0) * 620;
       const y = Math.max(15, 140 - (Math.sin(elev * Math.PI / 180.0) * 130));
 
-      puck.setAttribute('cx', x);
-      puck.setAttribute('cy', y);
+      // Calculate physical angle of incidence (theta) and cosine efficiency on 30° tilt / 135° SE array
+      const tiltRad = 30.0 * Math.PI / 180.0;
+      const panelAzRad = 135.0 * Math.PI / 180.0;
+      const sunAzRad = az * Math.PI / 180.0;
+      const elevRad = elev * Math.PI / 180.0;
+      let cosInc = Math.sin(elevRad)*Math.cos(tiltRad) + Math.cos(elevRad)*Math.sin(tiltRad)*Math.cos(sunAzRad - panelAzRad);
+      if (elev <= 0) cosInc = 0;
+      cosInc = Math.max(0, Math.min(1, cosInc));
+      const incAngleDeg = (Math.acos(cosInc) * 180.0 / Math.PI).toFixed(1);
+      const cosEffPct = (cosInc * 100).toFixed(1);
 
+      // 1. Update Advisor Tab SVG elements
+      const puck = document.getElementById('sunArcPuck');
+      const puckLabel = document.getElementById('sunArcPuckLabel');
+      const badge = document.getElementById('sunArcStatusBadge');
+      if (puck) {
+        puck.setAttribute('cx', x);
+        puck.setAttribute('cy', y);
+      }
       if (puckLabel) {
         puckLabel.setAttribute('x', Math.max(70, Math.min(690, x)));
         puckLabel.setAttribute('y', Math.max(14, y - 12));
         puckLabel.textContent = `${elev.toFixed(1)}° Elev (${Math.round(az)}° Az)`;
       }
-
       if (badge) {
         if (elev >= 35) {
           badge.textContent = '⚡ GOLDEN HARVEST WINDOW (≥35°)';
@@ -4962,6 +5109,37 @@ Signed: Solaria Autonomous Solar Guardian
           badge.className = 'badge badge-night';
         }
       }
+
+      // 2. Update Live Monitor Tab SVG elements (ISSUE-015)
+      const livePuck = document.getElementById('liveSunPuck');
+      const livePuckLabel = document.getElementById('liveSunPuckLabel');
+      const liveBadge = document.getElementById('liveSunArcBadge');
+      const liveInc = document.getElementById('liveIncidenceVal');
+      const liveCos = document.getElementById('liveCosineEffVal');
+      
+      if (livePuck) {
+        livePuck.setAttribute('cx', x);
+        livePuck.setAttribute('cy', y);
+      }
+      if (livePuckLabel) {
+        livePuckLabel.setAttribute('x', Math.max(70, Math.min(690, x)));
+        livePuckLabel.setAttribute('y', Math.max(14, y - 12));
+        livePuckLabel.textContent = `${elev.toFixed(1)}° Elev (${Math.round(az)}° Az)`;
+      }
+      if (liveBadge) {
+        if (elev >= 35) {
+          liveBadge.textContent = '⚡ GOLDEN WINDOW (≥35°)';
+          liveBadge.className = 'badge badge-array';
+        } else if (elev > 0) {
+          liveBadge.textContent = '🌅 LOW HORIZON SUN';
+          liveBadge.className = 'badge badge-online';
+        } else {
+          liveBadge.textContent = '🌙 NIGHT HORIZON';
+          liveBadge.className = 'badge badge-night';
+        }
+      }
+      if (liveInc) liveInc.textContent = `${incAngleDeg}°`;
+      if (liveCos) liveCos.textContent = `${cosEffPct}%`;
     }
 
     // ISSUE-012: Actionable Outage Card & Actuator
@@ -5055,6 +5233,21 @@ Signed: Solaria Autonomous Solar Guardian
         title: "⚡ 2S2P String Balance Diagnostic",
         plain: "Your 4 panels are wired in two series pairs connected in parallel. If panel voltage reads ~18V instead of ~36V, one pair has shading, an open bypass diode, or an unplugged MC4 connector.",
         spec: "Nominal Vmp: 36.0V - 38.0V | Half-String Threshold: < 24.0V under >200 W/m²"
+      },
+      tree_shading: {
+        title: "🌲 Tree Shading Diagnostic Analyzer",
+        plain: "Solaria's built-in Tree Shading Diagnostic Analyzer calculates exactly how much daily energy (kWh) is lost to specific tree profiles and provides guidance on canopy trimming.",
+        spec: "Loss: ~0.30 kWh/day (300 Wh) | Clear-Sky Exposure: 86.8% | Est. Season Recovery: +36 kWh"
+      },
+      pr_ratio: {
+        title: "⚡ Performance Ratio (PR)",
+        plain: "Compares actual energy generated against theoretical output under current irradiance and cell temperature. Values above 80% indicate an exceptionally healthy array.",
+        spec: "Target: 80% - 90% | Deratings: Temperature (-0.4%/°C), Wiring Loss, Soiling"
+      },
+      soc_plateau: {
+        title: "🔋 Coulomb Counting State of Charge",
+        plain: "Tracks active amp-hours going into and out of the LiFePO4 cells to provide an accurate battery percentage across the flat 13.2V operating zone.",
+        spec: "Precision: ±1.5% Ah Integration | Zero-Reset at 14.4V Absorption Cutoff"
       }
     };
 

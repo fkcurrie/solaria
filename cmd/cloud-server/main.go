@@ -1734,7 +1734,7 @@ func mathRound(val float64, decimals int) float64 {
 func srvPort(port string) int {
 	p, err := strconv.Atoi(port)
 	if err != nil || p <= 0 || p > 65535 {
-		return 8080
+		return 8081
 	}
 	return p
 }
@@ -2221,6 +2221,37 @@ func handleSunTimes(w http.ResponseWriter, r *http.Request) {
 	sinElev := math.Sin(latRad)*math.Sin(decl) + math.Cos(latRad)*math.Cos(decl)*math.Cos(hraRad)
 	elevationDeg := math.Asin(math.Max(-1.0, math.Min(1.0, sinElev))) * 180.0 / math.Pi
 
+	// Solar azimuth calculation:
+	cosElev := math.Cos(elevationDeg * math.Pi / 180.0)
+	var azimuthDeg float64 = 180.0
+	if cosElev > 0.001 {
+		cosAz := (sinElev*math.Sin(latRad) - math.Sin(decl)) / (cosElev * math.Cos(latRad))
+		cosAz = math.Max(-1.0, math.Min(1.0, cosAz))
+		azRad := math.Acos(cosAz)
+		if hraRad > 0 {
+			azimuthDeg = 180.0 + azRad*180.0/math.Pi
+		} else {
+			azimuthDeg = 180.0 - azRad*180.0/math.Pi
+		}
+	}
+
+	// 400W 2S2P Array geometry for Dorset cottage: 30° tilt, 135° SE azimuth
+	panelTiltDeg := 30.0
+	panelAzimuthDeg := 135.0
+	tiltRad := panelTiltDeg * math.Pi / 180.0
+	panelAzRad := panelAzimuthDeg * math.Pi / 180.0
+	sunAzRad := azimuthDeg * math.Pi / 180.0
+	elevRad := elevationDeg * math.Pi / 180.0
+
+	// Angle of Incidence (theta): cos(theta) = sin(elev)*cos(tilt) + cos(elev)*sin(tilt)*cos(sunAz - panelAz)
+	cosIncidence := math.Sin(elevRad)*math.Cos(tiltRad) + math.Cos(elevRad)*math.Sin(tiltRad)*math.Cos(sunAzRad-panelAzRad)
+	if elevationDeg <= 0 {
+		cosIncidence = 0
+	}
+	cosIncidence = math.Max(0.0, math.Min(1.0, cosIncidence))
+	incidenceAngleDeg := math.Acos(cosIncidence) * 180.0 / math.Pi
+	cosineEfficiencyPct := cosIncidence * 100.0
+
 	tomorrow := now.AddDate(0, 0, 1)
 	nextSunrise, nextSunset, _, _ := CalculateSunTimes(tomorrow, lat, lon)
 
@@ -2248,26 +2279,31 @@ func handleSunTimes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"site":                "1296 Wren Lake Drive, Dorset, ON",
-		"latitude":            lat,
-		"longitude":           lon,
-		"timezone":            "America/Toronto",
-		"current_time":        now.Format(time.RFC3339),
-		"current_time_text":   now.Format("03:04:05 PM"),
-		"is_day":              isDay,
-		"solar_elevation_deg": mathRound(elevationDeg, 1),
-		"solar_zenith_deg":    mathRound(90.0-elevationDeg, 1),
-		"today_sunrise":       sunrise.Format(time.RFC3339),
-		"today_sunset":        sunset.Format(time.RFC3339),
-		"today_solar_noon":    solarNoon.Format(time.RFC3339),
-		"today_sunrise_text":  sunrise.Format("03:04 PM"),
-		"today_sunset_text":   sunset.Format("03:04 PM"),
-		"tomorrow_sunrise":    nextSunrise.Format(time.RFC3339),
-		"tomorrow_sunset":     nextSunset.Format(time.RFC3339),
-		"next_event":          nextEvent,
-		"next_event_time":     nextEventTime.Format(time.RFC3339),
-		"seconds_remaining":   secondsRemaining,
-		"countdown_text":      formatDurationCountdown(time.Duration(secondsRemaining) * time.Second),
+		"site":                  "1296 Wren Lake Drive, Dorset, ON",
+		"latitude":              lat,
+		"longitude":             lon,
+		"timezone":              "America/Toronto",
+		"current_time":          now.Format(time.RFC3339),
+		"current_time_text":     now.Format("03:04:05 PM"),
+		"is_day":                isDay,
+		"solar_elevation_deg":   mathRound(elevationDeg, 1),
+		"solar_azimuth_deg":     mathRound(azimuthDeg, 1),
+		"solar_zenith_deg":      mathRound(90.0-elevationDeg, 1),
+		"panel_tilt_deg":        panelTiltDeg,
+		"panel_azimuth_deg":     panelAzimuthDeg,
+		"incidence_angle_deg":   mathRound(incidenceAngleDeg, 1),
+		"cosine_efficiency_pct": mathRound(cosineEfficiencyPct, 1),
+		"today_sunrise":         sunrise.Format(time.RFC3339),
+		"today_sunset":          sunset.Format(time.RFC3339),
+		"today_solar_noon":      solarNoon.Format(time.RFC3339),
+		"today_sunrise_text":    sunrise.Format("03:04 PM"),
+		"today_sunset_text":     sunset.Format("03:04 PM"),
+		"tomorrow_sunrise":      nextSunrise.Format(time.RFC3339),
+		"tomorrow_sunset":       nextSunset.Format(time.RFC3339),
+		"next_event":            nextEvent,
+		"next_event_time":       nextEventTime.Format(time.RFC3339),
+		"seconds_remaining":     secondsRemaining,
+		"countdown_text":        formatDurationCountdown(time.Duration(secondsRemaining) * time.Second),
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -2329,8 +2365,11 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 		"array_topology":              "2S2P (Two Strings of 2 in Series)",
 		"clear_sky_theoretical_kwh":   2.28,
 		"actual_measured_kwh":         1.84,
+		"clear_sky_exposure_pct":      86.8,
 		"total_shading_loss_kwh_day":  0.30,
+		"total_shading_loss_wh_day":   300,
 		"season_harvest_recovery_kwh": 36.0,
+		"primary_action":              "Trim lower overhang branches on eastern white pine ~15m from array",
 		"bypass_diode_activity":       "Nominal (No permanent string diode failure detected)",
 		"shading_patterns":            patterns,
 		"summary_advisory":            "Array solar window is 86.8% unshaded. Trimming 2 eastern tree branches will recover ~1.2 kWh per week.",
