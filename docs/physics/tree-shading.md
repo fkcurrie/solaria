@@ -4,7 +4,7 @@ Tree canopy shading creates distinctive, reproducible signatures in off-grid sol
 
 ---
 
-## 🌲 Morning Pine vs. Afternoon Hemlock Profiles
+## 🌲 Morning Eastern vs. Afternoon Western Profiles
 
 ```text
 Power (W)
@@ -12,19 +12,19 @@ Power (W)
 400│                           ╭───────────╮ [Unshaded Solar Noon Peak]
 300│                          ╭╯           ╰╮
 200│                         ╭╯             ╰╮
-100│     ╭───[Pine Notch]───╯                ╰───[Hemlock Notch]───╮
+100│     ╭───[East Notch]───╯                ╰───[West Notch]───╮
   0└───┴───────────┴───────────┴───────────┴───────────┴───────────┴──► Time
      07:00       09:00       11:00       13:00       15:00       17:00
 ```
 
-1. **Morning White Pines ($08:00 - 10:30$):**
-   - High trees to the east block direct low-angle solar rays ($< 25^\circ$ elevation).
+1. **Morning Eastern Trees ($08:00 - 10:30$):**
+   - Trees to the east block direct low-angle solar rays ($< 25^\circ$ elevation).
    - Harvest remains capped at diffuse ambient levels (~30W–60W) before jumping sharply to >250W once the sun clears the canopy.
 2. **Solar Noon Optimal Window ($11:30 - 14:00$):**
    - Direct line-of-sight southern sky access.
    - Array reaches full 340W–385W peak output.
-3. **Afternoon Western Hemlocks ($15:30 - 18:00$):**
-   - Steep, sudden drop in power as western hemlock branches cast shadows across series strings.
+3. **Afternoon Western Trees ($15:30 - 18:00$):**
+   - Steep drop in power as western tree branches and ridge shadows cast across series strings.
 
 ---
 
@@ -35,8 +35,8 @@ The Solaria analytics server computes the estimated energy gain ($\Delta\text{kW
 ```json
 {
   "shading_analysis": {
-    "morning_pine_loss_kwh": 0.42,
-    "afternoon_hemlock_loss_kwh": 0.38,
+    "morning_east_tree_loss_kwh": 0.42,
+    "afternoon_west_tree_loss_kwh": 0.38,
     "unshaded_potential_kwh": 2.85,
     "actual_harvest_kwh": 2.05,
     "tree_canopy_efficiency": 71.9

@@ -1040,11 +1040,11 @@
             <text x="710" y="152" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="end">WEST (20:12)</text>
             
             <!-- Tree Shading Obstruction Horizon Notches -->
-            <rect x="140" y="110" width="90" height="25" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" rx="3" />
-            <text x="185" y="126" fill="#fca5a5" font-size="9" font-weight="700" text-anchor="middle">🌲 East Pine Notch</text>
+            <rect x="140" y="110" width="105" height="25" fill="rgba(239, 68, 68, 0.25)" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" rx="3" />
+            <text x="192" y="126" fill="#fca5a5" font-size="9" font-weight="700" text-anchor="middle">🌲 Morning East Shading</text>
             
-            <rect x="540" y="115" width="80" height="20" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" rx="3" />
-            <text x="580" y="129" fill="#fde047" font-size="9" font-weight="700" text-anchor="middle">🌲 West Hemlock</text>
+            <rect x="540" y="115" width="105" height="20" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" rx="3" />
+            <text x="592" y="129" fill="#fde047" font-size="9" font-weight="700" text-anchor="middle">🌲 Afternoon West Shading</text>
             
             <!-- Sky Dome & Golden Generation Window -->
             <path d="M 70,135 Q 380,15 690,135 Z" fill="url(#liveSkyGrad)" />
@@ -1103,13 +1103,13 @@
         <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 8px 10px; border-radius: 4px; margin-bottom: 10px; font-size: 0.77rem; color: #a7f3d0;">
           <strong>✂️ Actionable Canopy Guidance:</strong>
           <div id="liveShadingActionText" style="margin-top: 2px; color: #f8fafc;">
-            Trim lower overhang branches on eastern white pine ~15m from array to recover ~180 Wh morning generation.
+            Trim lower overhang tree branches to the east (~15m from array) to recover ~180 Wh morning generation.
           </div>
         </div>
         
         <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
           <div style="font-size: 0.72rem; color: #94a3b8;">
-            🌲 Detected: <strong style="color: #cbd5e1;">4 Canopy Profiles</strong> (Pine, Birch, Oak, Hemlock)
+            🌲 Detected: <strong style="color: #cbd5e1;">4 Shading Profiles</strong> (East, Midday, Afternoon, West)
           </div>
           <button onclick="switchTab('tab-advisor', document.querySelector('.nav-tab-btn[data-tab=\'tab-advisor\']'))" class="btn-solar" style="font-size: 0.75rem; padding: 4px 10px;">
             🌲 Full Canopy Advisor &rarr;
@@ -1581,10 +1581,10 @@
             <span class="badge badge-retry" style="font-size: 0.7rem;">MODERATE</span>
           </div>
           <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-            East White Pine Canopy (105°-120° Azimuth) &bull; <strong>~180 Wh lost/day</strong>
+            Morning East Tree Canopy (105°-120° Azimuth) &bull; <strong>~180 Wh lost/day</strong>
           </div>
           <div style="font-size: 0.78rem; color: #38bdf8; margin-top: 6px;">
-            ✂️ <strong>Action:</strong> Trim lower overhang branches on eastern white pine ~15m from array.
+            ✂️ <strong>Action:</strong> Trim lower overhang tree branches to the east (~15m from array).
           </div>
         </div>
 
@@ -1594,7 +1594,7 @@
             <span class="badge badge-online" style="font-size: 0.7rem;">MINOR</span>
           </div>
           <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">
-            West Hemlock Ridge (245°-260° Azimuth) &bull; <strong>~120 Wh lost/day</strong>
+            Late Afternoon West Tree & Ridge Shading (245°-260° Azimuth) &bull; <strong>~120 Wh lost/day</strong>
           </div>
           <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 6px;">
             ℹ️ <strong>Action:</strong> No trimming required (battery is full by 4 PM on clear days).
@@ -3886,7 +3886,7 @@ Signed: Solaria Autonomous Solar Guardian
         const exposureText = `${Number(exposurePct).toFixed(1)}% CLEAR SKY`;
         const lossKWh = data.total_shading_loss_kwh_day !== undefined ? Number(data.total_shading_loss_kwh_day).toFixed(2) : '0.30';
         const recoveryKWh = data.season_harvest_recovery_kwh !== undefined ? Number(data.season_harvest_recovery_kwh).toFixed(1) : '36.0';
-        const primaryAction = data.primary_action || (data.shading_patterns && data.shading_patterns[0] ? data.shading_patterns[0].advisory : 'Trim lower overhang branches on eastern white pine ~15m from array to recover ~180 Wh morning generation.');
+        const primaryAction = data.primary_action || (data.shading_patterns && data.shading_patterns[0] ? data.shading_patterns[0].advisory : 'Trim lower overhang tree branches to the east (~15m from array) to recover ~180 Wh morning generation.');
 
         // Update Advisor tab elements
         const badgeAdvisor = document.getElementById('shadingSunExposureBadge');

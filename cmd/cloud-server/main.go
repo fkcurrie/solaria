@@ -496,8 +496,8 @@ func NewSolarModelLearner(filePath string) *SolarModelLearner {
 		LastTrainedAt:        time.Now().UTC().Format(time.RFC3339),
 		HourlyMultipliers: [24]float64{
 			1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-			0.95, 0.91, 0.82, 0.94, 0.98, 0.92, // 8-9AM pine branch notch, 11-12 birch crown notch
-			0.96, 0.97, 0.95, 0.89, 0.92, 0.96, // 3-4PM afternoon oak shadow
+			0.95, 0.91, 0.82, 0.94, 0.98, 0.92, // 8-9AM morning tree notch, 11-12 midday tree crown notch
+			0.96, 0.97, 0.95, 0.89, 0.92, 0.96, // 3-4PM afternoon tree shadow
 			1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 		},
 		HourlySampleCounts: [24]int64{
@@ -507,9 +507,9 @@ func NewSolarModelLearner(filePath string) *SolarModelLearner {
 			60, 60, 60, 60, 60, 60,
 		},
 		LearnedNotches: []ShadingAnomalyNotch{
-			{Hour: 8, TimeLabel: "08:00 AM - 09:30 AM", LossPct: 18.0, Description: "Eastern White Pine branch horizon notch (verified via 2S2P string bypass activation)"},
-			{Hour: 11, TimeLabel: "11:30 AM - 12:30 PM", LossPct: 8.0, Description: "Midday birch leaf crown diffuse scatter"},
-			{Hour: 15, TimeLabel: "03:00 PM - 04:30 PM", LossPct: 11.0, Description: "South-West mature oak branch shadow cast as sun dips behind ridge"},
+			{Hour: 8, TimeLabel: "08:00 AM - 09:30 AM", LossPct: 18.0, Description: "Morning eastern tree canopy horizon notch (verified via 2S2P string bypass activation)"},
+			{Hour: 11, TimeLabel: "11:30 AM - 12:30 PM", LossPct: 8.0, Description: "Midday tree canopy diffuse scatter"},
+			{Hour: 15, TimeLabel: "03:00 PM - 04:30 PM", LossPct: 11.0, Description: "South-West mature tree branch shadow cast as sun dips behind ridge"},
 		},
 	}
 	l.Load()
@@ -605,11 +605,11 @@ func (l *SolarModelLearner) TrainRecord(rec SolarRecord) {
 			lossPct := mathRound((1.0-mult)*100.0, 1)
 			desc := fmt.Sprintf("Observed %v%% attenuation vs pure clear sky model", lossPct)
 			if hr == 8 || hr == 9 {
-				desc = fmt.Sprintf("Eastern pine canopy attenuation (-%v%% vs clear sky)", lossPct)
+				desc = fmt.Sprintf("Eastern tree canopy attenuation (-%v%% vs clear sky)", lossPct)
 			} else if hr == 11 || hr == 12 {
 				desc = fmt.Sprintf("Midday tree branch crown notch (-%v%% vs clear sky)", lossPct)
 			} else if hr >= 15 {
-				desc = fmt.Sprintf("Late afternoon western ridge shadow (-%v%% vs clear sky)", lossPct)
+				desc = fmt.Sprintf("Late afternoon western tree & ridge shadow (-%v%% vs clear sky)", lossPct)
 			}
 			notches = append(notches, ShadingAnomalyNotch{
 				Hour:        hr,
@@ -2326,15 +2326,15 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 	patterns := []ShadingPattern{
 		{
 			TimeWindow:      "08:45 AM - 10:15 AM",
-			ObstructionType: "East White Pine Canopy Shading",
+			ObstructionType: "Morning East Tree Canopy Shading",
 			BearingCompass:  "East-Southeast (105° - 120° Azimuth)",
 			Severity:        "MODERATE",
 			EstimatedLossWh: 180,
-			Advisory:        "Trim lower overhang branches on the eastern white pine ~15m from array to recover ~180 Wh morning generation.",
+			Advisory:        "Trim lower overhang tree branches to the east (~15m from array) to recover ~180 Wh morning generation.",
 		},
 		{
 			TimeWindow:      "12:15 PM - 01:00 PM",
-			ObstructionType: "Midday Paper Birch Overhang Notch",
+			ObstructionType: "Midday Tree Overhang Shading",
 			BearingCompass:  "South (175° - 185° Azimuth)",
 			Severity:        "MINOR",
 			EstimatedLossWh: 75,
@@ -2342,19 +2342,19 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 		},
 		{
 			TimeWindow:      "02:45 PM - 03:45 PM",
-			ObstructionType: "Afternoon Red Oak Branch Shading",
+			ObstructionType: "Afternoon Southwest Tree Shading",
 			BearingCompass:  "Southwest (215° - 230° Azimuth)",
 			Severity:        "MODERATE",
 			EstimatedLossWh: 110,
-			Advisory:        "Prune lower western oak limb to eliminate String-1 bypass diode activation during early afternoon.",
+			Advisory:        "Prune lower western tree limbs to eliminate String-1 bypass diode activation during early afternoon.",
 		},
 		{
 			TimeWindow:      "04:15 PM - 05:30 PM",
-			ObstructionType: "West Hemlock Ridge Shadowing",
+			ObstructionType: "Late Afternoon West Tree Shading",
 			BearingCompass:  "West-Southwest (245° - 260° Azimuth)",
 			Severity:        "MINOR",
 			EstimatedLossWh: 120,
-			Advisory:        "Seasonal late-afternoon ridge shadow. Negligible impact as battery bank is typically >95% SOC by 4 PM.",
+			Advisory:        "Seasonal late-afternoon tree & ridge shadow. Negligible impact as battery bank is typically >95% SOC by 4 PM.",
 		},
 	}
 
@@ -2369,10 +2369,10 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 		"total_shading_loss_kwh_day":  0.30,
 		"total_shading_loss_wh_day":   300,
 		"season_harvest_recovery_kwh": 36.0,
-		"primary_action":              "Trim lower overhang branches on eastern white pine ~15m from array",
+		"primary_action":              "Trim lower overhang tree branches to the east (~15m from array)",
 		"bypass_diode_activity":       "Nominal (No permanent string diode failure detected)",
 		"shading_patterns":            patterns,
-		"summary_advisory":            "Array solar window is 86.8% unshaded. Trimming 2 eastern tree branches will recover ~1.2 kWh per week.",
+		"summary_advisory":            "Array solar window is 86.8% unshaded. Trimming lower eastern tree branches will recover ~1.2 kWh per week.",
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }

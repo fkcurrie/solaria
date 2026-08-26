@@ -61,7 +61,7 @@ graph LR
 
 === "🌲 Atmospheric Physics & Shading Diagnostics"
     - **NOAA Solar Math Engine:** High-precision calculation of sunrise, solar noon, sunset, and solar elevation angle ($45.186^\circ\text{N}, -78.863^\circ\text{W}$).
-    - **Tree Shading Notch Detection:** Identifies morning eastern pine canopy vs. afternoon western hemlock shading profiles and calculates seasonal harvest recovery.
+    - **Tree Shading Notch Detection:** Identifies morning eastern vs. afternoon western tree shading profiles and calculates seasonal harvest recovery.
 
 === "🤖 Autonomous Self-Healing SRE Supervisor"
     - **24/7 Watchdog Daemon:** Monitors process memory, goroutines, and packet freshness.

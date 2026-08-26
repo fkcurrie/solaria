@@ -16,12 +16,12 @@ Solaria incorporates software safety invariants that detect sub-zero battery con
 
 ---
 
-## 🌲 Pine vs. Hemlock Tree Shading
+## 🌲 Diurnal Tree Shading Analysis
 
-Remote installations are often surrounded by tall coniferous and deciduous trees:
-- **Morning Pine Shading (East):** Dense white pines block direct morning sun between 08:00 and 10:30, keeping array voltage low until the sun climbs above $25^\circ$ elevation.
+Remote installations are often surrounded by tall trees and surrounding forest canopy:
+- **Morning Tree Shading (East):** Dense eastern tree canopy can block direct morning sun between 08:00 and 10:30, keeping array voltage low until the sun climbs above $25^\circ$ elevation.
 - **Solar Noon Peak (South):** Direct uninhibited irradiance between 11:30 and 14:00 where harvest reaches 340W–385W (85–96% of rated STC).
-- **Afternoon Hemlock Shading (West):** Late-afternoon shadows create characteristic "notches" in the diurnal power curve.
+- **Afternoon Tree Shading (West):** Late-afternoon tree and ridge shadows create characteristic "notches" in the diurnal power curve.
 
 Solaria's built-in **Tree Shading Diagnostic Analyzer** calculates exactly how much daily energy (kWh) is lost to specific tree profiles and provides guidance on canopy trimming.
 

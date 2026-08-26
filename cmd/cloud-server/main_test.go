@@ -730,19 +730,19 @@ func TestHandleShadingAnalysis_FourPatterns(t *testing.T) {
 		t.Fatalf("Expected 4 cottage shading patterns, got %d", len(res.ShadingPatterns))
 	}
 
-	foundBirch := false
-	foundOak := false
+	foundMidday := false
+	foundAfternoon := false
 	for _, p := range res.ShadingPatterns {
-		if strings.Contains(p.ObstructionType, "Birch") {
-			foundBirch = true
+		if strings.Contains(p.ObstructionType, "Midday") {
+			foundMidday = true
 		}
-		if strings.Contains(p.ObstructionType, "Oak") {
-			foundOak = true
+		if strings.Contains(p.ObstructionType, "Afternoon") {
+			foundAfternoon = true
 		}
 	}
 
-	if !foundBirch || !foundOak {
-		t.Errorf("Expected Birch and Oak shading patterns to be present in Dorset model")
+	if !foundMidday || !foundAfternoon {
+		t.Errorf("Expected Midday and Afternoon shading patterns to be present in Dorset model")
 	}
 }
 

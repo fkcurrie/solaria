@@ -123,7 +123,7 @@ The Central Cloud Hub organizes solar intelligence across 7 purpose-built tabs:
 5. 📈 **Year View (`tab-year`):** Seasonal generation trends and annual MWh harvest projection.
 6. 🌲 **Solar Advisor & Tools (`tab-advisor`):** Dedicated intelligence suite consolidating:
    - 🌅 **Daily Sunset Digest & Morning Solar Forecast:** End-of-day harvest summary, absorption duration, evening battery baseline ($2,176\text{ Wh}$ usable), and tomorrow's solar noon window.
-   - 🌲 **Tree Shading Advisory Engine:** Diurnal irradiance curve notch detection (morning east white pine canopy at 105°-120° azimuth vs afternoon hemlock ridge at 245°-260° azimuth), bypass diode drop tracking, and seasonal yield recovery.
+   - 🌲 **Tree Shading Advisory Engine:** Diurnal irradiance curve notch detection (morning east tree canopy at 105°-120° azimuth vs late afternoon west tree & ridge shadow at 245°-260° azimuth), bypass diode drop tracking, and seasonal yield recovery.
    - 🔌 **Commissioning Wizard & 2S2P Topology Verifier:** Safe 5-step wiring sequence checklist (battery first, solar second) and sub-zero cold-temperature $V_{\text{oc}}$ margin check (48.2V at -25°C vs 100V limit).
    - 📶 **BT-1 Bluetooth Signal Strength Diagnostics:** BLE RSSI link margin ($> -75\text{ dBm}$), Modbus CRC packet loss tracking, and metal battery box Faraday shielding mitigation via exterior RJ12 antenna mount.
    - ☁️ **Automated GCP & BigQuery Provisioning Assistant:** 1-click `./setup-gcp.sh` provisioning for day-partitioned datasets and IAM.
