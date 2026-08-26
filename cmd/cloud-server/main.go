@@ -3398,6 +3398,28 @@ func main() {
 	mux.HandleFunc("/api/v1/health", handleHealth)
 	mux.HandleFunc("/healthz", handleHealthz)
 
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		b, err := staticFS.ReadFile("static/robots.txt")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(b)
+	})
+
+	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		b, err := staticFS.ReadFile("static/sitemap.xml")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(b)
+	})
+
 	mux.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
