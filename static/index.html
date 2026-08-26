@@ -561,7 +561,14 @@
       }
     }
 
+    let reconnectTimer = null;
+    let reconnectAttempt = 0;
+    let bleWatchdogTimer = null;
+    let lastQueryTimestamp = 0;
+    let isUserDisconnected = false;
+
     async function tryAutoConnectSavedDevice() {
+      if (isUserDisconnected) return;
       if (isConnectingGatt || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) return;
       if (!navigator.bluetooth || !navigator.bluetooth.getDevices) {
         log('👉 Ready: Click "⚡ Connect Renogy BT-1" to pair and begin streaming.', 'info');
@@ -570,106 +577,170 @@
       try {
         const devices = await navigator.bluetooth.getDevices();
         if (devices.length > 0) {
-          const renogy = devices.find(d => d.name && (d.name.includes('BT') || d.name.includes('RN') || d.name.includes('Rover'))) || devices[0];
+          const renogy = devices.find(d => d.name && (d.name.includes('BT') || d.name.includes('RN') || d.name.includes('Rover') || d.name.includes('Solar'))) || devices[0];
           const devName = renogy.name || 'Renogy Controller';
-          log(`⚡ Authorized controller found (${devName}). Auto-connecting...`, 'info');
+          log(`⚡ Authorized controller found in browser cache (${devName}). Auto-connecting...`, 'info');
+          setupAdvertisementWatcher(renogy);
           await startRenogySession(renogy);
         } else {
-          log('👉 Click "⚡ Connect Renogy BT-1" to pair and begin streaming.', 'info');
+          log('👉 Ready: Click "⚡ Connect Renogy BT-1" to pair and begin streaming.', 'info');
         }
       } catch (e) {
-        log(`Auto-connect note: ${e.message}`, 'warn');
+        log(`Auto-connect notice: ${e.message}`, 'warn');
       }
     }
 
+    function setupAdvertisementWatcher(device) {
+      if (!device || typeof device.watchAdvertisements !== 'function') return;
+      try {
+        device.watchAdvertisements().then(() => {
+          device.addEventListener('advertisementreceived', (event) => {
+            if (!isUserDisconnected && (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected) && !isConnectingGatt) {
+              log(`📡 Bluetooth advertisement detected from ${device.name || 'Renogy BT Module'}. Initiating auto-connection...`, 'info');
+              startRenogySession(device);
+            }
+          });
+          log('📡 Web Bluetooth advertisement watcher active.', 'success');
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
     async function connectRenogyByService() {
+      isUserDisconnected = false;
       try {
         log('Scanning specifically for Renogy Controller (Service 0xFFD0)...', 'info');
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ services: [RENOGY_SERVICE_WRITE] }],
           optionalServices: ALL_SERVICES
         });
+        setupAdvertisementWatcher(bleDevice);
         await startRenogySession(bleDevice);
       } catch (err) {
-        log(`Scan cancelled: ${err.message}`, 'warn');
+        log(`Scan cancelled or failed: ${err.message}`, 'warn');
       }
     }
 
     async function startRenogySession(device) {
-      if (isConnectingGatt) return;
+      if (!device || isConnectingGatt) return;
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected && bleDevice.id === device.id) return;
+
       isConnectingGatt = true;
       bleDevice = device;
-      const autoReconnectEnabled = document.getElementById('autoReconnectCheck').checked;
       const devName = device.name || 'Renogy BT Module';
+      
+      const autoReconnectCheck = document.getElementById('autoReconnectCheck');
+      const autoReconnectEnabled = autoReconnectCheck ? autoReconnectCheck.checked : true;
+
+      const bleBadge = document.getElementById('bleBadge');
+      bleBadge.className = 'badge badge-reconnecting';
+      bleBadge.textContent = 'CONNECTING...';
+      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#fbbf24;">Acquiring GATT session (${devName})...</span>`;
       log(`Acquiring GATT session with ${devName}...`, 'info');
       sendToLinux({ type: 'device_selected', name: devName, id: device.id });
 
       device.removeEventListener('gattserverdisconnected', onDisconnected);
       device.addEventListener('gattserverdisconnected', onDisconnected);
 
-      let attempt = 0;
-      let connected = false;
-
-      while (!connected && autoReconnectEnabled) {
-        attempt++;
-        try {
-          if (attempt > 1) {
-            document.getElementById('bleStatusVal').innerHTML = `<span style="color:#fbbf24;">Retrying (${attempt})...</span>`;
-            log(`Retrying GATT connection (attempt ${attempt})...`, 'warn');
-          }
-          gattServer = await device.gatt.connect();
-          if (gattServer && gattServer.connected) {
-            connected = true;
-            break;
-          }
-        } catch (err) {
-          log(`GATT attempt ${attempt} failed: ${err.message}. Retrying in 3s...`, 'error');
-          sendToLinux({ type: 'error', message: `GATT attempt ${attempt}: ${err.message}` });
-          await new Promise(r => setTimeout(r, 3000));
+      try {
+        gattServer = await device.gatt.connect();
+        if (!gattServer || !gattServer.connected) {
+          throw new Error('GATT connect returned disconnected server');
         }
+
+        reconnectAttempt = 0;
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        document.getElementById('disconnectBtn').disabled = false;
+        document.getElementById('connectBtn').disabled = true;
+
+        bleBadge.className = 'badge badge-online';
+        bleBadge.textContent = 'CONNECTED';
+        document.getElementById('devNameVal').textContent = devName;
+        document.getElementById('bleStatusVal').innerHTML = `<span style="color:#34d399;">Connected to ${devName}</span>`;
+        log(`🎉 GATT Connected successfully to ${devName}! Hooking notification channels...`, 'success');
+
+        requestWakeLock();
+
+        // 1. Hook RX Notification Characteristic (0xFFF1)
+        try {
+          const rxService = await gattServer.getPrimaryService(RENOGY_SERVICE_READ);
+          notifyCharObj = await rxService.getCharacteristic(RENOGY_CHAR_NOTIFY);
+          await notifyCharObj.startNotifications();
+          notifyCharObj.removeEventListener('characteristicvaluechanged', onIncomingChunk);
+          notifyCharObj.addEventListener('characteristicvaluechanged', onIncomingChunk);
+          log('RX Notification Channel (0xFFF1) hooked.', 'success');
+        } catch (e) {
+          log(`RX Service setup warning: ${e.message}`, 'warn');
+        }
+
+        // 2. Hook TX Write Characteristic (0xFFD1)
+        try {
+          const txService = await gattServer.getPrimaryService(RENOGY_SERVICE_WRITE);
+          writeCharObj = await txService.getCharacteristic(RENOGY_CHAR_WRITE);
+          log('TX Write Channel (0xFFD1) ready.', 'success');
+        } catch (e) {
+          log(`TX Service setup warning: ${e.message}`, 'warn');
+        }
+
+        sendToLinux({ type: 'gatt_connected', name: devName, id: device.id });
+
+        // Query static model info then start active polling loop
+        setTimeout(queryDeviceInfo, 600);
+        setTimeout(() => {
+          startPollingLoop();
+        }, 1500);
+
+      } catch (err) {
+        log(`GATT connection to ${devName} failed: ${err.message}`, 'error');
+        sendToLinux({ type: 'error', message: `GATT connect error: ${err.message}` });
+        
+        bleBadge.className = 'badge badge-offline';
+        bleBadge.textContent = 'DISCONNECTED';
+        document.getElementById('bleStatusVal').innerHTML = `<span style="color:#f87171;">Connection Failed</span>`;
+        
+        if (autoReconnectEnabled && !isUserDisconnected) {
+          scheduleAutoReconnect();
+        }
+      } finally {
+        isConnectingGatt = false;
       }
+    }
 
-      isConnectingGatt = false;
-      if (!connected) return;
+    function scheduleAutoReconnect(customDelayMs) {
+      if (isUserDisconnected || isConnectingGatt) return;
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) return;
 
-      document.getElementById('disconnectBtn').disabled = false;
-      document.getElementById('connectBtn').disabled = true;
+      const autoReconnectCheck = document.getElementById('autoReconnectCheck');
+      if (autoReconnectCheck && !autoReconnectCheck.checked) return;
 
+      reconnectAttempt++;
+      // Exponential backoff: 2s, 4s, 8s, max 15s
+      const delayMs = customDelayMs !== undefined ? customDelayMs : Math.min(2000 * Math.pow(1.5, reconnectAttempt - 1), 15000);
+      const delaySec = (delayMs / 1000).toFixed(1);
+
+      const devName = (bleDevice && bleDevice.name) || 'Renogy Controller';
       const bleBadge = document.getElementById('bleBadge');
-      bleBadge.className = 'badge badge-online';
-      bleBadge.textContent = 'CONNECTED';
-
-      document.getElementById('devNameVal').textContent = devName;
-      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#34d399;">Connected to ${devName}</span>`;
-
-      log(`🎉 GATT Connected successfully to ${devName}! Initializing telemetry channels...`, 'success');
-      requestWakeLock();
-
-      try {
-        const rxService = await gattServer.getPrimaryService(RENOGY_SERVICE_READ);
-        notifyCharObj = await rxService.getCharacteristic(RENOGY_CHAR_NOTIFY);
-        await notifyCharObj.startNotifications();
-        notifyCharObj.removeEventListener('characteristicvaluechanged', onIncomingChunk);
-        notifyCharObj.addEventListener('characteristicvaluechanged', onIncomingChunk);
-        log('RX Notification Channel (0xFFF1) hooked.', 'success');
-      } catch (e) {
-        log(`RX Service setup: ${e.message}`, 'warn');
+      if (bleBadge) {
+        bleBadge.className = 'badge badge-reconnecting';
+        bleBadge.textContent = `RETRYING (${reconnectAttempt})`;
       }
+      document.getElementById('bleStatusVal').innerHTML = `<span style="color:#fbbf24;">Auto-reconnecting in ${delaySec}s (Attempt #${reconnectAttempt})...</span>`;
+      log(`🔄 Auto-reconnect scheduled in ${delaySec}s (Attempt #${reconnectAttempt})...`, 'warn');
 
-      try {
-        const txService = await gattServer.getPrimaryService(RENOGY_SERVICE_WRITE);
-        writeCharObj = await txService.getCharacteristic(RENOGY_CHAR_WRITE);
-        log('TX Write Channel (0xFFD1) ready.', 'success');
-      } catch (e) {
-        log(`TX Service setup: ${e.message}`, 'warn');
-      }
-
-      sendToLinux({ type: 'gatt_connected', name: devName, id: device.id });
-
-      setTimeout(queryDeviceInfo, 500);
-      setTimeout(() => {
-        startPollingLoop();
-      }, 1500);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(async () => {
+        reconnectTimer = null;
+        if (!isUserDisconnected && (!bleDevice || !bleDevice.gatt || !bleDevice.gatt.connected)) {
+          if (bleDevice) {
+            await startRenogySession(bleDevice);
+          } else {
+            await tryAutoConnectSavedDevice();
+          }
+        }
+      }, delayMs);
     }
 
     async function sendModbusFrame(rawCommand) {
@@ -682,7 +753,9 @@
         } else {
           await writeCharObj.writeValueWithoutResponse(fullFrame);
         }
-      } catch (e) {}
+      } catch (e) {
+        // Drop write error; watchdog or polling handles recovery
+      }
     }
 
     async function queryDeviceInfo() {
@@ -690,14 +763,12 @@
       await sendModbusFrame(raw);
     }
 
-    let lastTelemetryQueryTime = 0;
-
     async function queryRealtimeTelemetry() {
       const now = Date.now();
-      if (now - lastTelemetryQueryTime < (pollIntervalMs - 800)) {
+      if (now - lastQueryTimestamp < (pollIntervalMs - 800)) {
         return;
       }
-      lastTelemetryQueryTime = now;
+      lastQueryTimestamp = now;
       const raw = new Uint8Array([0xFF, 0x03, 0x01, 0x00, 0x00, 0x22]);
       await sendModbusFrame(raw);
     }
@@ -743,9 +814,9 @@
       }, pollIntervalMs);
     }
 
-    function onDisconnected() {
+    function onDisconnected(event) {
       const devName = (bleDevice && bleDevice.name) || 'Renogy BT Module';
-      log(`⚠️ Bluetooth disconnected from ${devName}`, 'warn');
+      log(`⚠️ Bluetooth connection dropped from ${devName}`, 'warn');
       sendToLinux({ type: 'disconnected', name: devName });
 
       document.getElementById('connectBtn').disabled = false;
@@ -762,25 +833,97 @@
         pollIntervalTimer = null;
       }
 
-      if (document.getElementById('autoReconnectCheck').checked && bleDevice) {
-        log('Auto-reconnect is enabled: attempting reconnection in 3s...', 'warn');
-        setTimeout(() => {
-          if (!isConnectingGatt && (!gattServer || !gattServer.connected)) {
-            startRenogySession(bleDevice);
-          }
-        }, 3000);
+      writeCharObj = null;
+      notifyCharObj = null;
+
+      if (!isUserDisconnected) {
+        scheduleAutoReconnect(1500);
       }
     }
 
     async function disconnectGatt() {
+      isUserDisconnected = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (pollIntervalTimer) {
+        clearInterval(pollIntervalTimer);
+        pollIntervalTimer = null;
+      }
       if (bleDevice && bleDevice.gatt) {
-        log('User initiated GATT disconnect.', 'warn');
-        bleDevice.gatt.disconnect();
+        log('User initiated manual GATT disconnect. Auto-reconnect paused.', 'warn');
+        try {
+          bleDevice.gatt.disconnect();
+        } catch (e) {}
+      }
+      document.getElementById('connectBtn').disabled = false;
+      document.getElementById('disconnectBtn').disabled = true;
+      const bleBadge = document.getElementById('bleBadge');
+      bleBadge.className = 'badge badge-offline';
+      bleBadge.textContent = 'DISCONNECTED';
+      document.getElementById('bleStatusVal').innerHTML = '<span style="color:#f87171;">Disconnected (Manual)</span>';
+    }
+
+    // --------------------------------------------------------------------------
+    // Autonomous Heartbeat & Watchdog Supervisor
+    // --------------------------------------------------------------------------
+    function runBleWatchdog() {
+      if (isUserDisconnected) return;
+      const autoReconnectCheck = document.getElementById('autoReconnectCheck');
+      if (autoReconnectCheck && !autoReconnectCheck.checked) return;
+
+      const now = Date.now();
+
+      // Case 1: Device is known, but GATT is not connected and no reconnect is in flight
+      if (bleDevice && (!bleDevice.gatt || !bleDevice.gatt.connected)) {
+        if (!isConnectingGatt && !reconnectTimer) {
+          log('🔍 Watchdog detected disconnected BLE state. Triggering auto-reconnect...', 'info');
+          scheduleAutoReconnect(500);
+        }
+        return;
+      }
+
+      // Case 2: GATT reports connected, but no packets have arrived for > 15 seconds (Zombie Session)
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected && lastBlePacketTimestamp) {
+        const timeSinceLastPacket = now - lastBlePacketTimestamp.getTime();
+        if (timeSinceLastPacket > 16000 && !isConnectingGatt) {
+          log(`⚠️ Watchdog detected silent/zombie GATT session (no telemetry for ${Math.round(timeSinceLastPacket/1000)}s). Forcing reset & reconnect...`, 'error');
+          try {
+            bleDevice.gatt.disconnect();
+          } catch (e) {}
+          onDisconnected();
+        }
+      }
+
+      // Case 3: No active bleDevice reference, check browser cache
+      if (!bleDevice && !isConnectingGatt && !reconnectTimer) {
+        tryAutoConnectSavedDevice();
       }
     }
 
+    // Start watchdog running every 4 seconds
+    bleWatchdogTimer = setInterval(runBleWatchdog, 4000);
+
+    // Reconnect / resume on tab visibility change or network resume
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        log('👁️ Tab active: verifying Bluetooth and WebSocket health...', 'info');
+        requestWakeLock();
+        runBleWatchdog();
+      }
+    });
+
+    window.addEventListener('online', () => {
+      log('🌐 Network online: checking connections...', 'info');
+      connectWebSocket();
+      runBleWatchdog();
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
       connectWebSocket();
+      tryAutoConnectSavedDevice();
+      requestWakeLock();
     });
   </script>
 </body>

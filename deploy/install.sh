@@ -278,7 +278,7 @@ SyslogIdentifier=solaria-sre
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
+systemctl daemon-reload >/dev/null 2>&1 || true
 systemctl enable solaria-bridge.service solaria-sre.service >/dev/null 2>&1 || true
 
 PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")

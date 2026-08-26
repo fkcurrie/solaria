@@ -2091,6 +2091,24 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			localRx = localRx[:0]
 			fmt.Printf("[\033[92m%s GATT READY\033[0m] Connected to \033[1m%s\033[0m (Channels: FFD1 TX, FFF1 RX)\n", nowStr, name)
 
+		case "disconnected", "device_disconnected":
+			name := payload.Name
+			if name == "" {
+				name = "Renogy Device"
+			}
+			fmt.Printf("[\033[1;33m%s ⚠️ BLE DISCONNECTED\033[0m] Device \033[1m%s\033[0m lost connection. Waiting for auto-reconnect...\n", nowStr, name)
+			ev, stats := tracker.RecordOutageStart(fmt.Sprintf("Bluetooth Disconnected: %s", name))
+			if ev != nil {
+				_, hist := tracker.GetStats()
+				broadcastControlMsg(map[string]interface{}{
+					"type":    "outage_event",
+					"event":   "outage_start",
+					"outage":  ev,
+					"stats":   stats,
+					"history": hist,
+				})
+			}
+
 		case "notification", "characteristic_value":
 			localRx = append(localRx, payload.Bytes...)
 			if len(localRx) >= 3 && localRx[1] == 0x03 {

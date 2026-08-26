@@ -20,10 +20,14 @@ let writeChar = null;
 let notifyChar = null;
 let pollInterval = null;
 let rxBuffer = new Uint8Array(0);
-let isReconnecting = false;
+let isConnectingGatt = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let lastPacketTime = 0;
 
 function log(msg, cls = '') {
   const box = document.getElementById('logBox');
+  if (!box) return;
   const t = new Date().toLocaleTimeString();
   const d = document.createElement('div');
   if (cls) d.className = cls;
@@ -47,13 +51,20 @@ function calcCrc16(buf) {
 function initWebSocket() {
   ws = new WebSocket('ws://localhost:8765');
   ws.onopen = () => {
-    document.getElementById('proxyBadge').className = 'badge badge-online';
-    document.getElementById('proxyBadge').textContent = 'Bridge Online';
+    const badge = document.getElementById('proxyBadge');
+    if (badge) {
+      badge.className = 'badge badge-online';
+      badge.textContent = 'Bridge Online';
+    }
     log('Connected to Linux WebSocket!', 'log-ok');
+    autoConnectExisting();
   };
   ws.onclose = () => {
-    document.getElementById('proxyBadge').className = 'badge badge-offline';
-    document.getElementById('proxyBadge').textContent = 'Bridge Offline';
+    const badge = document.getElementById('proxyBadge');
+    if (badge) {
+      badge.className = 'badge badge-offline';
+      badge.textContent = 'Bridge Offline';
+    }
     setTimeout(initWebSocket, 3000);
   };
 }
@@ -65,12 +76,14 @@ function sendToLinux(obj) {
 }
 
 async function autoConnectExisting() {
+  if (isConnectingGatt || (bleDevice && bleDevice.gatt && bleDevice.gatt.connected)) return;
   if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
   try {
     const devices = await navigator.bluetooth.getDevices();
     if (devices.length > 0) {
-      log(`Found previously authorized device: ${devices[0].name || 'Renogy BT'}`, 'log-ok');
-      await connectToDevice(devices[0]);
+      const renogy = devices.find(d => d.name && (d.name.includes('BT') || d.name.includes('RN') || d.name.includes('Rover') || d.name.includes('Solar'))) || devices[0];
+      log(`Found authorized controller: ${renogy.name || 'Renogy BT'}`, 'log-ok');
+      await connectToDevice(renogy);
     }
   } catch (e) {
     log(`Auto-connect note: ${e.message}`);
@@ -91,23 +104,36 @@ async function requestPairing() {
 }
 
 async function connectToDevice(dev) {
+  if (!dev || isConnectingGatt) return;
+  isConnectingGatt = true;
   bleDevice = dev;
   const name = dev.name || 'Renogy BT Module';
-  document.getElementById('devName').textContent = name;
-  log(`Connecting GATT to ${name}...`);
+  const devNameEl = document.getElementById('devName');
+  if (devNameEl) devNameEl.textContent = name;
+  log(`Connecting GATT session to ${name}...`);
 
   dev.removeEventListener('gattserverdisconnected', onDisconnected);
   dev.addEventListener('gattserverdisconnected', onDisconnected);
 
   try {
     gattServer = await dev.gatt.connect();
-    document.getElementById('bleStatus').className = 'badge badge-solar';
-    document.getElementById('bleStatus').textContent = 'Connected';
-    log('GATT Connected! Hooking channels...', 'log-ok');
+    reconnectAttempts = 0;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    const bleStatus = document.getElementById('bleStatus');
+    if (bleStatus) {
+      bleStatus.className = 'badge badge-solar';
+      bleStatus.textContent = 'Connected';
+    }
+    log(`GATT Connected to ${name}! Hooking channels...`, 'log-ok');
 
     const rxService = await gattServer.getPrimaryService(RENOGY_SERVICE_READ);
     notifyChar = await rxService.getCharacteristic(RENOGY_CHAR_NOTIFY);
     await notifyChar.startNotifications();
+    notifyChar.removeEventListener('characteristicvaluechanged', onDataChunk);
     notifyChar.addEventListener('characteristicvaluechanged', onDataChunk);
 
     const txService = await gattServer.getPrimaryService(RENOGY_SERVICE_WRITE);
@@ -115,19 +141,21 @@ async function connectToDevice(dev) {
 
     sendToLinux({ type: 'gatt_connected', name: name, id: dev.id });
 
-    // Start auto polling (10 seconds)
+    // Start auto polling (5 seconds)
     if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(pollTelemetry, 10000);
+    pollInterval = setInterval(pollTelemetry, 5000);
     pollTelemetry();
 
   } catch (e) {
-    log(`GATT failed: ${e.message}`, 'log-err');
+    log(`GATT connection failed: ${e.message}`, 'log-err');
     scheduleReconnect();
+  } finally {
+    isConnectingGatt = false;
   }
 }
 
 async function pollTelemetry() {
-  if (!writeChar) return;
+  if (!writeChar || !gattServer || !gattServer.connected) return;
   try {
     const raw = new Uint8Array([0xFF, 0x03, 0x01, 0x00, 0x00, 0x22]);
     const crc = calcCrc16(raw);
@@ -143,6 +171,7 @@ async function pollTelemetry() {
 }
 
 function onDataChunk(event) {
+  lastPacketTime = Date.now();
   const chunk = new Uint8Array(event.target.value.buffer, event.target.value.byteOffset, event.target.value.byteLength);
   sendToLinux({ type: 'notification', characteristic: RENOGY_CHAR_NOTIFY, bytes: Array.from(chunk) });
 
@@ -172,38 +201,69 @@ function parseFrame(bytes) {
     const stateCode = data.length >= 66 ? data[65] : 0;
     const stateMap = { 0: 'Deactivated', 1: 'Active', 2: 'MPPT', 3: 'Equalize', 4: 'Boost', 5: 'Float', 6: 'Limit' };
 
-    document.getElementById('pvWatts').textContent = `${pvWatts} W`;
-    document.getElementById('battSoc').textContent = `${soc} %`;
-    document.getElementById('battVolts').textContent = `${volts.toFixed(1)} V`;
-    document.getElementById('chargeState').textContent = stateMap[stateCode] || `Code ${stateCode}`;
+    const pvWattsEl = document.getElementById('pvWatts');
+    if (pvWattsEl) pvWattsEl.textContent = `${pvWatts} W`;
+    const battSocEl = document.getElementById('battSoc');
+    if (battSocEl) battSocEl.textContent = `${soc} %`;
+    const battVoltsEl = document.getElementById('battVolts');
+    if (battVoltsEl) battVoltsEl.textContent = `${volts.toFixed(1)} V`;
+    const chargeStateEl = document.getElementById('chargeState');
+    if (chargeStateEl) chargeStateEl.textContent = stateMap[stateCode] || `Code ${stateCode}`;
 
     log(`Solar: ${pvWatts}W | Batt: ${volts.toFixed(1)}V (${soc}%)`, 'log-solar');
   }
 }
 
 function onDisconnected() {
-  log('Bluetooth disconnected. Will auto-reconnect...', 'log-err');
-  document.getElementById('bleStatus').className = 'badge badge-offline';
-  document.getElementById('bleStatus').textContent = 'Disconnected';
-  if (pollInterval) clearInterval(pollInterval);
-  sendToLinux({ type: 'device_disconnected' });
+  log('Bluetooth disconnected. Scheduling automatic reconnection...', 'log-err');
+  const bleStatus = document.getElementById('bleStatus');
+  if (bleStatus) {
+    bleStatus.className = 'badge badge-offline';
+    bleStatus.textContent = 'Reconnecting...';
+  }
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+  writeChar = null;
+  notifyChar = null;
+  sendToLinux({ type: 'disconnected', name: (bleDevice && bleDevice.name) || 'Renogy Module' });
   scheduleReconnect();
 }
 
 function scheduleReconnect() {
-  if (isReconnecting) return;
-  isReconnecting = true;
-  setTimeout(async () => {
-    isReconnecting = false;
+  if (isConnectingGatt) return;
+  reconnectAttempts++;
+  const delayMs = Math.min(2000 * Math.pow(1.5, reconnectAttempts - 1), 15000);
+  log(`Auto-reconnect attempt #${reconnectAttempts} in ${(delayMs/1000).toFixed(1)}s...`, 'log-solar');
+
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
     if (bleDevice) {
-      log('Auto-reconnecting to Renogy module...');
       await connectToDevice(bleDevice);
+    } else {
+      await autoConnectExisting();
     }
-  }, 4000);
+  }, delayMs);
 }
 
-document.getElementById('pairBtn').addEventListener('click', requestPairing);
+// Watchdog for stalled GATT channels
+setInterval(() => {
+  if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected && lastPacketTime > 0) {
+    if (Date.now() - lastPacketTime > 15000 && !isConnectingGatt) {
+      log('Watchdog: Telemetry stalled (>15s). Resetting GATT...', 'log-err');
+      try { bleDevice.gatt.disconnect(); } catch (e) {}
+      onDisconnected();
+    }
+  } else if (bleDevice && (!bleDevice.gatt || !bleDevice.gatt.connected) && !isConnectingGatt && !reconnectTimer) {
+    scheduleReconnect();
+  }
+}, 4000);
+
+const pairBtn = document.getElementById('pairBtn');
+if (pairBtn) pairBtn.addEventListener('click', requestPairing);
+
 window.addEventListener('load', () => {
   initWebSocket();
-  autoConnectExisting();
 });
