@@ -17,6 +17,8 @@ jobs:
   golangci:
     name: "GolangCI-Lint Execution"
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
 
