@@ -1,0 +1,130 @@
+name: "Slash Command /review Bot Trigger"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  slash-review:
+    name: "Execute /review Slash Command"
+    if: ${{ github.event.issue.pull_request && (contains(github.event.comment.body, '/review') || contains(github.event.comment.body, '/audit')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add 'eyes' Reaction to Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: Get PR Branch Details
+        id: pr_data
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('head_ref', pr.data.head.ref);
+            core.setOutput('head_sha', pr.data.head.sha);
+
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr_data.outputs.head_ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Security Vulnerability Scan (govulncheck)
+        id: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          if govulncheck ./... > govuln_output.txt 2>&1; then
+            echo "VULN_STATUS=PASSED" >> $GITHUB_ENV
+          else
+            echo "VULN_STATUS=WARNINGS_FOUND" >> $GITHUB_ENV
+          fi
+
+      - name: Go Security AST Scan (gosec)
+        id: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          if gosec -quiet -exclude=G104 ./... > gosec_output.txt 2>&1; then
+            echo "GOSEC_STATUS=PASSED" >> $GITHUB_ENV
+          else
+            echo "GOSEC_STATUS=WARNINGS_FOUND" >> $GITHUB_ENV
+          fi
+
+      - name: Format & Syntax Check (gofmt)
+        id: gofmt
+        run: |
+          FMT_OUT=$(gofmt -l .)
+          if [ -z "$FMT_OUT" ]; then
+            echo "FMT_STATUS=PASSED" >> $GITHUB_ENV
+          else
+            echo "FMT_STATUS=FORMATTING_REQUIRED" >> $GITHUB_ENV
+          fi
+
+      - name: Run Package Unit Tests
+        id: test
+        run: |
+          if go test -v ./... > test_output.txt 2>&1; then
+            echo "TEST_STATUS=PASSED" >> $GITHUB_ENV
+          else
+            echo "TEST_STATUS=FAILED" >> $GITHUB_ENV
+          fi
+
+      - name: Post Automated PR Bot Review Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const vulnStatus = process.env.VULN_STATUS || 'UNKNOWN';
+            const gosecStatus = process.env.GOSEC_STATUS || 'UNKNOWN';
+            const fmtStatus = process.env.FMT_STATUS || 'UNKNOWN';
+            const testStatus = process.env.TEST_STATUS || 'UNKNOWN';
+
+            const isClean = vulnStatus === 'PASSED' && gosecStatus === 'PASSED' && fmtStatus === 'PASSED' && testStatus === 'PASSED';
+
+            const commentBody = `### 🤖 On-Demand \`/review\` Audit Report
+
+            | Audit Domain | Status | Tool |
+            | :--- | :--- | :--- |
+            | **Vulnerability Check** | ${vulnStatus === 'PASSED' ? '✅ PASSED' : '⚠️ WARNINGS'} | \`govulncheck\` |
+            | **AST Security Analysis** | ${gosecStatus === 'PASSED' ? '✅ PASSED' : '⚠️ WARNINGS'} | \`gosec\` |
+            | **Formatting & Syntax** | ${fmtStatus === 'PASSED' ? '✅ PASSED' : '🎨 FORMATTING NEEDED'} | \`gofmt\` |
+            | **Unit Test Suite** | ${testStatus === 'PASSED' ? '✅ PASSED' : '❌ FAILED'} | \`go test\` |
+
+            ---
+
+            ${isClean ? '**Verdict:** 🟢 **READY FOR MERGE.** All automated quality, linter, and security checks passed cleanly.' : '**Verdict:** 🟡 **REVIEW NEEDED.** Please resolve flagged items before merging.'}
+
+            *Triggered on-demand via \`/review\` command by @${context.actor}.*`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            });
