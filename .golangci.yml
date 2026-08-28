@@ -19,10 +19,6 @@ linters-settings:
     confidence: "medium"
     excludes:
       - G104 # Defer closed response/file error checks
-  ineffassign: {}
-  staticcheck:
-    checks: ["all"]
-  unused: {}
   misspell:
     locale: US
 
