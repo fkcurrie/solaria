@@ -44,23 +44,23 @@ type AutoHealAction struct {
 
 // SREStatus captures overall system operational health
 type SREStatus struct {
-	LastAuditTime        time.Time        `json:"last_audit_time"`
-	OverallHealth        string           `json:"overall_health"` // "HEALTHY", "DEGRADED", "UNHEALTHY"
-	BridgeActive         bool             `json:"bridge_active"`
-	CloudServerActive    bool             `json:"cloud_server_active"`
-	CloudRunActive       bool             `json:"cloudrun_active"`
-	TelemetryStreaming   bool             `json:"telemetry_streaming"`
-	LastPacketAgeSec     int              `json:"last_packet_age_sec"`
-	CloudRunPacketAgeSec int              `json:"cloudrun_packet_age_sec"`
-	TotalIncidents       int              `json:"total_incidents"`
-	ActiveIncidents      int              `json:"active_incidents"`
-	RecentIncidents      []Incident       `json:"recent_incidents"`
-	RecentAutoHeals      []AutoHealAction `json:"recent_auto_heals"`
-	LiFePO4SafetyPass    bool             `json:"lifepo4_safety_pass"`
-	StringTopologyPass   bool             `json:"string_topology_pass"`
-	SpoolHealthPass      bool             `json:"spool_health_pass"`
-	SecurityAuditPass    bool             `json:"security_audit_pass"`
-	CloudRunFreshnessPass bool            `json:"cloudrun_freshness_pass"`
+	LastAuditTime         time.Time        `json:"last_audit_time"`
+	OverallHealth         string           `json:"overall_health"` // "HEALTHY", "DEGRADED", "UNHEALTHY"
+	BridgeActive          bool             `json:"bridge_active"`
+	CloudServerActive     bool             `json:"cloud_server_active"`
+	CloudRunActive        bool             `json:"cloudrun_active"`
+	TelemetryStreaming    bool             `json:"telemetry_streaming"`
+	LastPacketAgeSec      int              `json:"last_packet_age_sec"`
+	CloudRunPacketAgeSec  int              `json:"cloudrun_packet_age_sec"`
+	TotalIncidents        int              `json:"total_incidents"`
+	ActiveIncidents       int              `json:"active_incidents"`
+	RecentIncidents       []Incident       `json:"recent_incidents"`
+	RecentAutoHeals       []AutoHealAction `json:"recent_auto_heals"`
+	LiFePO4SafetyPass     bool             `json:"lifepo4_safety_pass"`
+	StringTopologyPass    bool             `json:"string_topology_pass"`
+	SpoolHealthPass       bool             `json:"spool_health_pass"`
+	SecurityAuditPass     bool             `json:"security_audit_pass"`
+	CloudRunFreshnessPass bool             `json:"cloudrun_freshness_pass"`
 }
 
 type SREAgent struct {
@@ -266,7 +266,7 @@ func (a *SREAgent) AutoHealCloudRunSync() {
 		return
 	}
 	log.Println("🛠️ [AUTO-HEAL] Cloud Run telemetry stream stale (>120s). Initiating emergency telemetry sync...")
-	
+
 	client := &http.Client{Timeout: 4 * time.Second}
 	req, _ := http.NewRequest(http.MethodGet, a.cloudURL+"/api/v1/live", nil)
 	resp, err := client.Do(req)
@@ -370,7 +370,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 			TotalBleFrames    int64  `json:"total_ble_frames"`
 			TotalUploads      int64  `json:"total_successful_uploads"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&bridgeStatus); err == nil {
+		if decErr := json.NewDecoder(resp.Body).Decode(&bridgeStatus); decErr == nil {
 			var freshestTime time.Time
 			if bridgeStatus.LastBlePacketTime != "" {
 				if t, parseErr := time.Parse(time.RFC3339, bridgeStatus.LastBlePacketTime); parseErr == nil {

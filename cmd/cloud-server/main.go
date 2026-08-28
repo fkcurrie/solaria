@@ -32,7 +32,6 @@ var (
 	BuildDate = "unknown"
 )
 
-
 // Diagnostic Logging Structs & Subsystems
 type LogEntry struct {
 	Timestamp string                 `json:"timestamp"`
@@ -716,13 +715,13 @@ func init() {
 	if err == nil {
 		bqClient = client
 		dataset := bqClient.Dataset("solaria")
-		if err := dataset.Create(ctx, &bigquery.DatasetMetadata{Location: "US"}); err != nil && !strings.Contains(err.Error(), "Already Exists") {
-			log.Printf("BigQuery dataset note: %v", err)
+		if dsErr := dataset.Create(ctx, &bigquery.DatasetMetadata{Location: "US"}); dsErr != nil && !strings.Contains(dsErr.Error(), "Already Exists") {
+			log.Printf("BigQuery dataset note: %v", dsErr)
 		}
 
 		bqTable = dataset.Table("telemetry")
-		schema, err := bigquery.InferSchema(BQRecord{})
-		if err == nil {
+		schema, sErr := bigquery.InferSchema(BQRecord{})
+		if sErr == nil {
 			tableMetadata := &bigquery.TableMetadata{
 				Schema: schema,
 				TimePartitioning: &bigquery.TimePartitioning{
@@ -1719,21 +1718,6 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func mathSinFactor(h int) float64 {
-	// Peak at solar noon (h=13)
-	val := float64(h-6) / 14.0 * 3.14159265
-	s := float64(0.0)
-	if val > 0 && val < 3.14159265 {
-		// Taylor expansion approximation for sin(x)
-		x := val
-		s = x - (x*x*x)/6.0 + (x*x*x*x*x)/120.0
-		if s < 0 {
-			s = 0
-		}
-	}
-	return s
-}
-
 func mathRound(val float64, decimals int) float64 {
 	pow := 1.0
 	for i := 0; i < decimals; i++ {
@@ -2555,7 +2539,7 @@ func handlePeakGenerationForecast(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		timeLabel := fmt.Sprintf("%02d:00", h)
+		var timeLabel string
 		if h == 0 {
 			timeLabel = "12 AM"
 		} else if h < 12 {
@@ -3125,13 +3109,13 @@ func handleE2EAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]interface{}{
-		"timestamp":       time.Now().UTC().Format(time.RFC3339),
-		"total_probes":    len(probes),
-		"passed_probes":   passCount,
-		"failed_probes":   len(probes) - passCount,
-		"pass_rate_pct":   (float64(passCount) / float64(len(probes))) * 100.0,
-		"overall_verdict": "ALL_SYSTEMS_OPERATIONAL",
-		"probes":          probes,
+		"timestamp":        time.Now().UTC().Format(time.RFC3339),
+		"total_probes":     len(probes),
+		"passed_probes":    passCount,
+		"failed_probes":    len(probes) - passCount,
+		"pass_rate_pct":    (float64(passCount) / float64(len(probes))) * 100.0,
+		"overall_verdict":  "ALL_SYSTEMS_OPERATIONAL",
+		"probes":           probes,
 		"machine_learning": mlSummary,
 		"system_health": map[string]interface{}{
 			"bridge_connected":    bridgeConnected,

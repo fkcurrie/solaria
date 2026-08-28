@@ -917,9 +917,9 @@ func TestHandleBatteryControllerDiagnostics(t *testing.T) {
 				OperatingDays:   45,
 			},
 			Weather: WeatherMetrics{
-				IsDay:                true,
-				DirectRadiationWM2:   450.0,
-				DiffuseRadiationWM2:  80.0,
+				IsDay:               true,
+				DirectRadiationWM2:  450.0,
+				DiffuseRadiationWM2: 80.0,
 			},
 			BLEConnected: true,
 			OutageStatus: "NOMINAL",

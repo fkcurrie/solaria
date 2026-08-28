@@ -125,7 +125,6 @@ func main() {
 			if sendBatch(client, *targetURL, *token, batch) {
 				totalSynced += len(batch)
 			}
-			batch = batch[:0]
 		}
 	}
 

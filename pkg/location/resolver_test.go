@@ -37,8 +37,8 @@ func TestQueryGPSD_Mock(t *testing.T) {
 	defer listener.Close()
 
 	go func() {
-		conn, err := listener.Accept()
-		if err != nil {
+		conn, cErr := listener.Accept()
+		if cErr != nil {
 			return
 		}
 		defer conn.Close()

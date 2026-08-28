@@ -135,7 +135,7 @@ func queryIPGeo() (SiteLocation, error) {
 				Lat         float64 `json:"lat"`
 				Lon         float64 `json:"lon"`
 			}
-			if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && res.Status == "success" {
+			if decErr := json.NewDecoder(resp.Body).Decode(&res); decErr == nil && res.Status == "success" {
 				siteName := fmt.Sprintf("%s, %s, %s", res.City, res.RegionName, res.CountryCode)
 				return SiteLocation{
 					Name:      siteName,

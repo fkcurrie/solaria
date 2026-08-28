@@ -207,13 +207,13 @@ func main() {
 		fmt.Printf("Error creating csv: %v\n", err)
 		return
 	}
-	defer csvFile.Close()
+	defer func() { _ = csvFile.Close() }()
 
 	w := csv.NewWriter(csvFile)
 	defer w.Flush()
 
 	// Header
-	w.Write([]string{
+	_ = w.Write([]string{
 		"timestamp", "pv_power_w", "pv_voltage_v", "pv_current_a",
 		"battery_soc_pct", "battery_voltage_v", "battery_current_a",
 		"controller_temp_c", "battery_temp_c", "load_power_w", "load_voltage_v", "load_current_a",
@@ -222,7 +222,7 @@ func main() {
 	})
 
 	for _, r := range records {
-		w.Write([]string{
+		_ = w.Write([]string{
 			r.Timestamp.Format(time.RFC3339),
 			fmt.Sprintf("%d", r.PVPowerW),
 			fmt.Sprintf("%.1f", r.PVVoltageV),

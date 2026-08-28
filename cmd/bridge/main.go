@@ -38,7 +38,6 @@ var (
 	BuildDate = "unknown"
 )
 
-
 // Diagnostic Logging Structs & Subsystems
 type LogEntry struct {
 	Timestamp string                 `json:"timestamp"`
@@ -139,11 +138,11 @@ func (b *DiagnosticLogBuffer) GetStats() map[string]interface{} {
 
 // Global Configuration & Defaults
 var (
-	httpPort        = 8080
-	wsPort          = 8765
-	siteLat         = 45.186
-	siteLon         = -78.863
-	siteName        = "1296 Wren Lake Drive, Dorset, ON"
+	httpPort              = 8080
+	wsPort                = 8765
+	siteLat               = 45.186
+	siteLon               = -78.863
+	siteName              = "1296 Wren Lake Drive, Dorset, ON"
 	arrayRatedWatts       = 400.0
 	cloudEndpoint         = "http://localhost:8081/api/v1/telemetry"
 	fallbackCloudEndpoint = "http://localhost:8081/api/v1/ingest"

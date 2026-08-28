@@ -135,7 +135,9 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		var h struct {
 			SpoolCount int `json:"spool_count"`
 		}
-		_ = json.NewDecoder(resp.Body).Decode(&h)
+		if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+			return "", err
+		}
 		if h.SpoolCount > 200 {
 			return "", fmt.Errorf("offline spool backlog elevated (%d records unsynced)", h.SpoolCount)
 		}
@@ -160,7 +162,9 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 			Status  string `json:"status"`
 			Service string `json:"service"`
 		}
-		_ = json.NewDecoder(resp.Body).Decode(&h)
+		if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+			return "", err
+		}
 		return fmt.Sprintf("Service: %s, Status: %s", h.Service, h.Status), nil
 	}))
 
@@ -187,12 +191,12 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 			BLEConnected bool   `json:"ble_connected"`
 			OutageStatus string `json:"outage_status"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&rec); err != nil {
-			return "", err
+		if decErr := json.NewDecoder(resp.Body).Decode(&rec); decErr != nil {
+			return "", decErr
 		}
-		t, err := time.Parse(time.RFC3339, rec.Timestamp)
+		t, parseErr := time.Parse(time.RFC3339, rec.Timestamp)
 		latency := time.Since(t)
-		if err == nil && latency > 120*time.Second {
+		if parseErr == nil && latency > 120*time.Second {
 			return "", fmt.Errorf("telemetry timestamp is stale (latency: %v, timestamp: %s)", latency.Round(time.Second), rec.Timestamp)
 		}
 		return fmt.Sprintf("Site: %s, PV: %dW (%.1fV), Batt: %.1fV (%d%% SOC), State: %s, Stream Lag: %v",
@@ -224,8 +228,8 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 				BatteryVoltageV float64 `json:"battery_voltage_v"`
 			} `json:"telemetry"`
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&rec); err != nil {
-			return "", fmt.Errorf("failed to decode Cloud Run live payload: %v", err)
+		if decErr := json.NewDecoder(resp.Body).Decode(&rec); decErr != nil {
+			return "", fmt.Errorf("failed to decode Cloud Run live payload: %v", decErr)
 		}
 		t, err := time.Parse(time.RFC3339, rec.Timestamp)
 		if err != nil {
@@ -269,13 +273,13 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
 		var fc struct {
-			TodayPeakHour       string                 `json:"today_peak_hour"`
-			TodayPeakWatts      int                    `json:"today_peak_watts"`
-			TodayClearSkyKWh    float64                `json:"today_clear_sky_kwh"`
-			LearnedModel        map[string]interface{} `json:"learned_model"`
-			HourlyCurve         []interface{}          `json:"hourly_curve"`
-			MonthlyForecast     []interface{}          `json:"monthly_forecast"`
-			SolsticeAnalysis    map[string]interface{} `json:"solstice_analysis"`
+			TodayPeakHour    string                 `json:"today_peak_hour"`
+			TodayPeakWatts   int                    `json:"today_peak_watts"`
+			TodayClearSkyKWh float64                `json:"today_clear_sky_kwh"`
+			LearnedModel     map[string]interface{} `json:"learned_model"`
+			HourlyCurve      []interface{}          `json:"hourly_curve"`
+			MonthlyForecast  []interface{}          `json:"monthly_forecast"`
+			SolsticeAnalysis map[string]interface{} `json:"solstice_analysis"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&fc); err != nil {
 			return "", err
@@ -488,8 +492,8 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
 		var m struct {
-			Name      string `json:"name"`
-			ShortName string `json:"short_name"`
+			Name       string `json:"name"`
+			ShortName  string `json:"short_name"`
 			ThemeColor string `json:"theme_color"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
