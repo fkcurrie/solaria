@@ -39,10 +39,10 @@ jobs:
       # ------------------------------------------------------------------------
       # Gate 1: Code Linting & Static Security Analysis
       # ------------------------------------------------------------------------
-      - name: "Gate 1: Code Linting (golangci-lint)"
+      - name: Gate 1: Code Linting (golangci-lint)
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.60.3
+          version: latest
           args: --timeout=5m
 
       # ------------------------------------------------------------------------
