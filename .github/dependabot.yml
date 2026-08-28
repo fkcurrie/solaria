@@ -1,20 +1,31 @@
 version: 2
 updates:
-  # Maintain dependencies for Go
+  # Maintain Go dependencies in go.mod
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
     open-pull-requests-limit: 10
     labels:
-      - "security"
       - "dependencies"
+      - "security"
+      - "automated pr"
+    commit-message:
+      prefix: "chore(deps):"
 
-  # Maintain GitHub Actions dependencies
+  # Maintain GitHub Actions workflow dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    open-pull-requests-limit: 5
     labels:
-      - "ci"
+      - "actions"
       - "dependencies"
+      - "automated pr"
+    commit-message:
+      prefix: "chore(ci):"

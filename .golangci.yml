@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gofmt:
+    simplify: true
+  gosec:
+    severity: "medium"
+    confidence: "medium"
+    excludes:
+      - G104 # Defer closed response/file error checks
+  ineffassign: {}
+  staticcheck:
+    checks: ["all"]
+  unused: {}
+  misspell:
+    locale: US
+
+linters:
+  enable:
+    - errcheck
+    - gofmt
+    - gosec
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - bodyclose
+    - copyloopvar
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
