@@ -127,6 +127,7 @@ jobs:
             GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-bridge" ./cmd/bridge
             GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-edge" ./cmd/edge-agent
             GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-cloud" ./cmd/cloud-server
+            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-sre-agent" ./cmd/sre-agent
             GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-e2e-audit" ./cmd/e2e-audit
 
             cp systemd/*.service "${BUNDLE_DIR}/systemd/"

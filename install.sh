@@ -267,6 +267,10 @@ if [ "$DRY_RUN" = false ]; then
             if [ -f "bin/solaria-bridge" ] && [ -f "bin/solaria-edge" ] && [ -f "bin/solaria-cloud" ]; then
                 echo -e "  ${GREEN}[OK] Successfully installed pre-compiled release ${LATEST_TAG}.${NC}"
                 FETCHED_RELEASE=true
+                if [ ! -f "bin/solaria-sre-agent" ] && command -v go &>/dev/null; then
+                    echo -e "  Building missing bin/solaria-sre-agent from source..."
+                    go build -ldflags="-s -w" -o bin/solaria-sre-agent ./cmd/sre-agent
+                fi
             fi
         fi
     fi
