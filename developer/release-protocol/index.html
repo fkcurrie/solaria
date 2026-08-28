@@ -12,13 +12,9 @@
         <meta name="author" content="Frank Currie">
       
       
-        <link rel="canonical" href="https://fkcurrie.github.io/solaria/developer/ci-workflows/">
+        <link rel="canonical" href="https://fkcurrie.github.io/solaria/developer/release-protocol/">
       
       
-        <link rel="prev" href="../../operations/troubleshooting/">
-      
-      
-        <link rel="next" href="../testing/">
       
       
         
@@ -29,7 +25,7 @@
     
     
       
-        <title>Multi-Arch CI Matrix & QEMU - Solaria</title>
+        <title>Solaria Enterprise Release Protocol Specification - Solaria</title>
       
     
     
@@ -80,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#solaria-automated-cicd-pipelines-release-workflows" class="md-skip">
+        <a href="#solaria-enterprise-release-protocol-specification" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Multi-Arch CI Matrix & QEMU
+              Solaria Enterprise Release Protocol Specification
             
           </span>
         </div>
@@ -350,13 +346,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../ci-workflows/" class="md-tabs__link">
           
   
   
@@ -1427,31 +1421,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
             
   
   
@@ -1469,7 +1460,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1484,37 +1475,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Multi-Arch CI Matrix & QEMU
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../ci-workflows/" class="md-nav__link">
         
   
   
@@ -1530,109 +1494,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#github-actions-workflows-summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🛠️ GitHub Actions Workflows Summary
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="🛠️ GitHub Actions Workflows Summary">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-multi-arch-binary-compilation-githubworkflowsciyml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Multi-Arch Binary Compilation (.github/workflows/ci.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-multi-distro-qemu-matrix-31-probe-e2e-audit-githubworkflowsbootstrap-ciyml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Multi-Distro QEMU Matrix &amp; 31-Probe E2E Audit (.github/workflows/bootstrap-ci.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-golangci-lint-quality-standards-check-githubworkflowsgolangci-lintyml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. GolangCI-Lint Quality &amp; Standards Check (.github/workflows/golangci-lint.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-pr-bot-security-reviewer-slash-command-trigger-githubworkflowspr-bot-revieweryml-githubworkflowsslash-command-revieweryml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. PR Bot Security Reviewer &amp; Slash Command Trigger (.github/workflows/pr-bot-reviewer.yml &amp; .github/workflows/slash-command-reviewer.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-dependabot-automated-dependency-security-githubdependabotyml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Dependabot Automated Dependency Security (.github/dependabot.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-production-6-gate-release-engine-githubworkflowsreleaseyml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Production 6-Gate Release Engine (.github/workflows/release.yml)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1728,22 +1589,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#github-actions-workflows-summary" class="md-nav__link">
+  <a href="#1-versioning-scheme" class="md-nav__link">
     <span class="md-ellipsis">
       
-        🛠️ GitHub Actions Workflows Summary
+        1. Versioning Scheme
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="🛠️ GitHub Actions Workflows Summary">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-six-release-quality-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Six Release Quality Gates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Six Release Quality Gates">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-multi-arch-binary-compilation-githubworkflowsciyml" class="md-nav__link">
+  <a href="#gate-1-code-linting-static-security-analysis" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Multi-Arch Binary Compilation (.github/workflows/ci.yml)
+        Gate 1: Code Linting &amp; Static Security Analysis
       
     </span>
   </a>
@@ -1751,10 +1623,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-multi-distro-qemu-matrix-31-probe-e2e-audit-githubworkflowsbootstrap-ciyml" class="md-nav__link">
+  <a href="#gate-2-package-unit-test-suite" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Multi-Distro QEMU Matrix &amp; 31-Probe E2E Audit (.github/workflows/bootstrap-ci.yml)
+        Gate 2: Package Unit Test Suite
       
     </span>
   </a>
@@ -1762,10 +1634,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-golangci-lint-quality-standards-check-githubworkflowsgolangci-lintyml" class="md-nav__link">
+  <a href="#gate-3-31-probe-e2e-system-audit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. GolangCI-Lint Quality &amp; Standards Check (.github/workflows/golangci-lint.yml)
+        Gate 3: 31-Probe E2E System Audit
       
     </span>
   </a>
@@ -1773,10 +1645,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-pr-bot-security-reviewer-slash-command-trigger-githubworkflowspr-bot-revieweryml-githubworkflowsslash-command-revieweryml" class="md-nav__link">
+  <a href="#gate-4-security-vulnerability-scan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. PR Bot Security Reviewer &amp; Slash Command Trigger (.github/workflows/pr-bot-reviewer.yml &amp; .github/workflows/slash-command-reviewer.yml)
+        Gate 4: Security Vulnerability Scan
       
     </span>
   </a>
@@ -1784,10 +1656,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-dependabot-automated-dependency-security-githubdependabotyml" class="md-nav__link">
+  <a href="#gate-5-documentation-parity-alignment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Dependabot Automated Dependency Security (.github/dependabot.yml)
+        Gate 5: Documentation Parity &amp; Alignment
       
     </span>
   </a>
@@ -1795,10 +1667,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-production-6-gate-release-engine-githubworkflowsreleaseyml" class="md-nav__link">
+  <a href="#gate-6-multi-architecture-packaging-checksum-verification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Production 6-Gate Release Engine (.github/workflows/release.yml)
+        Gate 6: Multi-Architecture Packaging &amp; Checksum Verification
       
     </span>
   </a>
@@ -1807,6 +1679,28 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-release-asset-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Release Asset Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-github-release-workflow-human-sign-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. GitHub Release Workflow &amp; Human Sign-Off
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1830,33 +1724,83 @@
   
 
 
-<h1 id="solaria-automated-cicd-pipelines-release-workflows">Solaria Automated CI/CD Pipelines &amp; Release Workflows<a class="headerlink" href="#solaria-automated-cicd-pipelines-release-workflows" title="Permanent link">&para;</a></h1>
-<p>Solaria uses GitHub Actions to enforce rigorous multi-architecture compilation, static analysis linting, security scanning, 31-probe E2E auditing, and automated release packaging.</p>
+<h1 id="solaria-enterprise-release-protocol-specification">Solaria Enterprise Release Protocol Specification<a class="headerlink" href="#solaria-enterprise-release-protocol-specification" title="Permanent link">&para;</a></h1>
+<p>This document defines the official, gate-driven release protocol for Solaria. Every production and pre-release tag MUST pass all six release quality gates before distribution artifacts are published.</p>
 <hr />
-<h2 id="github-actions-workflows-summary">🛠️ GitHub Actions Workflows Summary<a class="headerlink" href="#github-actions-workflows-summary" title="Permanent link">&para;</a></h2>
-<h3 id="1-multi-arch-binary-compilation-githubworkflowsciyml">1. Multi-Arch Binary Compilation (<code>.github/workflows/ci.yml</code>)<a class="headerlink" href="#1-multi-arch-binary-compilation-githubworkflowsciyml" title="Permanent link">&para;</a></h3>
-<p>Builds Go binaries across supported host architectures on every commit:
-- <code>linux/amd64</code> (Standard x86_64 servers &amp; Cloud Run)
-- <code>linux/arm64</code> (Raspberry Pi &frac34;/5, Apple Silicon)
-- <code>linux/arm/v7</code> (Raspberry Pi 2, Zero 2W)
-- <code>darwin/arm64</code> (macOS Apple Silicon)
-- <code>darwin/amd64</code> (macOS Intel)</p>
-<h3 id="2-multi-distro-qemu-matrix-31-probe-e2e-audit-githubworkflowsbootstrap-ciyml">2. Multi-Distro QEMU Matrix &amp; 31-Probe E2E Audit (<code>.github/workflows/bootstrap-ci.yml</code>)<a class="headerlink" href="#2-multi-distro-qemu-matrix-31-probe-e2e-audit-githubworkflowsbootstrap-ciyml" title="Permanent link">&para;</a></h3>
-<p>Tests the <code>setup.sh</code> installer inside real Docker containers and executes <code>bin/solaria-e2e-audit</code> across 31 subsystem probes:
-- <code>debian:bookworm-slim</code> (ARM64 via QEMU)
-- <code>debian:bookworm-slim</code> (x86_64)
-- <code>ubuntu:24.04</code> (x86_64)</p>
-<h3 id="3-golangci-lint-quality-standards-check-githubworkflowsgolangci-lintyml">3. GolangCI-Lint Quality &amp; Standards Check (<code>.github/workflows/golangci-lint.yml</code>)<a class="headerlink" href="#3-golangci-lint-quality-standards-check-githubworkflowsgolangci-lintyml" title="Permanent link">&para;</a></h3>
-<p>Executes 10 Go linters (<code>errcheck</code>, <code>gofmt</code>, <code>gosec</code>, <code>govet</code>, <code>ineffassign</code>, <code>staticcheck</code>, <code>unused</code>, <code>misspell</code>, <code>bodyclose</code>, <code>copyloopvar</code>) configured in <code>.golangci.yml</code> on every push and PR.</p>
-<h3 id="4-pr-bot-security-reviewer-slash-command-trigger-githubworkflowspr-bot-revieweryml-githubworkflowsslash-command-revieweryml">4. PR Bot Security Reviewer &amp; Slash Command Trigger (<code>.github/workflows/pr-bot-reviewer.yml</code> &amp; <code>.github/workflows/slash-command-reviewer.yml</code>)<a class="headerlink" href="#4-pr-bot-security-reviewer-slash-command-trigger-githubworkflowspr-bot-revieweryml-githubworkflowsslash-command-revieweryml" title="Permanent link">&para;</a></h3>
+<h2 id="1-versioning-scheme">1. Versioning Scheme<a class="headerlink" href="#1-versioning-scheme" title="Permanent link">&para;</a></h2>
+<p>Solaria follows Semantic Versioning (SemVer 2.0.0):</p>
 <ul>
-<li>Runs <code>govulncheck</code>, <code>gosec</code>, <code>gofmt</code>, and <code>go test</code> on every Pull Request, posting interactive review scorecards and applying quality labels.</li>
-<li>Responds on-demand when contributors comment <code>/review</code> or <code>/audit</code> on a Pull Request.</li>
+<li><strong>Major Versions (<code>vX.0.0</code>):</strong> Breaking API contract changes or fundamental architectural shifts.</li>
+<li><strong>Minor Versions (<code>v0.Y.0</code> / <code>v1.Y.0</code>):</strong> New backwards-compatible features, protocol engines, or major subsystem additions.</li>
+<li><strong>Patch Versions (<code>v0.Y.Z</code>):</strong> Backwards-compatible bug fixes, security patches, or documentation updates.</li>
+<li><strong>Pre-Releases (<code>vX.Y.Z-alpha.N</code> / <code>vX.Y.Z-beta.N</code>):</strong> Feature-complete release candidates for staging and testing.</li>
 </ul>
-<h3 id="5-dependabot-automated-dependency-security-githubdependabotyml">5. Dependabot Automated Dependency Security (<code>.github/dependabot.yml</code>)<a class="headerlink" href="#5-dependabot-automated-dependency-security-githubdependabotyml" title="Permanent link">&para;</a></h3>
-<p>Performs weekly automated vulnerability scans and opens update PRs for Go modules (<code>go.mod</code>) and GitHub Actions workflows.</p>
-<h3 id="6-production-6-gate-release-engine-githubworkflowsreleaseyml">6. Production 6-Gate Release Engine (<code>.github/workflows/release.yml</code>)<a class="headerlink" href="#6-production-6-gate-release-engine-githubworkflowsreleaseyml" title="Permanent link">&para;</a></h3>
-<p>Enforces the 6 release quality gates whenever a version tag (<code>v*</code>) is pushed, producing <code>.tar.gz</code> and <code>.zip</code> bundles (<code>amd64</code>, <code>arm64</code>, <code>armv7</code>), <code>SHA256SUMS</code> manifests, and generating a GitHub Draft Release.</p>
+<hr />
+<h2 id="2-the-six-release-quality-gates">2. The Six Release Quality Gates<a class="headerlink" href="#2-the-six-release-quality-gates" title="Permanent link">&para;</a></h2>
+<p>Before any release tag (<code>v*</code>) is created, the code MUST pass the following six automated release quality gates:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[Tag Pushed] --&gt; [Gate 1: Code Linting]
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>             --&gt; [Gate 2: Unit Test Suite]
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>             --&gt; [Gate 3: 31-Probe E2E System Audit]
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>             --&gt; [Gate 4: Vulnerability Database Scan]
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>             --&gt; [Gate 5: Documentation Parity]
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>             --&gt; [Gate 6: Multi-Arch Packaging] --&gt; [GitHub Draft Release]
+</span></code></pre></div>
+<h3 id="gate-1-code-linting-static-security-analysis">Gate 1: Code Linting &amp; Static Security Analysis<a class="headerlink" href="#gate-1-code-linting-static-security-analysis" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tool: <code>golangci-lint run ./...</code></li>
+<li>Criteria: Zero unhandled errors, zero formatting violations, and zero security warnings.</li>
+</ul>
+<h3 id="gate-2-package-unit-test-suite">Gate 2: Package Unit Test Suite<a class="headerlink" href="#gate-2-package-unit-test-suite" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tool: <code>go test -v ./...</code></li>
+<li>Criteria: 100% test pass rate across all packages (<code>cmd/bridge</code>, <code>cmd/edge-agent</code>, <code>cmd/cloud-server</code>, <code>cmd/sre-agent</code>, <code>pkg/location</code>).</li>
+</ul>
+<h3 id="gate-3-31-probe-e2e-system-audit">Gate 3: 31-Probe E2E System Audit<a class="headerlink" href="#gate-3-31-probe-e2e-system-audit" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tool: <code>bin/solaria-e2e-audit</code></li>
+<li>Criteria: 31 out of 31 E2E probes pass against live background test daemons.</li>
+</ul>
+<h3 id="gate-4-security-vulnerability-scan">Gate 4: Security Vulnerability Scan<a class="headerlink" href="#gate-4-security-vulnerability-scan" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tool: <code>govulncheck ./...</code></li>
+<li>Criteria: Zero known CVE vulnerabilities in Go standard library or imported dependencies.</li>
+</ul>
+<h3 id="gate-5-documentation-parity-alignment">Gate 5: Documentation Parity &amp; Alignment<a class="headerlink" href="#gate-5-documentation-parity-alignment" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tool: Internal docs audit and markdown verification.</li>
+<li>Criteria: All installation flags, environment variables, and architecture diagrams match current codebase logic.</li>
+</ul>
+<h3 id="gate-6-multi-architecture-packaging-checksum-verification">Gate 6: Multi-Architecture Packaging &amp; Checksum Verification<a class="headerlink" href="#gate-6-multi-architecture-packaging-checksum-verification" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Targets: <code>linux/amd64</code>, <code>linux/arm64</code>, <code>linux/arm</code> (v7).</li>
+<li>Deliverables: <code>.tar.gz</code> and <code>.zip</code> archives per architecture containing binaries, systemd service units, setup scripts, and <code>.env.example</code>.</li>
+<li>Manifest: Master <code>SHA256SUMS</code> file generated and verified.</li>
+</ul>
+<hr />
+<h2 id="3-release-asset-structure">3. Release Asset Structure<a class="headerlink" href="#3-release-asset-structure" title="Permanent link">&para;</a></h2>
+<p>Standard directory layout inside every release archive (<code>solaria_vX.Y.Z_linux_ARCH.tar.gz</code> and <code>.zip</code>):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>solaria_vX.Y.Z_linux_ARCH/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├── bin/
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│   ├── solaria-bridge
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│   ├── solaria-edge
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│   ├── solaria-cloud
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│   └── solaria-e2e-audit
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├── systemd/
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│   ├── solaria-bridge.service
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│   ├── solaria-edge.service
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│   └── solaria-cloud.service
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>├── .env.example
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>├── install.sh
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>└── setup.sh
+</span></code></pre></div>
+<hr />
+<h2 id="4-github-release-workflow-human-sign-off">4. GitHub Release Workflow &amp; Human Sign-Off<a class="headerlink" href="#4-github-release-workflow-human-sign-off" title="Permanent link">&para;</a></h2>
+<ol>
+<li>The automated 6-Gate Release Gatekeeper workflow (<code>.github/workflows/release.yml</code>) executes when a version tag (<code>v*</code>) is pushed.</li>
+<li>Upon passing all six gates, the workflow attaches all compiled <code>.tar.gz</code>, <code>.zip</code>, and <code>SHA256SUMS</code> files to a <strong>GitHub Draft Release</strong>.</li>
+<li>The release notes are populated automatically from <code>RELEASE_NOTES/vX.Y.Z.md</code>.</li>
+<li>Release manager inspects the Draft Release and clicks <strong>Publish Release</strong>.</li>
+</ol>
 
 
 
@@ -1889,44 +1833,6 @@
       
         <footer class="md-footer">
   
-    
-      
-      <nav class="md-footer__inner md-grid" aria-label="Footer" >
-        
-          
-          <a href="../../operations/troubleshooting/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Troubleshooting &amp; Log Streaming">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-            </div>
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              <div class="md-ellipsis">
-                Troubleshooting & Log Streaming
-              </div>
-            </div>
-          </a>
-        
-        
-          
-          <a href="../testing/" class="md-footer__link md-footer__link--next" aria-label="Next: End-to-End Test Suite &amp; E2E Audit">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              <div class="md-ellipsis">
-                End-to-End Test Suite & E2E Audit
-              </div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
-            </div>
-          </a>
-        
-      </nav>
     
   
   <div class="md-footer-meta md-typeset">
