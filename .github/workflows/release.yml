@@ -15,8 +15,6 @@ jobs:
   release-gatekeeper:
     name: "Automated 6-Gate Release Protocol & Asset Bundler"
     runs-on: ubuntu-latest
-    env:
-      GOTOOLCHAIN: local
 
     steps:
       - name: Checkout Code
@@ -27,7 +25,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'go.mod'
+          go-version: '1.25'
+          cache: false
 
       - name: Extract Release Variables
         id: vars
@@ -46,11 +45,9 @@ jobs:
         run: go mod download
 
       - name: "Gate 1: Code Linting (golangci-lint)"
-        env:
-          GOTOOLCHAIN: local
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
-          $(go env GOPATH)/bin/golangci-lint run -v --timeout=5m ./...
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run -v --timeout=5m ./...
 
       # ------------------------------------------------------------------------
       # Gate 2: Package Unit Test Suite
