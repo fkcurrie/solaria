@@ -93,9 +93,12 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 ## System Overview
 
 * **Modbus RTU Engine (`cmd/bridge`):** Go-based BLE packet reassembly, CRC16 validation, and WebSocket gateway.
-* **Atmospheric Correlation:** Enriches telemetry with solar radiometry (GHI, DHI, DNI, cloud cover) from Open-Meteo to compute real-time Performance Ratio (PR).
+* **Atmospheric Correlation & Shading Analyzer:** Enriches telemetry with solar radiometry (GHI, DHI, DNI, cloud cover) from Open-Meteo, computes real-time Performance Ratio (PR), and runs the built-in Tree Shading Diagnostic Analyzer to quantify harvest energy lost to canopy occlusion.
+* **Celestial Sun Trajectory Engine:** Real-time SVG celestial dome mapping solar elevation, azimuth, and panel normal angles ($45.186^\circ\text{N}, -78.863^\circ\text{W}$).
+* **Autonomous SRE Supervisor (`cmd/sre-agent`):** Continuous health auditing, auto-healing restarts, and 3-tier Bluetooth radio recovery.
 * **Connection Resilience:** Background watchdog with automatic BlueZ power cycling, Web Bluetooth WakeLock, and continuous outage logging.
 * **Storage Options:** Configurable local CSV/spool storage and buffered streaming inserts into date-partitioned BigQuery tables.
+* **Renogy BLE Hardware Emulator (`renogy-bt-emulator`):** Standalone pure Go BLE GATT server with 23,800+ real-world telemetry replay fixtures for offline testing.
 
 ---
 
@@ -103,13 +106,14 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 
 * [System Architecture](docs/architecture.md) — BLE GATT services, data pipeline, and Modbus frame format.
 * [Solar Hardware Specifications](docs/solar-specifications.md) — 400W 2S2P electrical wiring, Rover 20A MPPT limits, and battery profiles.
-* [Atmospheric Formulas & PR](docs/atmospheric-physics.md) — Irradiance math, Performance Ratio formulas, and classification states.
+* [Atmospheric Formulas & Tree Shading](docs/physics/tree-shading.md) — Irradiance math, shading occlusion formulas, and canopy analysis.
 * [BigQuery Telemetry Schema](docs/bigquery-schema.md) — 34-column schema reference and analytical SQL queries.
 * [Deployment Guide](docs/deployment.md) — Local edge setup, storage configuration, and Cloud Run deployment.
 * [Resilience & Troubleshooting](docs/troubleshooting-resilience.md) — Watchdog mechanics, outage tracking, and recovery procedures.
 * [Core Soul & Multi-Persona Governance](docs/SOUL.md) — Architectural invariants and multi-persona review system.
 * [Google Principal UX Review & 15 Issues](docs/ux-redesign/README.md) — [EPIC-002](docs/ux-redesign/EPIC-002-Google-Principal-UX-Review-and-Design-Systems.md) and 15 design issues.
-* [Renogy BT-1 / BT-2 BLE Emulator](renogy-bt-emulator/README.md) — Standalone pure Go physical BLE hardware emulator ([EPIC-001](renogy-bt-emulator/EPIC-001-Renogy-BT1-BT2-Hardware-Emulator.md)).
+* [Renogy BT-1 / BT-2 BLE Emulator](renogy-bt-emulator/README.md) — Standalone pure Go physical BLE hardware emulator ([EPIC-001](renogy-bt-emulator/EPIC-001-Renogy-BT1-BT2-Hardware-Emulator.md)) and [Telemetry Fixtures](renogy-bt-emulator/fixtures/telemetry/README.md).
+
 
 ---
 

@@ -23,9 +23,26 @@ This standalone project provides a physical/virtual Bluetooth Low Energy (BLE) p
 
 ---
 
+## 📁 Real Hardware Telemetry Fixtures & Ground-Truth Replay
+
+Authentic multi-day telemetry captured from Project Solaria's off-grid hardware is available in [**`fixtures/telemetry/`**](./fixtures/telemetry/):
+
+- **23,825+ 10-Second Telemetry Samples** across 4 consecutive days (August 23–26).
+- **Full Diurnal Cycle Trace**: [`solar_telemetry_2026-08-24.csv`](./fixtures/telemetry/solar_telemetry_2026-08-24.csv) (13,262 records covering dawn wake-up, MPPT Bulk/Absorption/Float, and night drain).
+- **Tree Shading & Anomaly Traces**: Midday canopy occlusion notches ([Aug 25](./fixtures/telemetry/solar_telemetry_2026-08-25.csv)) and transient 2S2P diode drop anomalies ([Aug 26](./fixtures/telemetry/solar_telemetry_2026-08-26.csv)).
+- **Replay Manifest & Register Mapping**: See [`manifest.json`](./fixtures/telemetry/manifest.json) and [`fixtures/telemetry/README.md`](./fixtures/telemetry/README.md) for full Modbus register mappings (`0x0100`–`0x0122`).
+
+```bash
+# Replay authentic hardware telemetry at 10x speed
+./bin/renogy-bt-emulator -mode=replay -trace=fixtures/telemetry/solar_telemetry_2026-08-24.csv -speed=10x
+```
+
+---
+
 ## 📚 Renogy Protocol & Hardware References
 
 - **Renogy Rover Modbus Protocol Specification**: RS-232 / RS-485 RJ12 Modbus RTU specification covering register banks `0x000A` through `0x0122`.
 - **Renogy BT-1 Bluetooth Module Manual**: Specifications for 2.4 GHz BLE GATT communication over Service `0xFFD0` (Rx/Tx) and `0xFFF0` (Notifications).
 - **Renogy BT-2 Bluetooth Module Manual**: Multi-device RS-485 communication protocol for smart lithium batteries and parallel Rover MPPT controllers.
 - **Renogy 12V 170Ah Smart LiFePO4 Battery Manual (`RBT170LFP12-BT`)**: BMS registers, cell voltage balance, low-temperature charge cutoffs (0°C / 32°F).
+
