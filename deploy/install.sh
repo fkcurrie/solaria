@@ -205,12 +205,29 @@ PORT="8080"
 EOF
 chmod 0600 "$CONFIG_DIR/solaria.env"
 
-# Copy pre-compiled binaries if installing from repo directory
+# Ensure binaries exist: build or fetch if missing
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mkdir -p "$INSTALL_DIR/bin"
+mkdir -p "$CURRENT_DIR/bin"
+
+if [[ ! -f "$CURRENT_DIR/bin/solaria-bridge" ]]; then
+    for GOPATH_CANDIDATE in "/usr/local/go/bin" "${HOME}/.local/go/bin" "${HOME}/go/bin" "/usr/lib/go/bin" "/home/fcurrie/.local/go/bin"; do
+        if [ -d "$GOPATH_CANDIDATE" ] && [[ ":$PATH:" != *":$GOPATH_CANDIDATE:"* ]]; then
+            export PATH="$GOPATH_CANDIDATE:$PATH"
+        fi
+    done
+    if command -v go &>/dev/null && [ -d "$CURRENT_DIR/cmd/bridge" ]; then
+        echo -e "  Compiling binaries from source..."
+        (cd "$CURRENT_DIR" && go build -ldflags="-s -w" -o bin/solaria-bridge ./cmd/bridge)
+        (cd "$CURRENT_DIR" && go build -ldflags="-s -w" -o bin/solaria-edge ./cmd/edge-agent)
+        (cd "$CURRENT_DIR" && go build -ldflags="-s -w" -o bin/solaria-cloud ./cmd/cloud-server)
+        (cd "$CURRENT_DIR" && go build -ldflags="-s -w" -o bin/solaria-sre-agent ./cmd/sre-agent)
+        (cd "$CURRENT_DIR" && go build -ldflags="-s -w" -o bin/solaria-e2e-audit ./cmd/e2e-audit 2>/dev/null || true)
+    fi
+fi
+
 if [[ -f "$CURRENT_DIR/bin/solaria-bridge" ]]; then
-    cp "$CURRENT_DIR/bin/solaria-bridge" "$INSTALL_DIR/bin/"
-    cp "$CURRENT_DIR/bin/solaria-sre-agent" "$INSTALL_DIR/bin/"
-    cp "$CURRENT_DIR/bin/solaria-e2e-audit" "$INSTALL_DIR/bin/"
+    cp "$CURRENT_DIR/bin/"* "$INSTALL_DIR/bin/" 2>/dev/null || true
     chmod +x "$INSTALL_DIR/bin/"*
 fi
 
@@ -280,6 +297,7 @@ EOF
 
 systemctl daemon-reload >/dev/null 2>&1 || true
 systemctl enable solaria-bridge.service solaria-sre.service >/dev/null 2>&1 || true
+systemctl restart solaria-bridge.service solaria-sre.service >/dev/null 2>&1 || true
 
 PRIMARY_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
 

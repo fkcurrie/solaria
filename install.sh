@@ -254,27 +254,38 @@ if [ "$DRY_RUN" = false ]; then
     mkdir -p bin
     FETCHED_RELEASE=false
 
-    # Attempt fetching pre-compiled release binary tarball from GitHub Releases
-    LATEST_TAG=$(curl -fsSL https://api.github.com/repos/fkcurrie/solaria/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || true)
-    if [ -n "$LATEST_TAG" ]; then
-        RELEASE_ARCH="amd64"
-        case "$GO_ARCH" in
-            amd64)         RELEASE_ARCH="amd64" ;;
-            arm64)         RELEASE_ARCH="arm64" ;;
-            armv6l|armv7l) RELEASE_ARCH="arm" ;;
-            *)             RELEASE_ARCH="amd64" ;;
-        esac
-        TARBALL_URL="https://github.com/fkcurrie/solaria/releases/download/${LATEST_TAG}/solaria_${LATEST_TAG}_linux_${RELEASE_ARCH}.tar.gz"
-        echo -e "  Attempting to fetch pre-compiled release ${LATEST_TAG} (${RELEASE_ARCH})..."
-        if curl -fsSL "$TARBALL_URL" -o /tmp/solaria_release.tar.gz 2>/dev/null; then
-            tar -xzf /tmp/solaria_release.tar.gz -C bin/
-            rm -f /tmp/solaria_release.tar.gz
-            if [ -f "bin/solaria-bridge" ] && [ -f "bin/solaria-edge" ] && [ -f "bin/solaria-cloud" ]; then
-                echo -e "  ${GREEN}[OK] Successfully installed pre-compiled release ${LATEST_TAG}.${NC}"
-                FETCHED_RELEASE=true
-                if [ ! -f "bin/solaria-sre-agent" ] && command -v go &>/dev/null; then
-                    echo -e "  Building missing bin/solaria-sre-agent from source..."
-                    go build -ldflags="-s -w" -o bin/solaria-sre-agent ./cmd/sre-agent
+    # Prefer building from source if running inside repo with Go toolchain
+    if [ -d "cmd/bridge" ] && command -v go &>/dev/null; then
+        echo -e "  Building binaries directly from local source repository..."
+        echo -e "  Building bin/solaria-bridge..."
+        go build -ldflags="-s -w" -o bin/solaria-bridge ./cmd/bridge
+        echo -e "  Building bin/solaria-edge..."
+        go build -ldflags="-s -w" -o bin/solaria-edge ./cmd/edge-agent
+        echo -e "  Building bin/solaria-cloud..."
+        go build -ldflags="-s -w" -o bin/solaria-cloud ./cmd/cloud-server
+        echo -e "  Building bin/solaria-sre-agent..."
+        go build -ldflags="-s -w" -o bin/solaria-sre-agent ./cmd/sre-agent
+        echo -e "  ${GREEN}[OK] All binaries compiled successfully from source.${NC}"
+        FETCHED_RELEASE=true
+    else
+        # Attempt fetching pre-compiled release binary tarball from GitHub Releases
+        LATEST_TAG=$(curl -fsSL https://api.github.com/repos/fkcurrie/solaria/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+        if [ -n "$LATEST_TAG" ]; then
+            RELEASE_ARCH="amd64"
+            case "$GO_ARCH" in
+                amd64)         RELEASE_ARCH="amd64" ;;
+                arm64)         RELEASE_ARCH="arm64" ;;
+                armv6l|armv7l) RELEASE_ARCH="arm" ;;
+                *)             RELEASE_ARCH="amd64" ;;
+            esac
+            TARBALL_URL="https://github.com/fkcurrie/solaria/releases/download/${LATEST_TAG}/solaria_${LATEST_TAG}_linux_${RELEASE_ARCH}.tar.gz"
+            echo -e "  Attempting to fetch pre-compiled release ${LATEST_TAG} (${RELEASE_ARCH})..."
+            if curl -fsSL "$TARBALL_URL" -o /tmp/solaria_release.tar.gz 2>/dev/null; then
+                tar -xzf /tmp/solaria_release.tar.gz -C bin/
+                rm -f /tmp/solaria_release.tar.gz
+                if [ -f "bin/solaria-bridge" ] && [ -f "bin/solaria-edge" ] && [ -f "bin/solaria-cloud" ]; then
+                    echo -e "  ${GREEN}[OK] Successfully installed pre-compiled release ${LATEST_TAG}.${NC}"
+                    FETCHED_RELEASE=true
                 fi
             fi
         fi
