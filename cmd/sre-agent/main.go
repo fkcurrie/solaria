@@ -659,16 +659,21 @@ func (a *SREAgent) GetAutoHeals() []AutoHealAction {
 
 func main() {
 	var (
-		daemonMode  = flag.Bool("daemon", false, "Run continuous autonomous SRE monitoring loop")
-		auditOnce   = flag.Bool("audit", false, "Run single one-shot diagnostic audit and exit")
-		autoHeal    = flag.Bool("auto-heal", true, "Enable autonomous self-healing and process supervisor")
-		port        = flag.Int("port", 8082, "SRE Agent HTTP server port")
-		bridgeURL   = flag.String("bridge-url", "http://localhost:8080", "Bridge daemon URL")
-		cloudURL    = flag.String("cloud-url", "http://localhost:8081", "Cloud server URL")
-		cloudRunURL = flag.String("cloudrun-url", os.Getenv("SOLARIA_CLOUD_ENDPOINT"), "Cloud Run deployed service URL (defaults to SOLARIA_CLOUD_ENDPOINT env or cloud-url)")
-		interval    = flag.Duration("interval", 5*time.Second, "Monitoring interval in daemon mode")
+		daemonMode     = flag.Bool("daemon", false, "Run continuous autonomous SRE monitoring loop")
+		supervisorMode = flag.Bool("supervisor", false, "Run continuous autonomous SRE monitoring loop (alias for -daemon)")
+		auditOnce      = flag.Bool("audit", false, "Run single one-shot diagnostic audit and exit")
+		autoHeal       = flag.Bool("auto-heal", true, "Enable autonomous self-healing and process supervisor")
+		port           = flag.Int("port", 8082, "SRE Agent HTTP server port")
+		bridgeURL      = flag.String("bridge-url", "http://localhost:8080", "Bridge daemon URL")
+		cloudURL       = flag.String("cloud-url", "http://localhost:8081", "Cloud server URL")
+		cloudRunURL    = flag.String("cloudrun-url", os.Getenv("SOLARIA_CLOUD_ENDPOINT"), "Cloud Run deployed service URL (defaults to SOLARIA_CLOUD_ENDPOINT env or cloud-url)")
+		interval       = flag.Duration("interval", 5*time.Second, "Monitoring interval in daemon mode")
 	)
 	flag.Parse()
+
+	if *supervisorMode {
+		*daemonMode = true
+	}
 
 	token := os.Getenv("SOLARIA_API_TOKEN")
 	agent := NewSREAgent(*bridgeURL, *cloudURL, *cloudRunURL, "logs/incidents.json", token, *autoHeal)
