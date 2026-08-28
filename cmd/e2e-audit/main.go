@@ -401,8 +401,12 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err := json.NewDecoder(resp.Body).Decode(&diag); err != nil {
 			return "", err
 		}
+		sysMB := 0.0
+		if val, ok := diag.Runtime["sys_mb"].(float64); ok {
+			sysMB = val
+		}
 		return fmt.Sprintf("Cloud Diagnostics: %s, Memory: %.1fMB Sys, RingBuffer Active",
-			diag.Service, diag.Runtime["sys_mb"].(float64)), nil
+			diag.Service, sysMB), nil
 	}))
 
 	// ==========================================

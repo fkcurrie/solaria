@@ -85,7 +85,7 @@ func queryGPSD(addr string) (SiteLocation, error) {
 	if err != nil {
 		return SiteLocation{}, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 
@@ -125,7 +125,7 @@ func queryIPGeo() (SiteLocation, error) {
 	// Primary Endpoint: ip-api.com
 	resp, err := client.Get("http://ip-api.com/json/")
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			var res struct {
 				Status      string  `json:"status"`
@@ -150,7 +150,7 @@ func queryIPGeo() (SiteLocation, error) {
 	// Fallback Endpoint: ipinfo.io
 	resp2, err := client.Get("https://ipinfo.io/json")
 	if err == nil {
-		defer resp2.Body.Close()
+		defer func() { _ = resp2.Body.Close() }()
 		if resp2.StatusCode == http.StatusOK {
 			var res2 struct {
 				City    string `json:"city"`

@@ -277,7 +277,7 @@ func NewDiskSpooler(dir string) *DiskSpooler {
 				count++
 			}
 		}
-		f.Close()
+		_ = f.Close()
 		s.cachedCount = count
 	}
 	return s
@@ -368,7 +368,7 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 			}
 		}
 	}
-	f.Close()
+	_ = f.Close()
 
 	if len(toUpload) == 0 {
 		_ = os.Remove(stagingPath)
@@ -405,7 +405,7 @@ func (s *DiskSpooler) Drain(uploader func(record SolarRecord) error) (int, error
 				_, _ = tf.Write(existingData)
 			}
 			_ = tf.Sync()
-			tf.Close()
+			_ = tf.Close()
 			_ = os.Rename(tmpPath, s.spoolPath)
 		}
 		atomic.StoreInt64(&s.cachedCount, int64(len(remaining)))
@@ -460,7 +460,7 @@ func (s *DiskSpooler) DrainBatch(uploader func(records []SolarRecord) error, bat
 			}
 		}
 	}
-	f.Close()
+	_ = f.Close()
 
 	if len(toUpload) == 0 {
 		_ = os.Remove(stagingPath)
@@ -499,7 +499,7 @@ func (s *DiskSpooler) DrainBatch(uploader func(records []SolarRecord) error, bat
 				_, _ = tf.Write(existingData)
 			}
 			_ = tf.Sync()
-			tf.Close()
+			_ = tf.Close()
 			_ = os.Rename(tmpPath, s.spoolPath)
 		}
 		atomic.StoreInt64(&s.cachedCount, int64(len(remaining)))
@@ -596,7 +596,7 @@ func loadEnv() {
 				k := strings.TrimSpace(parts[0])
 				v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
 				if os.Getenv(k) == "" {
-					os.Setenv(k, v)
+					_ = os.Setenv(k, v)
 				}
 			}
 			break
