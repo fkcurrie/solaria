@@ -1014,12 +1014,12 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	json.NewEncoder(w).Encode(ringBuf.GetHistory(limit))
+	_ = json.NewEncoder(w).Encode(ringBuf.GetHistory(limit))
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 		"service":   "solaria-dashboard",
@@ -1215,7 +1215,7 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	json.NewEncoder(w).Encode(info)
+	_ = json.NewEncoder(w).Encode(info)
 }
 
 func classifyWeather(cloudPct float64, tempC float64, isDay bool, avgIrr float64, sunClass string) (string, string) {
@@ -1246,7 +1246,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("day"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		w.Write(cached)
+		_ = w.Write(cached)
 		return
 	}
 
@@ -1432,7 +1432,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("day", data, 2*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	w.Write(data)
+	_ = w.Write(data)
 }
 
 func handleWeekStats(w http.ResponseWriter, r *http.Request) {
@@ -1441,7 +1441,7 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("week"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		w.Write(cached)
+		_ = w.Write(cached)
 		return
 	}
 
@@ -1542,7 +1542,7 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("week", data, 10*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	w.Write(data)
+	_ = w.Write(data)
 }
 
 func handleMonthStats(w http.ResponseWriter, r *http.Request) {
@@ -1551,7 +1551,7 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("month"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		w.Write(cached)
+		_ = w.Write(cached)
 		return
 	}
 
@@ -1633,7 +1633,7 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("month", data, 15*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	w.Write(data)
+	_ = w.Write(data)
 }
 
 func handleYearStats(w http.ResponseWriter, r *http.Request) {
@@ -1642,7 +1642,7 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("year"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		w.Write(cached)
+		_ = w.Write(cached)
 		return
 	}
 
@@ -1715,7 +1715,7 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("year", data, 30*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	w.Write(data)
+	_ = w.Write(data)
 }
 
 func mathRound(val float64, decimals int) float64 {
@@ -1736,7 +1736,7 @@ func srvPort(port string) int {
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_ = w.Write([]byte("OK"))
 }
 
 func handleSampleDay(w http.ResponseWriter, r *http.Request) {
@@ -1852,7 +1852,7 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 			ringBuf.Push([]SolarRecord{rec})
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "success",
 			"message": "Hardware configuration saved and applied",
 			"config":  newCfg,
@@ -1864,7 +1864,7 @@ func handleHardwareConfig(w http.ResponseWriter, r *http.Request) {
 	hardwareConfigMu.RLock()
 	cfg := activeHardwareConfig
 	hardwareConfigMu.RUnlock()
-	json.NewEncoder(w).Encode(cfg)
+	_ = json.NewEncoder(w).Encode(cfg)
 }
 
 func handleArrayOrientation(w http.ResponseWriter, r *http.Request) {
@@ -1929,7 +1929,7 @@ func handleArrayOrientation(w http.ResponseWriter, r *http.Request) {
 		SeasonalNotes:    "Facing South-East at 45° captures maximum direct early morning sun over Wren Lake, quickly reheating LiFePO4 cells after cold cottage nights.",
 		OptimalTime:      "10:00 AM - 01:30 PM (Direct Irradiance Window)",
 	}
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // handlePowerBudget calculates runtime hours and cottage advisory based on selected wattage and battery capacity
