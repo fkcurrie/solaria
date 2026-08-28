@@ -82,7 +82,7 @@ func main() {
 			if err != nil {
 				fmt.Printf("[%d/%d] Ingest POST failed: %v\n", i+1, len(rawRecords), err)
 			} else {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				pvW := rec["pv_power_w"]
 				soc := rec["battery_soc_pct"]
 				vBatt := rec["battery_voltage_v"]

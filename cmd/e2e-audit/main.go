@@ -76,7 +76,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -104,7 +104,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -131,7 +131,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var h struct {
 			SpoolCount int `json:"spool_count"`
 		}
@@ -154,7 +154,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -174,7 +174,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -213,7 +213,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", fmt.Errorf("Cloud Run endpoint unreachable: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusUnauthorized {
 			return "", fmt.Errorf("Cloud Run rejected request (401 Unauthorized - Google Frontend IAM invoker authentication required)")
 		}

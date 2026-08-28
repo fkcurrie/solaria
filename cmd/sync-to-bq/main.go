@@ -80,11 +80,11 @@ func main() {
 			log.Printf("⚠️ Could not open %s: %v", filename, err)
 			continue
 		}
+		defer func() { _ = f.Close() }()
 
 		r := csv.NewReader(f)
 		header, err := r.Read()
 		if err != nil {
-			f.Close()
 			continue
 		}
 
@@ -119,7 +119,6 @@ func main() {
 				batch = batch[:0]
 			}
 		}
-		f.Close()
 
 		if len(batch) > 0 {
 			if sendBatch(client, *targetURL, *token, batch) {
@@ -222,7 +221,7 @@ func sendBatch(client *http.Client, url, token string, batch []SolarRecord) bool
 		log.Printf("⚠️ Ingestion request failed: %v", err)
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(resp.Body)
