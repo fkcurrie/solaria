@@ -635,7 +635,7 @@ func (l *SolarModelLearner) TrainBatch(records []SolarRecord) {
 	for _, rec := range records {
 		l.TrainRecord(rec)
 	}
-	l.Save()
+	_ = l.Save()
 }
 
 func (l *SolarModelLearner) GetLearnedForecast(theoreticalW int, hour int) int {
@@ -967,7 +967,7 @@ func handleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":   "ok",
 		"ingested": len(batch),
 	})
@@ -1001,7 +1001,7 @@ func handleLive(w http.ResponseWriter, r *http.Request) {
 		latest.Telemetry.ChargingState = "DISCONNECTED"
 	}
 
-	json.NewEncoder(w).Encode(latest)
+	_ = json.NewEncoder(w).Encode(latest)
 }
 
 func handleHistory(w http.ResponseWriter, r *http.Request) {

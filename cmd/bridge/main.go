@@ -1153,7 +1153,7 @@ func uploadSingleRecord(record SolarRecord) error {
 			})
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: HTTP %d", ep, resp.StatusCode))
 			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Upload to %s returned HTTP %d", ep, resp.StatusCode), "ERR_CLOUD_HTTP", map[string]interface{}{
@@ -1230,7 +1230,7 @@ func uploadBatchRecords(records []SolarRecord) error {
 			})
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			uploadErrors = append(uploadErrors, fmt.Sprintf("%s: HTTP %d", ep, resp.StatusCode))
 			bridgeLogger.Log("WARN", "CLOUD_UPLOADER", fmt.Sprintf("Batch upload to %s returned HTTP %d", ep, resp.StatusCode), "ERR_BATCH_HTTP", map[string]interface{}{
@@ -2017,7 +2017,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		clientsMu.Lock()
 		delete(activeClients, conn)
 		clientsMu.Unlock()
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	clientAddr := conn.RemoteAddr().String()

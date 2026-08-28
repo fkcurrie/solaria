@@ -287,7 +287,7 @@ func (a *SREAgent) AutoHealCloudRunSync() {
 			}
 			postResp, postErr := client.Do(postReq)
 			if postErr == nil {
-				postResp.Body.Close()
+				_ = postResp.Body.Close()
 				log.Printf("🛠️ [AUTO-HEAL] Pushed emergency telemetry frame to Cloud Run (Status: %d)", postResp.StatusCode)
 				a.recordAutoHeal(AutoHealAction{
 					Timestamp: time.Now(),

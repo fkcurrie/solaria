@@ -154,7 +154,7 @@ func (s *Spooler) Drain(uploader func(record SolarRecord) error) (int, error) {
 			}
 		}
 	}
-	f.Close()
+	_ = f.Close()
 
 	if len(validRecords) == 0 {
 		_ = os.Remove(s.filePath)
@@ -183,7 +183,7 @@ func (s *Spooler) Drain(uploader func(record SolarRecord) error) (int, error) {
 				_, _ = tf.Write(append(d, '\n'))
 			}
 			_ = tf.Sync()
-			tf.Close()
+			_ = tf.Close()
 			_ = os.Rename(tmpPath, s.filePath)
 		}
 	}
