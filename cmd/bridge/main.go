@@ -31,6 +31,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	Version   = "v1.0.0"
+	Commit    = "dev"
+	BuildDate = "unknown"
+)
+
+
 // Diagnostic Logging Structs & Subsystems
 type LogEntry struct {
 	Timestamp string                 `json:"timestamp"`
@@ -2193,7 +2200,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "Print version information and exit")
+	showV := flag.Bool("v", false, "Print version information and exit")
 	flag.Parse()
+
+	if *showVersion || *showV {
+		fmt.Printf("solaria-bridge %s (commit: %s, built: %s)\n", Version, Commit, BuildDate)
+		os.Exit(0)
+	}
 
 	loadEnv()
 	initBridgeAuth()

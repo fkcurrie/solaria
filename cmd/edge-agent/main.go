@@ -59,9 +59,22 @@ func loadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+var (
+	Version   = "v1.0.0"
+	Commit    = "dev"
+	BuildDate = "unknown"
+)
+
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to YAML configuration file")
+	showVersion := flag.Bool("version", false, "Print version information and exit")
+	showV := flag.Bool("v", false, "Print version information and exit")
 	flag.Parse()
+
+	if *showVersion || *showV {
+		log.Printf("solaria-edge %s (commit: %s, built: %s)\n", Version, Commit, BuildDate)
+		os.Exit(0)
+	}
 
 	log.Println("==========================================================")
 	log.Println("SOLARIA GO EDGE AGENT (Raspberry Pi & Linux)")

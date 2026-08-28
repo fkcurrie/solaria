@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io"
@@ -23,6 +24,13 @@ import (
 
 	"cloud.google.com/go/bigquery"
 )
+
+var (
+	Version   = "v1.0.0"
+	Commit    = "dev"
+	BuildDate = "unknown"
+)
+
 
 // Diagnostic Logging Structs & Subsystems
 type LogEntry struct {
@@ -3401,6 +3409,15 @@ func handleGCPOnboarding(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "Print version information and exit")
+	showV := flag.Bool("v", false, "Print version information and exit")
+	flag.Parse()
+
+	if *showVersion || *showV {
+		fmt.Printf("solaria-cloud %s (commit: %s, built: %s)\n", Version, Commit, BuildDate)
+		os.Exit(0)
+	}
+
 	listenPort := srvPort(os.Getenv("PORT"))
 
 	mux := http.NewServeMux()
