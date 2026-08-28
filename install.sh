@@ -209,8 +209,13 @@ else
     echo -e "  [OK] System packages verified (bluez, avahi, curl, git)"
 fi
 
-# Step 3: Go Toolchain
+# Step 3: Go Toolchain Check
 echo -e "\n${CYAN}[3/6] Verifying Go Toolchain...${NC}"
+for GOPATH_CANDIDATE in "/usr/local/go/bin" "${HOME}/.local/go/bin" "${HOME}/go/bin" "/usr/lib/go/bin"; do
+    if [ -d "$GOPATH_CANDIDATE" ] && [[ ":$PATH:" != *":$GOPATH_CANDIDATE:"* ]]; then
+        export PATH="$GOPATH_CANDIDATE:$PATH"
+    fi
+done
 export PATH="$HOME/.local/go/bin:$HOME/go/bin:/usr/local/go/bin:$PATH"
 
 if command -v go &>/dev/null; then

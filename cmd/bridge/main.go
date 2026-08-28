@@ -1414,7 +1414,6 @@ func startHeartbeatWorker(ctx context.Context) {
 
 var (
 	frameMu              sync.Mutex
-	lastFrameProcess     time.Time
 	totalFramesProcessed int64
 )
 
@@ -1429,7 +1428,6 @@ func processFrame(frame []byte) {
 
 	frameMu.Lock()
 	lastFrameTime = time.Now()
-	lastFrameProcess = time.Now()
 	totalFramesProcessed++
 	frameMu.Unlock()
 	tracker.save()
