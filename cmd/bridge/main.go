@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/solaria/renogy-solar/pkg/location"
 )
 
 var (
@@ -603,19 +604,11 @@ func loadEnv() {
 		}
 	}
 
-	if val := os.Getenv("SITE_NAME"); val != "" {
-		siteName = val
-	}
-	if val := os.Getenv("SITE_LATITUDE"); val != "" {
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			siteLat = f
-		}
-	}
-	if val := os.Getenv("SITE_LONGITUDE"); val != "" {
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			siteLon = f
-		}
-	}
+	resolvedLoc := location.ResolveLocation(os.Getenv("SITE_LATITUDE"), os.Getenv("SITE_LONGITUDE"), os.Getenv("SITE_NAME"))
+	siteLat = resolvedLoc.Latitude
+	siteLon = resolvedLoc.Longitude
+	siteName = resolvedLoc.Name
+
 	if val := os.Getenv("PANEL_RATED_WATTS"); val != "" {
 		if f, err := strconv.ParseFloat(val, 64); err == nil {
 			arrayRatedWatts = f
