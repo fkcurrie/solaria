@@ -52,11 +52,19 @@ detect_site_location() {
     if command -v curl &>/dev/null; then
         IP_GEO=$(curl -s --max-time 3 http://ip-api.com/json/ || true)
         if [ -n "$IP_GEO" ]; then
-            DETECTED_LAT=$(echo "$IP_GEO" | jq -r '.lat // empty' 2>/dev/null)
-            DETECTED_LON=$(echo "$IP_GEO" | jq -r '.lon // empty' 2>/dev/null)
-            CITY=$(echo "$IP_GEO" | jq -r '.city // empty' 2>/dev/null)
-            REGION=$(echo "$IP_GEO" | jq -r '.regionName // empty' 2>/dev/null)
-            COUNTRY=$(echo "$IP_GEO" | jq -r '.countryCode // empty' 2>/dev/null)
+            if command -v jq &>/dev/null; then
+                DETECTED_LAT=$(echo "$IP_GEO" | jq -r '.lat // empty' 2>/dev/null || true)
+                DETECTED_LON=$(echo "$IP_GEO" | jq -r '.lon // empty' 2>/dev/null || true)
+                CITY=$(echo "$IP_GEO" | jq -r '.city // empty' 2>/dev/null || true)
+                REGION=$(echo "$IP_GEO" | jq -r '.regionName // empty' 2>/dev/null || true)
+                COUNTRY=$(echo "$IP_GEO" | jq -r '.countryCode // empty' 2>/dev/null || true)
+            else
+                DETECTED_LAT=$(echo "$IP_GEO" | grep -o '"lat":[0-9.-]*' | cut -d: -f2 || true)
+                DETECTED_LON=$(echo "$IP_GEO" | grep -o '"lon":[0-9.-]*' | cut -d: -f2 || true)
+                CITY="Local Site"
+                REGION="Region"
+                COUNTRY="CA"
+            fi
             if [ -n "$DETECTED_LAT" ] && [ -n "$DETECTED_LON" ]; then
                 DETECTED_NAME="${CITY}, ${REGION}, ${COUNTRY}"
                 DETECTED_SOURCE="IP_GEOLOCATION"
@@ -271,23 +279,50 @@ if [ "$DRY_RUN" = false ]; then
         go build -ldflags="-s -w" -o bin/solaria-edge ./cmd/edge-agent
         echo -e "  Building bin/solaria-cloud..."
         go build -ldflags="-s -w" -o bin/solaria-cloud ./cmd/cloud-server
+        echo -e "  Building bin/solaria-sre-agent..."
+        go build -ldflags="-s -w" -o bin/solaria-sre-agent ./cmd/sre-agent
         echo -e "  [OK] Binaries compiled successfully from source."
+    fi
+
+    # Deploy to /opt/solaria/bin if running as root or with sudo
+    if [ -n "$SUDO" ] || [ "$(id -u)" -eq 0 ]; then
+        $SUDO mkdir -p /opt/solaria/bin /etc/solaria /var/log/solaria
+        $SUDO cp -f bin/* /opt/solaria/bin/ 2>/dev/null || true
+        $SUDO chmod +x /opt/solaria/bin/* 2>/dev/null || true
+        TARGET_BIN_DIR="/opt/solaria/bin"
+    else
+        TARGET_BIN_DIR="${INSTALL_DIR}/bin"
     fi
 
     # Grant Bluetooth & Raw Socket capabilities
     if command -v setcap &>/dev/null && [ -n "$SUDO" ]; then
         echo -e "  Granting Bluetooth raw socket capabilities (CAP_NET_RAW, CAP_NET_ADMIN)..."
-        $SUDO setcap 'cap_net_raw,cap_net_admin+eip' bin/solaria-bridge 2>/dev/null || true
-        $SUDO setcap 'cap_net_raw,cap_net_admin+eip' bin/solaria-edge 2>/dev/null || true
+        $SUDO setcap 'cap_net_raw,cap_net_admin+eip' "${TARGET_BIN_DIR}/solaria-bridge" 2>/dev/null || true
+        $SUDO setcap 'cap_net_raw,cap_net_admin+eip' "${TARGET_BIN_DIR}/solaria-edge" 2>/dev/null || true
     fi
 fi
 
 # Step 5: Systemd Service
-echo -e "\n${CYAN}[5/6] Configuring Background Service...${NC}"
+echo -e "\n${CYAN}[5/6] Configuring Background Services...${NC}"
 if [ "$INSTALL_SERVICE" = true ] && [ -d "/etc/systemd/system" ] && [ -n "$SUDO" ]; then
     if [ "$DRY_RUN" = false ]; then
-        SERVICE_FILE="/etc/systemd/system/solaria-bridge.service"
         CURRENT_USER="$(id -un)"
+
+        # Write default solaria.env if missing
+        if [ ! -f "/etc/solaria/solaria.env" ]; then
+            detect_site_location
+            cat << ENV_EOF | $SUDO tee "/etc/solaria/solaria.env" > /dev/null
+SOLARIA_SITE_NAME="${DETECTED_NAME}"
+SOLARIA_LATITUDE="${DETECTED_LAT}"
+SOLARIA_LONGITUDE="${DETECTED_LON}"
+PORT="8080"
+STORAGE_MODE="both"
+ENV_EOF
+            $SUDO chmod 0600 "/etc/solaria/solaria.env"
+        fi
+
+        # Solaria Bridge Service
+        SERVICE_FILE="/etc/systemd/system/solaria-bridge.service"
         cat << SYSTEMD_EOF | $SUDO tee "$SERVICE_FILE" > /dev/null
 [Unit]
 Description=Solaria Renogy Solar Bridge & Atmospheric Supervisor
@@ -298,7 +333,8 @@ Wants=bluetooth.target
 Type=simple
 User=${CURRENT_USER}
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=${INSTALL_DIR}/bin/solaria-bridge
+EnvironmentFile=-/etc/solaria/solaria.env
+ExecStart=${TARGET_BIN_DIR}/solaria-bridge
 Restart=always
 RestartSec=5s
 Environment=PORT=8080
@@ -309,10 +345,32 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 SYSTEMD_EOF
 
+        # Solaria SRE Agent Service
+        SRE_SERVICE_FILE="/etc/systemd/system/solaria-sre.service"
+        cat << SYSTEMD_EOF | $SUDO tee "$SRE_SERVICE_FILE" > /dev/null
+[Unit]
+Description=Solaria Autonomous SRE Supervisor & Self-Healing Watchdog
+After=network-online.target solaria-bridge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${CURRENT_USER}
+WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-/etc/solaria/solaria.env
+ExecStart=${TARGET_BIN_DIR}/solaria-sre-agent -supervisor
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_EOF
+
         $SUDO systemctl daemon-reload
-        $SUDO systemctl enable solaria-bridge.service
-        $SUDO systemctl restart solaria-bridge.service || true
-        echo -e "  [OK] systemd service ${GREEN}solaria-bridge.service${NC} enabled and started."
+        $SUDO systemctl enable solaria-bridge.service solaria-sre.service
+        $SUDO systemctl restart solaria-bridge.service solaria-sre.service || true
+        echo -e "  [OK] systemd services ${GREEN}solaria-bridge.service${NC} & ${GREEN}solaria-sre.service${NC} enabled and started."
 
         # Configure Avahi mDNS Service
         if [ -d "/etc/avahi/services" ] && [ -f "deploy/solaria.service" ]; then

@@ -152,12 +152,9 @@ var (
 	siteTZ                = "America/Toronto"
 	siteLoc               = time.Local
 
-	mu             sync.Mutex
-	rxBuffer       []byte
-	cachedWeather  WeatherMetrics
-	lastWxFetch    time.Time
-	idTokenCache   string
-	idTokenExpires time.Time
+	mu            sync.Mutex
+	cachedWeather WeatherMetrics
+	lastWxFetch   time.Time
 
 	diskSpooler  *DiskSpooler
 	bridgeLogger = NewDiagnosticLogBuffer(1000)

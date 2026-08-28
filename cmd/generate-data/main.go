@@ -194,8 +194,8 @@ func main() {
 		fmt.Printf("Error marshaling json: %v\n", err)
 		return
 	}
-	if err := os.WriteFile(jsonPath, jsonData, 0644); err != nil {
-		fmt.Printf("Error writing json: %v\n", err)
+	if writeErr := os.WriteFile(jsonPath, jsonData, 0644); writeErr != nil {
+		fmt.Printf("Error writing json: %v\n", writeErr)
 		return
 	}
 	fmt.Printf("Successfully generated %s (%d records)\n", jsonPath, len(records))

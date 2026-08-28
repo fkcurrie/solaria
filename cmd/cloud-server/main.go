@@ -732,8 +732,8 @@ func init() {
 					Fields: []string{"site", "sun_classification"},
 				},
 			}
-			if err := bqTable.Create(ctx, tableMetadata); err != nil && !strings.Contains(err.Error(), "Already Exists") {
-				log.Printf("BigQuery table create note: %v", err)
+			if tblErr := bqTable.Create(ctx, tableMetadata); tblErr != nil && !strings.Contains(tblErr.Error(), "Already Exists") {
+				log.Printf("BigQuery table create note: %v", tblErr)
 			}
 		}
 		log.Printf("✅ Google Cloud BigQuery client initialized for dataset 'solaria.telemetry' in project: %s", gcpProject)

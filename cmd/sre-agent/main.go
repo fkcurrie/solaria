@@ -658,13 +658,6 @@ func (a *SREAgent) GetAutoHeals() []AutoHealAction {
 	return a.autoHeals
 }
 
-func constantTimeCompare(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
-}
-
 func main() {
 	var (
 		daemonMode  = flag.Bool("daemon", false, "Run continuous autonomous SRE monitoring loop")
