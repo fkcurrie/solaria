@@ -1,4 +1,4 @@
-name: "Solaria Production Release Engine"
+name: "Solaria Production 6-Gate Release Engine"
 
 on:
   push:
@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
+  security-events: write
 
 jobs:
-  release:
-    name: "Build Cross-Platform Binaries & GitHub Release"
+  release-gatekeeper:
+    name: "Automated 6-Gate Release Protocol & Asset Bundler"
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +26,7 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Extract Release Version
+      - name: Extract Release Variables
         id: vars
         run: |
           VERSION="${GITHUB_REF_NAME}"
@@ -34,42 +36,126 @@ jobs:
           echo "COMMIT=${COMMIT}" >> $GITHUB_OUTPUT
           echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_OUTPUT
 
-      - name: Run Unit Tests
+      # ------------------------------------------------------------------------
+      # Gate 1: Code Linting & Static Security Analysis
+      # ------------------------------------------------------------------------
+      - name: "Gate 1: Code Linting (golangci-lint)"
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.60.3
+          args: --timeout=5m
+
+      # ------------------------------------------------------------------------
+      # Gate 2: Package Unit Test Suite
+      # ------------------------------------------------------------------------
+      - name: "Gate 2: Package Unit Tests"
         run: go test -v ./...
 
-      - name: Cross-Compile & Package Binary Bundles
+      # ------------------------------------------------------------------------
+      # Gate 3: 31-Probe E2E System Audit
+      # ------------------------------------------------------------------------
+      - name: "Gate 3: 31-Probe E2E System Audit"
+        run: |
+          mkdir -p bin
+          echo "Compiling Solaria binaries for E2E audit..."
+          go build -o bin/solaria-bridge ./cmd/bridge
+          go build -o bin/solaria-cloud ./cmd/cloud-server
+          go build -o bin/solaria-e2e-audit ./cmd/e2e-audit
+
+          echo "Launching test daemons in background..."
+          SOLARIA_MOCK_MODBUS=true ./bin/solaria-bridge > bridge_test.log 2>&1 &
+          BRIDGE_PID=$!
+
+          CLOUD_HTTP_PORT=8081 ./bin/solaria-cloud > cloud_test.log 2>&1 &
+          CLOUD_PID=$!
+
+          sleep 3
+
+          echo "Executing 31-Probe E2E Audit..."
+          if ./bin/solaria-e2e-audit; then
+            echo "E2E Audit PASSED 100%"
+          else
+            echo "E2E Audit FAILED! Logs:"
+            cat bridge_test.log
+            cat cloud_test.log
+            kill $BRIDGE_PID $CLOUD_PID || true
+            exit 1
+          fi
+
+          kill $BRIDGE_PID $CLOUD_PID || true
+
+      # ------------------------------------------------------------------------
+      # Gate 4: Vulnerability Database Scan
+      # ------------------------------------------------------------------------
+      - name: "Gate 4: Vulnerability Scan (govulncheck)"
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      # ------------------------------------------------------------------------
+      # Gate 5: Documentation Alignment & Release Notes Check
+      # ------------------------------------------------------------------------
+      - name: "Gate 5: Documentation Verification"
+        run: |
+          NOTES_FILE="RELEASE_NOTES/${{ steps.vars.outputs.VERSION }}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            echo "Found matching release notes: $NOTES_FILE"
+          else
+            echo "RELEASE NOTES MISSING: Expected $NOTES_FILE"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------------
+      # Gate 6: Cross-Compilation, Tarball/Zip Asset Packaging & SHA256SUMS
+      # ------------------------------------------------------------------------
+      - name: "Gate 6: Multi-Arch Asset Packaging"
         run: |
           mkdir -p dist
           LDFLAGS="-s -w -X main.Version=${{ steps.vars.outputs.VERSION }} -X main.Commit=${{ steps.vars.outputs.COMMIT }} -X main.BuildDate=${{ steps.vars.outputs.BUILD_DATE }}"
 
-          # Architectures: amd64, arm64, arm (ARMv7)
+          # Target Architectures: amd64, arm64, arm (v7)
           for ARCH in amd64 arm64 arm; do
-            echo "==> Building Solaria release binaries for linux/${ARCH}..."
-            BUILD_DIR="build_linux_${ARCH}"
-            mkdir -p "${BUILD_DIR}"
+            echo "==> Packaging Solaria bundle for linux/${ARCH}..."
+            BUNDLE_DIR="solaria_${{ steps.vars.outputs.VERSION }}_linux_${ARCH}"
+            mkdir -p "${BUNDLE_DIR}/bin"
+            mkdir -p "${BUNDLE_DIR}/systemd"
 
-            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUILD_DIR}/solaria-bridge" ./cmd/bridge
-            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUILD_DIR}/solaria-edge" ./cmd/edge-agent
-            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUILD_DIR}/solaria-cloud" ./cmd/cloud-server
+            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-bridge" ./cmd/bridge
+            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-edge" ./cmd/edge-agent
+            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-cloud" ./cmd/cloud-server
+            GOOS=linux GOARCH=${ARCH} go build -ldflags="${LDFLAGS}" -o "${BUNDLE_DIR}/bin/solaria-e2e-audit" ./cmd/e2e-audit
+
+            cp systemd/*.service "${BUNDLE_DIR}/systemd/"
+            cp .env.example "${BUNDLE_DIR}/.env.example"
+            cp install.sh "${BUNDLE_DIR}/install.sh"
+            cp setup.sh "${BUNDLE_DIR}/setup.sh"
 
             TARBALL="dist/solaria_${{ steps.vars.outputs.VERSION }}_linux_${ARCH}.tar.gz"
-            tar -czvf "${TARBALL}" -C "${BUILD_DIR}" solaria-bridge solaria-edge solaria-cloud
+            ZIPFILE="dist/solaria_${{ steps.vars.outputs.VERSION }}_linux_${ARCH}.zip"
+
+            tar -czvf "${TARBALL}" "${BUNDLE_DIR}"
+            zip -r "${ZIPFILE}" "${BUNDLE_DIR}"
+
+            rm -rf "${BUNDLE_DIR}"
           done
 
           cd dist
-          sha256sum solaria_*.tar.gz > checksums.txt
-          cat checksums.txt
+          sha256sum solaria_* > SHA256SUMS
+          cat SHA256SUMS
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+      # ------------------------------------------------------------------------
+      # Publish Draft Release on GitHub
+      # ------------------------------------------------------------------------
+      - name: Create GitHub Draft Release
+        uses: softprops/action-gh-release@v2
         with:
           name: "Solaria Release ${{ steps.vars.outputs.VERSION }}"
           tag_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          draft: true
+          prerelease: true
+          body_path: "RELEASE_NOTES/${{ steps.vars.outputs.VERSION }}.md"
           files: |
-            dist/solaria_*.tar.gz
-            dist/checksums.txt
+            dist/solaria_*
+            dist/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

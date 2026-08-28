@@ -1,0 +1,23 @@
+[Unit]
+Description=Solaria BLE & Serial Modbus Bridge Daemon
+Documentation=https://fkcurrie.github.io/solaria/
+After=network.target bluetooth.service gpsd.service
+Wants=bluetooth.service gpsd.service
+
+[Service]
+Type=simple
+User=solaria
+Group=solaria
+WorkingDirectory=/opt/solaria
+ExecStart=/usr/local/bin/solaria-bridge
+Restart=always
+RestartSec=5s
+EnvironmentFile=-/etc/solaria/solaria.env
+
+# Security Sandbox
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

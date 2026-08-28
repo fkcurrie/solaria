@@ -13,7 +13,9 @@
   <a href="https://github.com/fkcurrie/solaria/actions/workflows/ci.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/ci.yml/badge.svg" alt="Build Status"></a>
   <a href="https://github.com/fkcurrie/solaria/actions/workflows/bootstrap-ci.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/bootstrap-ci.yml/badge.svg" alt="Multi-Distro Matrix"></a>
   <a href="https://github.com/fkcurrie/solaria/actions/workflows/docs.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/docs.yml/badge.svg" alt="Docs CI"></a>
-  <img src="https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go" alt="Go Version">
+  <a href="https://github.com/fkcurrie/solaria/actions/workflows/golangci-lint.yml"><img src="https://github.com/fkcurrie/solaria/actions/workflows/golangci-lint.yml/badge.svg" alt="GolangCI-Lint"></a>
+  <img src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go" alt="Go Version">
+  <img src="https://img.shields.io/badge/Release-v0.9.0--alpha.1-blue" alt="Release Tag">
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/Platform-Raspberry_Pi_%7C_Linux_%7C_Cloud_Run-green" alt="Platform">
 </p>
@@ -94,7 +96,7 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 
 * **Modbus RTU Engine (`cmd/bridge`):** Go-based BLE packet reassembly, CRC16 validation, and WebSocket gateway.
 * **Atmospheric Correlation & Shading Analyzer:** Enriches telemetry with solar radiometry (GHI, DHI, DNI, cloud cover) from Open-Meteo, computes real-time Performance Ratio (PR), and runs the built-in Tree Shading Diagnostic Analyzer to quantify harvest energy lost to canopy occlusion.
-* **Celestial Sun Trajectory Engine:** Real-time SVG celestial dome mapping solar elevation, azimuth, and panel normal angles ($45.186^\circ\text{N}, -78.863^\circ\text{W}$).
+* **Celestial Sun Trajectory Engine:** Dynamic 3-tiered site location resolver (`pkg/location`) with real-time SVG celestial dome mapping solar elevation, azimuth, and panel normal angles via `gpsd`, IP Geolocation, or explicit environment overrides.
 * **Autonomous SRE Supervisor (`cmd/sre-agent`):** Continuous health auditing, auto-healing restarts, and 3-tier Bluetooth radio recovery.
 * **Connection Resilience:** Background watchdog with automatic BlueZ power cycling, Web Bluetooth WakeLock, and continuous outage logging.
 * **Storage Options:** Configurable local CSV/spool storage and buffered streaming inserts into date-partitioned BigQuery tables.
@@ -109,6 +111,8 @@ Solaria supports three storage configurations controlled via `STORAGE_MODE` in `
 * [Atmospheric Formulas & Tree Shading](docs/physics/tree-shading.md) — Irradiance math, shading occlusion formulas, and canopy analysis.
 * [BigQuery Telemetry Schema](docs/bigquery-schema.md) — 34-column schema reference and analytical SQL queries.
 * [Deployment Guide](docs/deployment.md) — Local edge setup, storage configuration, and Cloud Run deployment.
+* [Enterprise Release Protocol](docs/developer/release-protocol.md) — 6-gate release protocol specification, asset bundling, and SemVer standards.
+* [Release Notes v0.9.0-alpha.1](RELEASE_NOTES/v0.9.0-alpha.1.md) — Current enterprise release candidate notes and changelog.
 * [Resilience & Troubleshooting](docs/troubleshooting-resilience.md) — Watchdog mechanics, outage tracking, and recovery procedures.
 * [Core Soul & Multi-Persona Governance](docs/SOUL.md) — Architectural invariants and multi-persona review system.
 * [Google Principal UX Review & 15 Issues](docs/ux-redesign/README.md) — [EPIC-002](docs/ux-redesign/EPIC-002-Google-Principal-UX-Review-and-Design-Systems.md) and 15 design issues.
