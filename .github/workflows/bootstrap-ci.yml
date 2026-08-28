@@ -23,7 +23,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: Run Unit Tests (amd64)
         if: matrix.goarch == 'amd64'
@@ -36,6 +36,18 @@ jobs:
           GOOS=linux GOARCH=${{ matrix.goarch }} go build -o bin/solaria-cloud-server ./cmd/cloud-server/main.go
           GOOS=linux GOARCH=${{ matrix.goarch }} go build -o bin/solaria-sre-agent ./cmd/sre-agent/main.go
           GOOS=linux GOARCH=${{ matrix.goarch }} go build -o bin/solaria-e2e-audit ./cmd/e2e-audit/main.go
+
+      - name: Execute Full-Stack 31-Probe E2E System Audit
+        if: matrix.goarch == 'amd64'
+        run: |
+          PORT=8080 ./bin/solaria-bridge &
+          BRIDGE_PID=$!
+          PORT=8081 SOLARIA_API_TOKEN=ci_secret_token_2026 ./bin/solaria-cloud-server &
+          CLOUD_PID=$!
+          sleep 3
+          ./bin/solaria-e2e-audit -bridge-url http://localhost:8080 -cloud-url http://localhost:8081 -cloudrun-url http://localhost:8081 -token ci_secret_token_2026
+          kill $BRIDGE_PID $CLOUD_PID || true
+
 
   # --------------------------------------------------------------------------
   # 2. Multi-Distro Bootstrap Regression Matrix (Debian, Ubuntu, Raspberry Pi)

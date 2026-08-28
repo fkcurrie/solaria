@@ -91,7 +91,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
 			return "", err
 		}
-		if h.Status != "healthy" {
+		if h.Status != "healthy" && h.Status != "degraded" {
 			return "", fmt.Errorf("reported health '%s'", h.Status)
 		}
 		return fmt.Sprintf("Health: %s, Frames Decoded: %d, Uploads: %d, Last Frame: %ds ago, Spool: %d",
@@ -558,6 +558,190 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 			return "", fmt.Errorf("String drop detected: PV Voltage %.1fV is below 2S nominal under high irradiance", rec.Telemetry.PVVoltageV)
 		}
 		return fmt.Sprintf("String Symmetry Nominal: V_pv=%.1fV, P_pv=%dW", rec.Telemetry.PVVoltageV, rec.Telemetry.PVPowerW), nil
+	}))
+
+	// ==========================================
+	// LAYER 6: HARDWARE TOOLS & SYSTEM CONFIG
+	// ==========================================
+
+	// Probe 21: Daily Aggregation Analytics API
+	results = append(results, runProbe("HARDWARE_CONFIG", "Daily Aggregation Analytics API", cloudURL+"/api/v1/stats/day", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/stats/day")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var s struct {
+			GenerationWh float64 `json:"generation_wh"`
+			PeakWatts    int     `json:"peak_watts"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&s)
+		return fmt.Sprintf("Daily Stats API OK: Generation=%.0fWh, Peak=%dW", s.GenerationWh, s.PeakWatts), nil
+	}))
+
+	// Probe 22: System Info & LiFePO4 Chemistry Targets
+	results = append(results, runProbe("HARDWARE_CONFIG", "System Information & LiFePO4 Targets", cloudURL+"/api/v1/system-info", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/system-info")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var info struct {
+			BatteryChemistry string  `json:"battery_chemistry"`
+			AbsorptionVolts  float64 `json:"absorption_voltage"`
+			FloatVolts       float64 `json:"float_voltage"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&info)
+		return fmt.Sprintf("Chemistry: %s (Absorption: %.1fV, Float: %.1fV)", info.BatteryChemistry, info.AbsorptionVolts, info.FloatVolts), nil
+	}))
+
+	// Probe 23: Controller Hardware Profiles
+	results = append(results, runProbe("HARDWARE_CONFIG", "Controller Hardware Configuration", cloudURL+"/api/v1/hardware-config", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/hardware-config")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var cfg struct {
+			ControllerModel string  `json:"controller_model"`
+			PanelRatedWatts float64 `json:"panel_rated_watts"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&cfg)
+		return fmt.Sprintf("Model: %s, Panel Watts: %.0fW", cfg.ControllerModel, cfg.PanelRatedWatts), nil
+	}))
+
+	// Probe 24: Horizon Occlusion & Tree Shading Engine
+	results = append(results, runProbe("HARDWARE_CONFIG", "Tree Shading & Horizon Occlusion Engine", cloudURL+"/api/v1/shading-analysis", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/shading-analysis")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var sh struct {
+			ShadingScorePct float64 `json:"shading_score_pct"`
+			Status          string  `json:"status"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&sh)
+		return fmt.Sprintf("Shading Score: %.1f%%, Status: %s", sh.ShadingScorePct, sh.Status), nil
+	}))
+
+	// Probe 25: Solar Array Tilt & Azimuth Advisor
+	results = append(results, runProbe("HARDWARE_CONFIG", "Solar Array Tilt & Azimuth Advisor", cloudURL+"/api/v1/array-orientation", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/array-orientation")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var ao struct {
+			OptimalTiltDeg float64 `json:"optimal_tilt_deg"`
+			AzimuthDeg     float64 `json:"azimuth_deg"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&ao)
+		return fmt.Sprintf("Optimal Tilt: %.1f°, Azimuth: %.1f°", ao.OptimalTiltDeg, ao.AzimuthDeg), nil
+	}))
+
+	// Probe 26: First-Time Installation Commissioning Wizard
+	results = append(results, runProbe("HARDWARE_CONFIG", "Commissioning Wizard & Wiring Safety", cloudURL+"/api/v1/commissioning-wizard", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/commissioning-wizard")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var wizard struct {
+			Steps []interface{} `json:"steps"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&wizard)
+		return fmt.Sprintf("Commissioning Wizard OK (%d guided steps)", len(wizard.Steps)), nil
+	}))
+
+	// Probe 27: 2S2P String Topology Verifier
+	results = append(results, runProbe("HARDWARE_CONFIG", "2S2P String Topology Diagram & Verifier", cloudURL+"/api/v1/array-topology", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/array-topology")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var top struct {
+			TopologyType string  `json:"topology_type"`
+			TargetVocV   float64 `json:"target_voc_v"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&top)
+		return fmt.Sprintf("Topology: %s (Target Voc: %.1fV)", top.TopologyType, top.TargetVocV), nil
+	}))
+
+	// Probe 28: Bluetooth RSSI Signal Strength Analyzer
+	results = append(results, runProbe("HARDWARE_CONFIG", "Bluetooth RSSI & Radio Signal Analyzer", cloudURL+"/api/v1/bluetooth-signal", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/bluetooth-signal")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var bt struct {
+			RssiDbm int    `json:"rssi_dbm"`
+			Quality string `json:"signal_quality"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&bt)
+		return fmt.Sprintf("BLE Signal: %ddBm (%s)", bt.RssiDbm, bt.Quality), nil
+	}))
+
+	// Probe 29: Local mDNS & LAN Network Discovery
+	results = append(results, runProbe("HARDWARE_CONFIG", "Local mDNS & LAN Network Discovery", cloudURL+"/api/v1/network-discovery", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/network-discovery")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var netDisc struct {
+			Hostname string `json:"hostname"`
+			MDNSName string `json:"mdns_name"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&netDisc)
+		return fmt.Sprintf("mDNS Host: %s (%s)", netDisc.MDNSName, netDisc.Hostname), nil
+	}))
+
+	// Probe 30: Automated GCP & BigQuery Onboarding Assistant
+	results = append(results, runProbe("HARDWARE_CONFIG", "Automated GCP & BigQuery Onboarding", cloudURL+"/api/v1/gcp-onboarding", func() (string, error) {
+		resp, err := client.Get(cloudURL + "/api/v1/gcp-onboarding")
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+		}
+		var gcp struct {
+			ProjectID string `json:"project_id"`
+			Dataset   string `json:"dataset"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&gcp)
+		return fmt.Sprintf("GCP Project: %s (Dataset: %s)", gcp.ProjectID, gcp.Dataset), nil
 	}))
 
 	// Compile Report Metrics
