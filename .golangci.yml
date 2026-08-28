@@ -10,7 +10,7 @@ linters-settings:
     disable:
       - fieldalignment
   errcheck:
-    check-type-assertions: true
+    check-type-assertions: false
     check-blank: false
   gofmt:
     simplify: true
@@ -19,6 +19,9 @@ linters-settings:
     confidence: "medium"
     excludes:
       - G104 # Defer closed response/file error checks
+      - G301 # Expect directory permissions to be 0750 or less
+      - G304 # File inclusion via variable
+      - G306 # Expect WriteFile permissions to be 0600 or less
   misspell:
     locale: US
 

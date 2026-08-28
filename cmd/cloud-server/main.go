@@ -1516,7 +1516,11 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 	for _, d := range daysList {
 		entry := daysMap[d]
-		labels = append(labels, entry["label"].(string))
+		if lbl, ok := entry["label"].(string); ok {
+			labels = append(labels, lbl)
+		} else {
+			labels = append(labels, d)
+		}
 		yieldKWh = append(yieldKWh, entry["yield_kwh"])
 		peakWatts = append(peakWatts, entry["peak_watts"])
 		minBattV = append(minBattV, entry["min_batt_v"])
@@ -3103,7 +3107,7 @@ func handleE2EAudit(w http.ResponseWriter, r *http.Request) {
 
 	passCount := 0
 	for _, p := range probes {
-		if p["passed"].(bool) {
+		if passed, ok := p["passed"].(bool); ok && passed {
 			passCount++
 		}
 	}

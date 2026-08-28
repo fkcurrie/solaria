@@ -88,6 +88,15 @@ while [[ $# -gt 0 ]]; do
             INSTALL_SERVICE=false
             shift
             ;;
+        --uninstall)
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            if [ -f "$SCRIPT_DIR/uninstall.sh" ]; then
+                exec "$SCRIPT_DIR/uninstall.sh" "$@"
+            else
+                echo "Error: uninstall.sh not found."
+                exit 1
+            fi
+            ;;
         -h|--help)
             SHOW_HELP=true
             shift
@@ -110,6 +119,7 @@ OPTIONS:
     -y, --yes, --non-interactive  Run without prompting, applying defaults
     --dry-run                     Check environment and display install plan without changes
     --no-service                  Compile binaries but skip systemd service installation
+    --uninstall                   Uninstall Solaria, stopping services and removing directories
     -h, --help                    Show this help message
 EOF
     exit 0
