@@ -197,9 +197,9 @@ if [ "$AGENT_MODE" = true ]; then
     }
   },
   "site_defaults": {
-    "site_name": "${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}",
-    "latitude": ${SITE_LATITUDE:-45.186},
-    "longitude": ${SITE_LONGITUDE:--78.863},
+    "site_name": "${SITE_NAME:-Auto-Detected Local Site}",
+    "latitude": ${SITE_LATITUDE:-43.6752},
+    "longitude": ${SITE_LONGITUDE:--79.3472},
     "rated_watts": ${PANEL_RATED_WATTS:-400.0}
   },
   "cloud_defaults": {
@@ -268,9 +268,9 @@ echo -e "\n${CYAN}[2/4] Storage & Site Configuration...${NC}"
 
 if [ "$NON_INTERACTIVE" = true ]; then
     STORAGE_MODE="${STORAGE_MODE:-both}"
-    SITE_NAME="${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}"
-    SITE_LATITUDE="${SITE_LATITUDE:-45.186}"
-    SITE_LONGITUDE="${SITE_LONGITUDE:--78.863}"
+    SITE_NAME="${SITE_NAME:-Local Solar Node}"
+    SITE_LATITUDE="${SITE_LATITUDE:-43.6752}"
+    SITE_LONGITUDE="${SITE_LONGITUDE:--79.3472}"
     PANEL_RATED_WATTS="${PANEL_RATED_WATTS:-400.0}"
     GCP_PROJECT="${GCP_PROJECT:-solaria-solar}"
     BIGQUERY_DATASET="${BIGQUERY_DATASET:-solaria}"
@@ -290,15 +290,15 @@ else
     esac
     echo -e "  Selected storage mode: ${GREEN}${STORAGE_MODE}${NC}"
 
-    DEFAULT_SITE_NAME="${SITE_NAME:-1296 Wren Lake Drive, Dorset, ON}"
+    DEFAULT_SITE_NAME="${SITE_NAME:-Local Solar Node}"
     read -rp "  Site Name [$DEFAULT_SITE_NAME]: " INPUT_SITE_NAME
     SITE_NAME="${INPUT_SITE_NAME:-$DEFAULT_SITE_NAME}"
 
-    DEFAULT_LAT="${SITE_LATITUDE:-45.186}"
+    DEFAULT_LAT="${SITE_LATITUDE:-43.6752}"
     read -rp "  Site Latitude [$DEFAULT_LAT]: " INPUT_LAT
     SITE_LATITUDE="${INPUT_LAT:-$DEFAULT_LAT}"
 
-    DEFAULT_LON="${SITE_LONGITUDE:--78.863}"
+    DEFAULT_LON="${SITE_LONGITUDE:--79.3472}"
     read -rp "  Site Longitude [$DEFAULT_LON]: " INPUT_LON
     SITE_LONGITUDE="${INPUT_LON:-$DEFAULT_LON}"
 

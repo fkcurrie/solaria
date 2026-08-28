@@ -399,8 +399,8 @@ func TestHandleShadingAnalysis(t *testing.T) {
 		t.Fatalf("Failed to decode shading analysis response: %v", err)
 	}
 
-	if res["site"] != "1296 Wren Lake Drive, Dorset, ON" {
-		t.Errorf("Expected Dorset site, got %v", res["site"])
+	if res["site"] == nil || res["site"] == "" {
+		t.Errorf("Expected non-empty site name, got %v", res["site"])
 	}
 
 	patterns, ok := res["shading_patterns"].([]interface{})
@@ -598,8 +598,10 @@ func TestHandleSunTimes_SolarElevation(t *testing.T) {
 		t.Fatalf("Failed to decode sun times: %v", err)
 	}
 
-	if res["latitude"] != 45.186 || res["longitude"] != -78.863 {
-		t.Errorf("Expected Dorset coordinates 45.186, -78.863, got %v, %v", res["latitude"], res["longitude"])
+	lat, okLat := res["latitude"].(float64)
+	lon, okLon := res["longitude"].(float64)
+	if !okLat || !okLon || lat == 0 || lon == 0 {
+		t.Errorf("Expected valid non-zero latitude/longitude, got %v, %v", res["latitude"], res["longitude"])
 	}
 	if res["solar_elevation_deg"] == nil || res["solar_zenith_deg"] == nil {
 		t.Errorf("Expected solar_elevation_deg and solar_zenith_deg in response")

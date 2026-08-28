@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/solaria/renogy-solar/pkg/location"
 )
 
 var (
@@ -561,7 +562,8 @@ func (l *SolarModelLearner) TrainRecord(rec SolarRecord) {
 	}
 
 	h := t.Hour()
-	theoW := computeTheoreticalWatts(t, 45.186, -78.863, 45.0, 135.0, 400.0)
+	lat, lon := getSiteLatLon()
+	theoW := computeTheoreticalWatts(t, lat, lon, 45.0, 135.0, 400.0)
 	if theoW < 25 {
 		return // Ignore night or deep dawn
 	}
@@ -753,8 +755,7 @@ func bqWorker(workerID int) {
 			if err != nil {
 				ts = time.Now().UTC()
 			}
-			lat := 45.186
-			lon := -78.863
+			lat, lon := getSiteLatLon()
 			if it.Location != nil {
 				if v, ok := it.Location["latitude"]; ok {
 					lat = v
@@ -1138,9 +1139,10 @@ func handleDiagnosticBundle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	lat, lon := getSiteLatLon()
 	bundle := map[string]interface{}{
 		"system":              "Project Solaria Cottage Solar Monitoring Platform",
-		"site":                "1296 Wren Lake Drive, Dorset, ON (45.186°N, -78.863°W)",
+		"site":                fmt.Sprintf("Solar Installation (%.3f°N, %.3f°W)", lat, lon),
 		"array":               "400W 2S2P Monocrystalline Solar Array (Renogy Rover 20A MPPT + 12V 170Ah LiFePO4)",
 		"bundle_generated_at": time.Now().UTC().Format(time.RFC3339),
 		"cloud_server": map[string]interface{}{
@@ -1163,6 +1165,7 @@ func handleDiagnosticBundle(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	lat, lon := getSiteLatLon()
 	latest := ringBuf.GetLatest()
 	telem := latest.Telemetry
 
@@ -1186,8 +1189,8 @@ func handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 			"array_voc":         "43.2V - 48.6V",
 			"array_imp":         "9.8A - 11.0A",
 			"overpaneling_pct":  138.0,
-			"site_name":         "1296 Wren Lake Drive",
-			"location":          "Dorset, Ontario, Canada (45.186° N, -78.863° W)",
+			"site_name":         "Solaria Node",
+			"location":          fmt.Sprintf("Solar Node (%.3f° N, %.3f° W)", lat, lon),
 			"elevation_m":       350,
 		},
 		"battery_bank": map[string]interface{}{
@@ -2105,7 +2108,8 @@ func handleSunsetDigest(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 	tomorrow := now.AddDate(0, 0, 1)
-	tmSunrise, tmSunset, tmNoon, _ := CalculateSunTimes(tomorrow, 45.186, -78.863)
+	lat, lon := getSiteLatLon()
+	tmSunrise, tmSunset, tmNoon, _ := CalculateSunTimes(tomorrow, lat, lon)
 
 	guidance := fmt.Sprintf("🌟 Ample solar harvest today! Battery is at %d%% (%.1fV). Sufficient energy to comfortably run Starlink, 12V fridge, and lighting overnight.", soc, battV)
 	if soc < 70 {
@@ -2208,8 +2212,7 @@ func handleSunTimes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().In(loc)
-	lat := 45.186
-	lon := -78.863
+	lat, lon := getSiteLatLon()
 
 	sunrise, sunset, solarNoon, isDay := CalculateSunTimes(now, lat, lon)
 
@@ -2366,9 +2369,10 @@ func handleShadingAnalysis(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	lat, lon := getSiteLatLon()
 	resp := map[string]interface{}{
-		"site":                        "1296 Wren Lake Drive, Dorset, ON",
-		"coordinates":                 "45.186 N, 78.863 W",
+		"site":                        "Solaria Node",
+		"coordinates":                 fmt.Sprintf("%.3f N, %.3f W", lat, math.Abs(lon)),
 		"array_rated_watts":           400,
 		"array_topology":              "2S2P (Two Strings of 2 in Series)",
 		"clear_sky_theoretical_kwh":   2.28,
@@ -2447,8 +2451,7 @@ func handlePeakGenerationForecast(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	now := time.Now().In(time.Local)
-	lat := 45.186
-	lon := -78.863
+	lat, lon := getSiteLatLon()
 	tiltRad := 45.0 * (math.Pi / 180.0)
 	panelAzimuthRad := 135.0 * (math.Pi / 180.0) // South-East (135°)
 
@@ -2755,8 +2758,8 @@ func handlePeakGenerationForecast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := PeakForecastResponse{
-		Site:                "1296 Wren Lake Drive, Dorset, ON",
-		Coordinates:         "45.186 N, 78.863 W",
+		Site:                "Solaria Node",
+		Coordinates:         fmt.Sprintf("%.3f N, %.3f W", lat, math.Abs(lon)),
 		ArrayCapacityW:      400,
 		ArrayTiltDeg:        45.0,
 		ArrayAzimuthDeg:     135.0,
@@ -3532,4 +3535,9 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+func getSiteLatLon() (float64, float64) {
+	loc := location.ResolveLocation(os.Getenv("SITE_LATITUDE"), os.Getenv("SITE_LONGITUDE"), os.Getenv("SITE_NAME"))
+	return loc.Latitude, loc.Longitude
 }
