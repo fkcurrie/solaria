@@ -40,11 +40,9 @@ jobs:
       # Gate 1: Code Linting & Static Security Analysis
       # ------------------------------------------------------------------------
       - name: "Gate 1: Code Linting (golangci-lint)"
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          skip-cache: true
-          args: --timeout=5m
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
+          $(go env GOPATH)/bin/golangci-lint run --timeout=5m
 
       # ------------------------------------------------------------------------
       # Gate 2: Package Unit Test Suite
