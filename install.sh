@@ -28,9 +28,49 @@ else
     NC=''
 fi
 
-NON_INTERACTIVE=false
+# Options
+AUTO_YES=false
 DRY_RUN=false
 INSTALL_SERVICE=true
+
+detect_site_location() {
+    # Tier 1: Local gpsd JSON fix
+    if command -v gpspipe &>/dev/null; then
+        GPS_OUT=$(gpspipe -w -n 5 2>/dev/null | grep -m 1 '"class":"TPV"' || true)
+        if [ -n "$GPS_OUT" ]; then
+            DETECTED_LAT=$(echo "$GPS_OUT" | jq -r '.lat // empty' 2>/dev/null)
+            DETECTED_LON=$(echo "$GPS_OUT" | jq -r '.lon // empty' 2>/dev/null)
+            if [ -n "$DETECTED_LAT" ] && [ -n "$DETECTED_LON" ]; then
+                DETECTED_NAME="Hardware GPS Fix ($DETECTED_LAT, $DETECTED_LON)"
+                DETECTED_SOURCE="GPS_HARDWARE"
+                return 0
+            fi
+        fi
+    fi
+
+    # Tier 2: IP Geolocation (ip-api.com)
+    if command -v curl &>/dev/null; then
+        IP_GEO=$(curl -s --max-time 3 http://ip-api.com/json/ || true)
+        if [ -n "$IP_GEO" ]; then
+            DETECTED_LAT=$(echo "$IP_GEO" | jq -r '.lat // empty' 2>/dev/null)
+            DETECTED_LON=$(echo "$IP_GEO" | jq -r '.lon // empty' 2>/dev/null)
+            CITY=$(echo "$IP_GEO" | jq -r '.city // empty' 2>/dev/null)
+            REGION=$(echo "$IP_GEO" | jq -r '.regionName // empty' 2>/dev/null)
+            COUNTRY=$(echo "$IP_GEO" | jq -r '.countryCode // empty' 2>/dev/null)
+            if [ -n "$DETECTED_LAT" ] && [ -n "$DETECTED_LON" ]; then
+                DETECTED_NAME="${CITY}, ${REGION}, ${COUNTRY}"
+                DETECTED_SOURCE="IP_GEOLOCATION"
+                return 0
+            fi
+        fi
+    fi
+
+    # Tier 3: Default Safe Baseline
+    DETECTED_LAT="43.6752"
+    DETECTED_LON="-79.3472"
+    DETECTED_NAME="Default Site Location"
+    DETECTED_SOURCE="DEFAULT_FALLBACK"
+}
 SHOW_HELP=false
 
 while [[ $# -gt 0 ]]; do
