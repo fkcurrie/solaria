@@ -2,9 +2,7 @@ name: "golangci-lint Quality & Standards Check"
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
   schedule:
     # Run every Monday at 07:00 UTC
     - cron: '0 7 * * 1'

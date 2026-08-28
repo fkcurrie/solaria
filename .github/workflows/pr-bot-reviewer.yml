@@ -1,9 +1,9 @@
 name: "PR Quality & Security Bot Reviewer"
 
 on:
+  push:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout PR Code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
