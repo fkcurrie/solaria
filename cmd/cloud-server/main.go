@@ -877,7 +877,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if tmpl != nil {
 		_ = tmpl.Execute(w, nil)
 	} else {
-		fmt.Fprintf(w, "Solaria Dashboard Running")
+		_, _ = fmt.Fprintf(w, "Solaria Dashboard Running")
 	}
 }
 
@@ -1130,7 +1130,7 @@ func handleDiagnosticBundle(w http.ResponseWriter, r *http.Request) {
 	bridgeClient := &http.Client{Timeout: 1500 * time.Millisecond}
 	if bResp, err := bridgeClient.Get("http://localhost:8080/api/v1/diagnostics"); err == nil && bResp.StatusCode == http.StatusOK {
 		_ = json.NewDecoder(bResp.Body).Decode(&bridgeDiag)
-		bResp.Body.Close()
+		_ = bResp.Body.Close()
 	} else {
 		bridgeDiag = map[string]interface{}{
 			"status": "unreachable_or_remote",
@@ -1246,7 +1246,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("day"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		_ = w.Write(cached)
+		_, _ = w.Write(cached)
 		return
 	}
 
@@ -1432,7 +1432,7 @@ func handleDayStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("day", data, 2*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	_ = w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func handleWeekStats(w http.ResponseWriter, r *http.Request) {
@@ -1441,7 +1441,7 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("week"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		_ = w.Write(cached)
+		_, _ = w.Write(cached)
 		return
 	}
 
@@ -1542,7 +1542,7 @@ func handleWeekStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("week", data, 10*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	_ = w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func handleMonthStats(w http.ResponseWriter, r *http.Request) {
@@ -1551,7 +1551,7 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("month"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		_ = w.Write(cached)
+		_, _ = w.Write(cached)
 		return
 	}
 
@@ -1633,7 +1633,7 @@ func handleMonthStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("month", data, 15*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	_ = w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func handleYearStats(w http.ResponseWriter, r *http.Request) {
@@ -1642,7 +1642,7 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 
 	if cached, ok := statsCache.Get("year"); ok {
 		w.Header().Set("X-Cache", "HIT")
-		_ = w.Write(cached)
+		_, _ = w.Write(cached)
 		return
 	}
 
@@ -1715,7 +1715,7 @@ func handleYearStats(w http.ResponseWriter, r *http.Request) {
 
 	statsCache.Set("year", data, 30*time.Minute)
 	w.Header().Set("X-Cache", "MISS")
-	_ = w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func mathRound(val float64, decimals int) float64 {
@@ -1736,7 +1736,7 @@ func srvPort(port string) int {
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_ = w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 func handleSampleDay(w http.ResponseWriter, r *http.Request) {
