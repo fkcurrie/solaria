@@ -53,7 +53,7 @@ func (u *Uploader) FlushPending() {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 			return fmt.Errorf("ingest rejected with status %d", resp.StatusCode)

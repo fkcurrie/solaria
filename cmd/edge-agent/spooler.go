@@ -53,7 +53,7 @@ func (s *Spooler) Append(record SolarRecord) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -77,7 +77,7 @@ func (s *Spooler) ReadBatch(limit int) ([]SolarRecord, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var records []SolarRecord
 	scanner := bufio.NewScanner(f)
@@ -107,7 +107,7 @@ func (s *Spooler) Count() int {
 	if err != nil {
 		return 0
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	count := 0
 	scanner := bufio.NewScanner(f)

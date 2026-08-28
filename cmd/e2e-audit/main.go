@@ -248,7 +248,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -268,7 +268,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -298,7 +298,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -323,7 +323,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -346,7 +346,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -368,7 +368,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -389,7 +389,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -415,7 +415,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusUnauthorized {
 			return "", fmt.Errorf("security breach: expected 401 Unauthorized, got %d", resp.StatusCode)
 		}
@@ -429,7 +429,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusUnauthorized {
 			return "", fmt.Errorf("expected 401 on empty token, got %d", resp.StatusCode)
 		}
@@ -446,7 +446,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -474,7 +474,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -487,7 +487,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -508,7 +508,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -525,7 +525,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var rec struct {
 			Telemetry struct {
 				BatteryTempC    int     `json:"battery_temp_c"`
@@ -547,7 +547,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var rec struct {
 			Telemetry struct {
 				PVPowerW   int     `json:"pv_power_w"`
@@ -574,7 +574,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -592,7 +592,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -611,7 +611,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -629,7 +629,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -647,7 +647,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -665,7 +665,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -682,7 +682,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -700,7 +700,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -718,7 +718,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}
@@ -736,7 +736,7 @@ func RunE2EAudit(bridgeURL, cloudURL, cloudRunURL, token string) E2EReport {
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 		}

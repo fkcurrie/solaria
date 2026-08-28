@@ -3051,7 +3051,7 @@ func handleE2EAudit(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 1500 * time.Millisecond}
 	bResp, bErr := client.Get("http://localhost:8080/api/v1/health")
 	if bErr == nil && bResp != nil {
-		defer bResp.Body.Close()
+		defer func() { _ = bResp.Body.Close() }()
 		if bResp.StatusCode == http.StatusOK {
 			bridgeConnected = true
 			var bh struct {

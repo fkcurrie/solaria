@@ -311,7 +311,7 @@ func (s *DiskSpooler) Spool(record SolarRecord) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return err
@@ -673,7 +673,7 @@ func fetchWeather() WeatherMetrics {
 		bridgeLogger.Log("WARN", "WEATHER_CLIENT", fmt.Sprintf("Open-Meteo API query failed: %v (using cached/fallback weather)", err), "ERR_WEATHER_FETCH_FAIL", map[string]interface{}{"url": url})
 		return cachedWeather
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
 		var omResp struct {
@@ -1036,7 +1036,7 @@ func logToCSV(telem Telemetry) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	w := csv.NewWriter(f)
 	defer w.Flush()

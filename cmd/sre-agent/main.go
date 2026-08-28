@@ -271,7 +271,7 @@ func (a *SREAgent) AutoHealCloudRunSync() {
 	req, _ := http.NewRequest(http.MethodGet, a.cloudURL+"/api/v1/live", nil)
 	resp, err := client.Do(req)
 	if err == nil && resp.StatusCode == http.StatusOK {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(resp.Body)
 		if len(body) > 0 {
 			payload := fmt.Sprintf(`{"batch":[%s]}`, string(body))
@@ -359,7 +359,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 	}
 	resp, err := client.Do(bridgeReq)
 	if resp != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	if err == nil && resp.StatusCode == http.StatusOK {
 		bridgeActive = true
@@ -415,7 +415,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 	cloudReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, a.cloudURL+"/api/v1/live", nil)
 	cResp, cErr := client.Do(cloudReq)
 	if cResp != nil {
-		defer cResp.Body.Close()
+		defer func() { _ = cResp.Body.Close() }()
 	}
 	if cErr == nil && cResp.StatusCode == http.StatusOK {
 		cloudActive = true
@@ -486,7 +486,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 		}
 		crResp, crErr := client.Do(crReq)
 		if crResp != nil {
-			defer crResp.Body.Close()
+			defer func() { _ = crResp.Body.Close() }()
 		}
 		if crErr == nil {
 			cloudRunActive = true
@@ -536,7 +536,7 @@ func (a *SREAgent) RunAudit(ctx context.Context) SREStatus {
 	secReq.Header.Set("Content-Type", "application/json")
 	sResp, sErr := client.Do(secReq)
 	if sResp != nil {
-		defer sResp.Body.Close()
+		defer func() { _ = sResp.Body.Close() }()
 	}
 	if sErr == nil {
 		if sResp.StatusCode != http.StatusUnauthorized {
