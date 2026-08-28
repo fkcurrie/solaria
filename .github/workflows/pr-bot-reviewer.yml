@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Post Automated PR Bot Review Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const vulnStatus = process.env.VULN_STATUS || 'UNKNOWN';

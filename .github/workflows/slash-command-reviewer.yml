@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Add 'eyes' Reaction to Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.reactions.createForIssueComment({
@@ -29,7 +29,7 @@ jobs:
 
       - name: Get PR Branch Details
         id: pr_data
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -90,7 +90,7 @@ jobs:
           fi
 
       - name: Post Automated PR Bot Review Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const vulnStatus = process.env.VULN_STATUS || 'UNKNOWN';
