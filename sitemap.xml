@@ -2,210 +2,218 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://fkcurrie.github.io/solaria/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/OFFGRID_APPLIANCE_GUIDE/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/SOUL/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/architecture/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/atmospheric-physics/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/bigquery-schema/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/deployment/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/review-personas/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/solar-specifications/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/troubleshooting-resilience/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
+    </url>
+    <url>
+         <loc>https://fkcurrie.github.io/solaria/ISSUES/ISSUE-remove-hardcoded-site-coordinates/</loc>
+         <lastmod>2026-08-28</lastmod>
+    </url>
+    <url>
+         <loc>https://fkcurrie.github.io/solaria/ISSUES/ISSUE-tiered-gps-ip-geolocation-installer/</loc>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/developer/ci-workflows/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/developer/contributing/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/developer/testing/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/install/distro-compatibility/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/install/quickstart/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/install/sd-card-setup/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/install/wiring-guide/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/operations/power-budget/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/operations/troubleshooting/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/operations/winterization/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/overview/architecture/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/overview/cottage-resilience/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/overview/hardware-bom/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/physics/atmospheric-physics/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/physics/battery-lifepo4/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/physics/solar-topology/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/physics/tree-shading/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/software/bigquery-schema/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/software/bridge-daemon/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/software/cloud-server/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/software/dashboard-pwa/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/software/modbus-protocol/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/sre/autonomous-supervisor/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/sre/bluetooth-watchdog/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/sre/disaster-recovery/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/EPIC-002-Google-Principal-UX-Review-and-Design-Systems/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-001-Hero-Energy-Flow-Vector-Sankey/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-002-Primary-Glance-Card-Trio-Anchor-Hierarchy/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-003-Tab-Navigation-Re-Architecture-Segmented-Controls/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-004-Semantic-Color-Harmony-Material-3-WCAG-Audit/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-005-Tabular-Numerics-Zero-Jitter-Live-Typography/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-006-LiFePO4-Non-Linear-SOC-Voltage-Plateau-Widget/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-007-Sun-Arc-Diurnal-Elevation-Radial-Compass-Tracker/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-008-Power-Budget-Scenario-Quick-Pick-Presets/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-009-Contextual-ELI5-Glossary-Tooltips/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-010-Tactile-Mobile-Floating-Bottom-Navigation-Bar/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-011-High-Contrast-Sunlight-Mode-Auto-Trigger/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-012-Human-Centered-Actionable-Outage-Cards/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-013-Diagnostic-Log-Stream-Filtering-and-Scroll-Lock/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-014-Smart-Loading-Skeleton-States-No-NaN-Jitter/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
     <url>
          <loc>https://fkcurrie.github.io/solaria/ux-redesign/ISSUE-015-Sound-and-Micro-Haptic-Feedback-for-Mutations/</loc>
-         <lastmod>2026-08-26</lastmod>
+         <lastmod>2026-08-28</lastmod>
     </url>
 </urlset>
