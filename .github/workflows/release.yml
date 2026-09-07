@@ -152,7 +152,7 @@ jobs:
       # Publish Draft Release on GitHub
       # ------------------------------------------------------------------------
       - name: Create GitHub Draft Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "Solaria Release ${{ steps.vars.outputs.VERSION }}"
           tag_name: ${{ github.ref_name }}
